@@ -836,9 +836,15 @@ function render() {
             if (isRev) b.classList.add('revealed');
             b.onclick = () => {
                 if (isSwapPhase) return;
+                // Only in faceDown phase (no hand, no faceUp)
                 if (players[0].hand.length > 0 || players[0].faceUp.some(c=>c)) return;
-                // Allow flipping (peeking) anytime regardless of whose turn or animation
-                if (revealedFaceDownIndex === null && !isRev) { revealedFaceDownIndex = i; render(); }
+                // Move faceDown card to hand immediately (anytime, any turn)
+                if (revealedFaceDownIndex === null && !isRev) {
+                    players[0].hand.push(players[0].faceDown[i]);
+                    players[0].faceDown[i] = null;
+                    playSound('play');
+                    render();
+                }
             };
             stack.appendChild(b);
         }
@@ -943,7 +949,7 @@ function render() {
         playBtn.style.animation = '';
     }
     const _inFDPhase = !isSwapPhase && players[0].hand.length===0 && players[0].faceUp.every(c=>!c) && players[0].faceDown.some(Boolean);
-    const _canTake = !isSwapPhase && (pile.length > 0 || (_inFDPhase && revealedFaceDownIndex !== null));
+    const _canTake = !isSwapPhase && pile.length > 0;
     document.getElementById('takeBtn').style.display = (_canTake && currentPlayer===0) ? 'block' : 'none';
 }
 
@@ -1115,17 +1121,8 @@ function _humanPlayAI() {
         if (!sel.every(c => c.slice(0,-1) === aiInterrupt.rank)) {
             showToast('בחר קלפי ' + aiInterrupt.rank + ' בלבד'); return;
         }
-        if (aiInterrupt.type === 'burn') {
-            const fdRevCard = revealedFaceDownIndex !== null ? players[0].faceDown[revealedFaceDownIndex] : null;
-            const fdMatch = fdRevCard && fdRevCard.slice(0,-1) === aiInterrupt.rank;
-            if (sel.length + (fdMatch ? 1 : 0) !== aiInterrupt.needed) {
-                showToast('בחר בדיוק ' + aiInterrupt.needed + ' קלפים לשריפה'); return;
-            }
-            if (fdMatch) { // include the revealed faceDown card
-                sel.push(fdRevCard);
-                players[0].faceDown[revealedFaceDownIndex] = null;
-                revealedFaceDownIndex = null;
-            }
+        if (aiInterrupt.type === 'burn' && sel.length !== aiInterrupt.needed) {
+            showToast('בחר בדיוק ' + aiInterrupt.needed + ' קלפים לשריפה'); return;
         }
         // Cancel AI timer
         clearTimeout(aiInterrupt.timer);
@@ -1178,26 +1175,7 @@ function _humanPlayAI() {
         return;
     }
     if (currentPlayer !== 0) return;
-    if (revealedFaceDownIndex !== null) {
-        const card = players[0].faceDown[revealedFaceDownIndex];
-        if (canPlay(card)) {
-            // Play the card — turn passes, player manually flips next card on their turn
-            players[0].faceDown[revealedFaceDownIndex] = null;
-            revealedFaceDownIndex = null;
-            playSound('play');
-            executeMove([card]);
-        } else {
-            // Can't play — take faceDown card + pile
-            players[0].faceDown[revealedFaceDownIndex] = null;
-            revealedFaceDownIndex = null;
-            players[0].hand.push(card, ...pile);
-            pile = [];
-            playSound('take');
-            showToast('↙ קלף לא חוקי — קח את הערימה');
-            nextTurn();
-        }
-        return;
-    }
+
     let cards = [];
     const hasHand = players[0].hand.length > 0;
     const hasFuSel = selectedTableIndices.length > 0;
@@ -1249,18 +1227,7 @@ function _humanPlayAI() {
 
 function _humanTakeAI() {
     if (animating || currentPlayer !== 0) return;
-    // faceDown revealed card: take it with pile
-    if (revealedFaceDownIndex !== null) {
-        players[0].hand.push(players[0].faceDown[revealedFaceDownIndex]);
-        players[0].faceDown[revealedFaceDownIndex] = null;
-        revealedFaceDownIndex = null;
-        players[0].hand.push(...pile);
-        pile = [];
-        playSound('take');
-        showToast('↙ לקחת את הערימה');
-        nextTurn();
-        return;
-    }
+
     // faceUp phase: must select a faceUp card (or group) to take with pile
     if (players[0].hand.length === 0 && players[0].faceUp.some(c => c)) {
         if (selectedTableIndices.length === 0) {
@@ -1729,9 +1696,7 @@ function nextTurn(skips = 1) {
         const topR = pileTopRank();
         const streak = pileStreak();
         const needed = topR ? 4 - streak : 0;
-        const fdRev = revealedFaceDownIndex !== null ? players[0].faceDown[revealedFaceDownIndex] : null;
-        const fdContrib = (fdRev && fdRev.slice(0,-1) === topR) ? 1 : 0;
-        const canBurn = needed > 0 && (players[0].hand.filter(c => c.slice(0,-1) === topR).length + fdContrib) >= needed;
+        const canBurn = needed > 0 && needed <= players[0].hand.filter(c => c.slice(0,-1) === topR).length;
         if (canBurn) {
             if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
             aiInterrupt = {
@@ -2135,8 +2100,11 @@ function renderOnline(state) {
             const b=renderCard(isRev?state.myFaceDown[i]:null,!isRev,false);
             if (isRev) b.classList.add('revealed');
             b.onclick=()=>{
-                if (!isMyTurn||state.myHand.length>0||state.myFaceUp.some(Boolean)) return;
-                if (revealedFaceDownIndex===null){revealedFaceDownIndex=i;renderOnline(state);}
+                if (state.myHand.length>0||state.myFaceUp.some(Boolean)) return;
+                // Flip faceDown to hand anytime (any turn)
+                if (!isRev){
+                    socket.emit('flipFaceDown',{cardIdx:i});
+                }
             };
             stack.appendChild(b);
         }
