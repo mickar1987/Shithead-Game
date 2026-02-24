@@ -445,6 +445,22 @@ io.on('connection', (socket) => {
     });
 
     // ── Play cards ──
+    // Flip faceDown card to hand (anytime, any turn)
+    socket.on('flipFaceDown', ({ cardIdx }) => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || room.isSwapPhase || room.gameOver) return;
+        const p = room.slots[slotIdx];
+        // Only in faceDown phase (no hand, no faceUp)
+        if (p.hand.length > 0 || p.faceUp.some(Boolean)) return;
+        if (!p.faceDown[cardIdx]) return;
+        // Move to hand
+        p.hand.push(p.faceDown[cardIdx]);
+        p.faceDown[cardIdx] = null;
+        broadcast(room, 'toast', `${p.name} הפך קלף`);
+        emitStateToAll(room);
+    });
+
     socket.on('playCards', ({ cards, isInterrupt }) => {
         // Reset timeout counter on manual play
         if (rooms[socket.data?.roomCode]?.slots[socket.data?.slotIdx])
@@ -578,43 +594,8 @@ io.on('connection', (socket) => {
                 nextTurn(room);
                 return;
             }
-            // Execute faceDown play then check if player can chain-reveal next faceDown
-            room.pile.push(c);
-            broadcast(room, 'cardPlayed', { playerIdx: slotIdx, cards: [c] });
-            // Check burn
-            const fdR = c.slice(0,-1);
-            let fdTopR = null;
-            for (let i = room.pile.length-1; i >= 0; i--) { if (room.pile[i].slice(0,-1) !== '3') { fdTopR = room.pile[i].slice(0,-1); break; } }
-            let fdStreak = 0;
-            for (let i = room.pile.length-1; i >= 0; i--) { if (room.pile[i].slice(0,-1) === fdTopR) fdStreak++; else break; }
-            const fdBurned = fdR === '10' || fdStreak >= 4;
-            if (fdBurned) {
-                broadcast(room, 'burn', { playerIdx: slotIdx });
-                room.pile = [];
-                drawUpToThree(room, slotIdx);
-                checkWin(room, slotIdx);
-            } else {
-                drawUpToThree(room, slotIdx);
-                checkWin(room, slotIdx);
-            }
-            if (room.slots[slotIdx].finished) { nextTurn(room); return; }
-            // Auto-reveal next faceDown if still in faceDown phase
-            const nextFDIdx = p.faceDown.findIndex(c => c);
-            if (nextFDIdx !== -1 && p.hand.length === 0 && p.faceUp.every(c => !c)) {
-                // Signal client to show next faceDown revealed (chain continue)
-                broadcast(room, 'toast', fdBurned ? `🔥 שריפה! ${p.name} פותח קלף נוסף` : `${p.name} פותח קלף נוסף`);
-                emitStateToAll(room);
-                // Keep same currentPlayer — they get to play/take the next faceDown
-                if (room.turnTimer > 0) startTurnTimer(room);
-            } else {
-                if (fdBurned) {
-                    emitStateToAll(room);
-                    startTurnTimer(room);
-                } else {
-                    const skips = fdR === '8' ? 2 : 1;
-                    nextTurn(room, skips);
-                }
-            }
+            // Play faceDown card normally — pass turn after
+            executeMove(room, slotIdx, [c]);
             return;
         }
 
