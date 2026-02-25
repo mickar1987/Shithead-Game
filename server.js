@@ -872,17 +872,19 @@ io.on('connection', (socket) => {
 
         const connected = room.slots.filter(s => s.connected).length;
 
-        // If in lobby (not yet playing) → close room if empty or host left
-        if (!room.gameStarted && (room.isSwapPhase || room.openRoom)) {
+        // If in lobby (not yet playing)
+        const inLobby = !room.gameStarted && (room.isSwapPhase === null || room.isSwapPhase === true || room.openRoom);
+        if (inLobby) {
             if (connected === 0 || slotIdx === 0) {
-                // Host left or room empty → close it
-                broadcast(room, 'toast', `${slotIdx === 0 ? 'המארח יצא' : 'החדר נסגר'}`);
+                // Host left or room empty → close and notify all
+                broadcast(room, 'roomClosed', { reason: slotIdx === 0 ? 'המארח יצא מהחדר' : 'החדר נסגר' });
                 clearRoomTimer(roomCode);
                 clearRoomTimer(roomCode + '_swap');
                 delete rooms[roomCode];
                 return;
             }
-            broadcast(room, 'playerLeft', { name, newPlayerCount: connected });
+            // Guest left — update lobby for remaining players
+            broadcast(room, 'lobbyPlayerLeft', { name, newCount: connected });
             emitOpenLobby(room);
             return;
         }
