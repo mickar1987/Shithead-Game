@@ -1,0 +1,2585 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>שיט-הד 🃏</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="שיט-הד">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rubik:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --sat: env(safe-area-inset-top);
+            --sab: env(safe-area-inset-bottom);
+            --gold: #f0c040;
+            --gold-dark: #c8960a;
+            --felt: #0a4d2e;
+            --felt-light: #0f6640;
+            --felt-dark: #052318;
+            --card-w: 52px;
+            --card-h: 76px;
+            --card-mini-w: 36px;
+            --card-mini-h: 52px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        .hidden { display: none !important; }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; position: fixed;
+            font-family: 'Rubik', sans-serif;
+            color: white;
+            background: #031a0f; /* same as felt-dark, fills ALL safe areas */
+        }
+
+
+        /* ── TABLE FELT ── */
+        .game-container {
+            display: flex; flex-direction: column;
+            height: 100dvh; width: 100vw;
+            padding: 0;
+            position: relative;
+            background:
+                radial-gradient(ellipse 80% 60% at 50% 50%, #0f5c35 0%, #073d22 60%, #031a0f 100%);
+            background-attachment: fixed;
+        }
+        .game-container::before {
+            content: '';
+            position: absolute; inset: 0; pointer-events: none;
+            background-image:
+                repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 40px),
+                repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 40px);
+        }
+
+        /* ── SETUP OVERLAY ── */
+        #setupOverlay {
+            position: fixed; inset: 0; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);
+            background: radial-gradient(ellipse at 50% 30%, #1a6040 0%, #041a0c 80%);
+        }
+        #setupOverlay::before {
+            content: '';
+            position: absolute; inset: 0; pointer-events: none;
+            background:
+                radial-gradient(circle 300px at 20% 80%, rgba(240,192,64,0.06) 0%, transparent 70%),
+                radial-gradient(circle 200px at 80% 20%, rgba(240,192,64,0.04) 0%, transparent 70%);
+        }
+        .setup-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(3rem, 12vw, 6rem);
+            letter-spacing: 4px;
+            line-height: 1;
+            color: var(--gold);
+            text-shadow: 0 0 40px rgba(240,192,64,0.4), 0 4px 20px rgba(0,0,0,0.8);
+            margin-bottom: 8px;
+        }
+        .setup-subtitle {
+            font-size: 0.75rem; letter-spacing: 3px; text-transform: uppercase;
+            color: rgba(255,255,255,0.4); margin-bottom: 48px;
+        }
+        .setup-btn {
+            width: 100%; max-width: 280px;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #1a6040, #0a3d22);
+            border: 1px solid rgba(240,192,64,0.3);
+            border-radius: 4px;
+            color: var(--gold);
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.4rem; letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative; overflow: hidden;
+        }
+        .setup-btn::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(240,192,64,0.1), transparent);
+            opacity: 0; transition: opacity 0.2s;
+        }
+        .setup-btn:hover { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .setup-btn:hover::after { opacity: 1; }
+        .setup-btn:active { transform: translateY(0); }
+        .setup-grid { display: flex; flex-direction: column; gap: 12px; width: 100%; align-items: center; }
+        .setup-back { color: rgba(255,255,255,0.4); font-size:12px; letter-spacing:2px; cursor:pointer; padding:4px 0; text-align:center; }
+        .setup-back:hover { color: var(--gold); }
+        .setup-input { width:100%;max-width:280px;padding:14px 16px;border-radius:4px;border:1px solid rgba(240,192,64,0.3);background:rgba(255,255,255,0.07);color:white;font-family:'Rubik',sans-serif;font-size:1rem;text-align:center;outline:none; box-sizing:border-box; }
+        .setup-input:focus { border-color: var(--gold); }
+        .lobby-player { padding:8px 12px; background:rgba(255,255,255,0.06); border-radius:6px; color:white; font-size:13px; margin-bottom:6px; display:flex; align-items:center; gap:8px; width:100%; max-width:280px; box-sizing:border-box; }
+        .lobby-dot { width:8px; height:8px; border-radius:50%; background:#4ade80; flex-shrink:0; }
+        .lobby-dot.empty { background:rgba(255,255,255,0.2); }
+
+        /* ── CARDS ── */
+        .card {
+            width: var(--card-w); height: var(--card-h);
+            border-radius: 6px;
+            border: 1px solid rgba(200,200,200,0.5);
+            background: #ffffff;
+            color: #1a1a1a;
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+            position: relative;
+            cursor: pointer; user-select: none;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, filter 0.15s ease;
+            flex-shrink: 0;
+        }
+        .card-inner { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+        .card-rank { font-size: 1em; }
+        .card-suit { font-size: 0.8em; }
+        .card.red { color: #cc2200; }
+
+        .card.back {
+            background: linear-gradient(135deg, #1a3a5c 0%, #0d2240 50%, #1a3a5c 100%);
+            border-color: #2a4a6c;
+            cursor: default;
+        }
+        .card.back::after {
+            content: '♠';
+            font-size: 1.4rem;
+            color: rgba(255,255,255,0.12);
+        }
+
+        /* Selected: clear gold border + slight lift, no bounce */
+        .card.selected {
+            transform: translateY(-14px);
+            border: 2px solid var(--gold) !important;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.55), 0 0 0 3px rgba(240,192,64,0.35);
+            z-index: 50;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+        /* Hover: subtle brightness only - NO movement */
+        .card:hover:not(.back):not(.not-playable):not(.selected) {
+            filter: brightness(1.06);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        .card.selected:hover {
+            transform: translateY(-14px); /* stay put when hovering selected */
+        }
+        .card.revealed {
+            border: 2px solid #60a5fa !important;
+            animation: cardPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes cardPulse {
+            0%, 100% { box-shadow: 0 3px 8px rgba(0,0,0,0.5), 0 0 0 0 rgba(96,165,250,0.6); }
+            50% { box-shadow: 0 3px 8px rgba(0,0,0,0.5), 0 0 0 8px rgba(96,165,250,0); }
+        }
+        .card.playable-hint {
+            border-color: rgba(74,222,128,0.5) !important;
+        }
+        .card.not-playable {
+            filter: brightness(0.55) saturate(0.4);
+            cursor: default;
+        }
+
+        /* mini cards for AI */
+        .card-mini {
+            width: var(--card-mini-w); height: var(--card-mini-h);
+            border-radius: 4px; font-size: 0.72rem;
+        }
+
+        /* ── POSITIONS ── */
+        #pos-top {
+            height: 150px; width: 100%;
+            display: flex; align-items: flex-start; justify-content: center;
+            padding-top: calc(env(safe-area-inset-top) + 8px); flex-shrink: 0;
+        }
+        #pos-left {
+            position: absolute; left: -50px; top: 50%;
+            transform: translateY(calc(-50% + 25px)) rotate(90deg);
+            width: 240px; height: 150px; z-index: 20;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #pos-right {
+            position: absolute; right: -50px; top: 50%;
+            transform: translateY(calc(-50% + 25px)) rotate(-90deg);
+            width: 240px; height: 150px; z-index: 20;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── CENTER PILE ── */
+        #pile-wrapper {
+            flex: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 0;
+            z-index: 10; width: 100%;
+            pointer-events: none;
+            position: relative;
+        }
+
+        .pile-area {
+            width: 110px; height: 110px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.2);
+            border: 2px dashed rgba(255,255,255,0.08);
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+            pointer-events: all;
+        }
+        .pile-count-badge {
+            position: absolute; top: -8px; right: -8px;
+            background: var(--gold); color: #000;
+            font-size: 9px; font-weight: 900;
+            width: 18px; height: 18px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        }
+        .pile-streak-badge {
+            position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+            background: rgba(20,12,0,0.88); color: var(--gold);
+            font-size: 9px; font-weight: 900; letter-spacing: 0.5px;
+            padding: 2px 6px; border-radius: 5px;
+            border: 1px solid rgba(240,192,64,0.6);
+            white-space: nowrap; pointer-events: none;
+            z-index: 20;
+        }
+        .draw-pile-area {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            margin-bottom: 12px;
+        }
+        .draw-deck {
+            width: var(--card-mini-w); height: var(--card-mini-h);
+            background: linear-gradient(135deg, #1a3a5c, #0d2240);
+            border: 1px solid #2a4a6c; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 11px; color: var(--gold);
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+            pointer-events: all;
+        }
+        .pile-label { font-size: 8px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.35); }
+
+        /* ── PLAYER AREA ── */
+        #playerArea {
+            margin-top: auto; width: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            padding-bottom: max(env(safe-area-inset-bottom), 16px); padding-top: 8px; padding-left: 8px; padding-right: 8px;
+            flex-shrink: 0;
+        }
+        #playerTable { display: flex; gap: 16px; margin-bottom: 10px; align-items: flex-end; }
+
+        .table-stack { position: relative; width: var(--card-w); height: calc(var(--card-h) + 12px); }
+        .table-stack .face-up { position: absolute; top: -10px; left: 0; z-index: 10; }
+        .ai-table-stack { position: relative; width: var(--card-mini-w); height: calc(var(--card-mini-h) + 8px); }
+        .ai-table-stack .face-up { position: absolute; top: -8px; left: 0; z-index: 10; }
+
+        #playerHand {
+            display: flex; gap: 6px; justify-content: center;
+            width: 100%; padding-top: 22px; min-height: 88px;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            padding-left: 8px; padding-right: 8px;
+        }
+
+        /* ── ACTION BUTTONS ── */
+        #actionButtons {
+            display: flex; gap: 10px; margin-bottom: 8px;
+        }
+        .action-btn {
+            padding: 9px 20px; border-radius: 4px; border: none;
+            font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 1px;
+            cursor: pointer; transition: all 0.15s; font-weight: 400;
+        }
+        #swapDoneBtn { background: linear-gradient(135deg, #3b6fe0, #1d4fc4); color: white; }
+        #playBtn { background: linear-gradient(135deg, #22a05a, #158040); color: white; }
+        #takeBtn { background: linear-gradient(135deg, #dc3030, #a01818); color: white; }
+        .action-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.4); filter: brightness(1.1); }
+        .action-btn:active { transform: translateY(0); filter: brightness(0.95); }
+
+        /* ── ACTIVE TURN HIGHLIGHT ── */
+        .active-turn-player {
+            outline: 3px solid var(--gold);
+            outline-offset: 12px;
+            border-radius: 12px;
+        }
+        #pos-left.active-turn-player,
+        #pos-right.active-turn-player {
+            outline-offset: 2px;
+        }
+        #playerArea.active-turn-player { outline-offset: 4px; border-radius: 16px; }
+
+        /* ── AI PLAYER SLOT ── */
+        .ai-player-wrap {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .ai-name-badge {
+            font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+            color: rgba(255,255,255,0.5); background: rgba(0,0,0,0.3);
+            padding: 2px 8px; border-radius: 20px;
+        }
+        .ai-hand-container {
+            position: relative; display: flex; justify-content: center; height: var(--card-mini-h);
+        }
+
+        /* ── PEEK BUTTON ── */
+        #peekBtn {
+            padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(168,85,247,0.5);
+            background: rgba(126,34,206,0.6); color: white;
+            font-size: 9px; font-weight: 700; letter-spacing: 1px;
+            cursor: pointer; transition: all 0.2s; margin-top: 4px;
+            pointer-events: all;
+        }
+        #peekBtn:hover { background: rgba(147,51,234,0.8); }
+        .peek-transparent { opacity: 0.15 !important; transform: scale(0.9) !important; }
+
+        /* ── LOG ── */
+        #logWindow {
+            display: none; position: fixed; top: calc(env(safe-area-inset-top) + 50px); left: 8px;
+            width: 200px; max-height: 220px;
+            background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; font-size: 10px; padding: 8px;
+            overflow-y: auto; z-index: 1000; color: #ccc;
+        }
+        .log-btn {
+            position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 8px;
+            background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.6); font-size: 9px; padding: 4px 8px;
+            border-radius: 4px; cursor: pointer; z-index: 1002;
+        }
+        .sound-btn.muted { opacity: 0.4; }
+
+        /* ── PILE STATUS ── */
+        #pileStatus {
+            font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+            color: var(--gold); font-weight: 700; margin-top: 4px;
+        }
+
+        /* ── RESULT OVERLAY ── */
+        #resultOverlay {
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(0,0,0,0.95);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            padding: 32px;
+        }
+        .result-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 3rem; letter-spacing: 4px; color: var(--gold);
+            text-shadow: 0 0 30px rgba(240,192,64,0.4);
+            margin-bottom: 24px;
+        }
+        .leaderboard-card {
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px; padding: 24px 32px; width: 100%; max-width: 320px;
+            margin-bottom: 24px;
+        }
+        .lb-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .lb-row:last-child { border-bottom: none; }
+        .lb-pos { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--gold); width: 32px; }
+        .lb-name { font-size: 1rem; font-weight: 700; flex: 1; }
+        .lb-medal { font-size: 1.5rem; }
+        .new-game-btn {
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+            color: #000; padding: 14px 40px; border-radius: 4px; border: none;
+            font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 2px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .new-game-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(240,192,64,0.3); }
+
+        /* ── ANIMATIONS ── */
+        @keyframes dealIn {
+            from { transform: translateY(-60px) scale(0.7); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .deal-in { animation: dealIn 0.35s cubic-bezier(0.34,1.4,0.64,1) both; }
+
+        @keyframes burnAnim {
+            0%   { filter: brightness(1); transform: scale(1) rotate(0deg); opacity: 1; }
+            30%  { filter: brightness(2.5) sepia(1) saturate(8) hue-rotate(-40deg); transform: scale(1.15) rotate(3deg); }
+            70%  { filter: brightness(3) sepia(1) saturate(12) hue-rotate(-60deg); transform: scale(1.25) rotate(-2deg); opacity: 0.8; }
+            100% { filter: brightness(0); transform: scale(0.3) rotate(10deg); opacity: 0; }
+        }
+        .react-btn {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .react-btn:active { transform: scale(1.3); }
+        .burn-effect { animation: burnAnim 0.6s ease-out forwards; }
+
+        @keyframes floatIn {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .float-in { animation: floatIn 0.4s cubic-bezier(0.34,1.4,0.64,1) both; }
+
+        @keyframes pulse-red {
+            0%,100% { box-shadow: 0 0 8px rgba(220,38,38,0.4); }
+            50% { box-shadow: 0 0 20px rgba(220,38,38,0.9); }
+        }
+        @keyframes takePile {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.1) rotate(-5deg); filter: brightness(1.3); }
+            100% { transform: scale(0.3) translateX(40px) translateY(60px); opacity: 0; }
+        }
+        .take-pile-anim { animation: takePile 0.45s ease-in forwards; }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .slide-in { animation: slideIn 0.3s ease-out both; }
+
+        /* Message toast */
+        #gameMessage {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.82); border: 1px solid rgba(240,192,64,0.35);
+            color: var(--gold); font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.3rem; letter-spacing: 2px;
+            padding: 10px 22px; border-radius: 8px;
+            z-index: 5000; pointer-events: none;
+            opacity: 0; transition: opacity 0.15s;
+        }
+        #gameMessage.show { opacity: 1; }
+
+        /* Special card glow - border only, no background tint */
+        .card-special-2  { border-color: rgba(99,179,237,0.7)  !important; }
+        .card-special-10 { border-color: rgba(252,129,74,0.7)  !important; }
+        .card-special-7  { border-color: rgba(154,211,73,0.7)  !important; }
+        .card-special-8  { border-color: rgba(214,158,46,0.7)  !important; }
+    </style>
+</head>
+<body>
+<div id="animLayer" style="position:fixed;inset:0;pointer-events:none;z-index:9000;overflow:visible;"></div>
+
+<!-- SETUP -->
+<div id="setupOverlay">
+    <div class="setup-title">SHITHEAD</div>
+
+    <div id="menuMain" class="setup-grid">
+        <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
+        <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
+    </div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.25</div>
+    <div id="menuVsAI" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
+        <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
+        <button onclick="startGame(3)" class="setup-btn">🃏 3 שחקנים</button>
+        <button onclick="startGame(4)" class="setup-btn">🏆 4 שחקנים</button>
+    </div>
+    <div id="menuOnline" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
+        <input id="playerNameInput" type="text" placeholder="השם שלך" maxlength="12" class="setup-input"/>
+        <button onclick="requireName('menuCreate')" class="setup-btn">➕ צור חדר</button>
+        <button onclick="requireName('menuJoin')" class="setup-btn">🔗 הצטרף לחדר</button>
+    </div>
+    <div id="menuCreate" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
+        <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
+            <button onclick="setRoomType('public')"  id="roomTypePublic"  class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">🌐 ציבורי</button>
+            <button onclick="setRoomType('private')" id="roomTypePrivate" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;">🔒 פרטי</button>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
+        <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
+            <button onclick="setTimer(20)" id="timerBtn20" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">20s</button>
+            <button onclick="setTimer(30)" id="timerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">30s</button>
+            <button onclick="setTimer(60)" id="timerBtn60" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">60s</button>
+            <button onclick="setTimer(0)"  id="timerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">♾</button>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">כמה שחקנים?</div>
+        <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🎲 קבע המשך</button>
+        <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">⚔️ 2 שחקנים</button>
+        <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🃏 3 שחקנים</button>
+        <button onclick="createOnlineRoom(4)" id="playerBtn4" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🏆 4 שחקנים</button>
+    </div>
+    <div id="menuJoin" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
+        <button onclick="showMenu('menuJoinPublic')" class="setup-btn">🌐 הצטרף לחדר ציבורי פנוי</button>
+        <button onclick="showMenu('menuJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
+    </div>
+    <div id="menuJoinPublic" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuJoin')">← חזור</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-bottom:4px;">חדרים ציבוריים פתוחים</div>
+        <div id="publicRoomsList" style="width:100%;max-width:280px;"></div>
+        <button onclick="refreshPublicRooms()" class="setup-btn" style="font-size:0.8rem;margin-top:4px;">🔄 רענן</button>
+    </div>
+    <div id="menuJoinPrivate" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuJoin')">← חזור</div>
+        <input id="roomCodeInput" type="text" placeholder="קוד חדר" maxlength="4" class="setup-input" style="font-size:1.6rem;letter-spacing:8px;text-transform:uppercase;"/>
+        <button onclick="joinOnlineRoom()" class="setup-btn">הצטרף ▶</button>
+    </div>
+    <div id="menuLobby" class="setup-grid hidden">
+        <div class="setup-back" onclick="leaveLobby()">← חזור</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:2px;">קוד החדר</div>
+        <div id="lobbyCode" style="font-family:'Bebas Neue',sans-serif;font-size:4rem;color:var(--gold);letter-spacing:8px;"></div>
+        <div id="lobbyStatus" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-bottom:8px;"></div>
+        <div id="lobbyPlayers" style="width:100%;max-width:280px;"></div>
+        <button id="startOpenBtn" onclick="hostStartGame()" class="setup-btn hidden" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;">▶ התחל משחק</button>
+        <div id="waitingMore" style="display:none;font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;">ממתין לשחקן נוסף לפחות...</div>
+    </div>
+
+    <div style="margin-top:32px; font-size:10px; color:rgba(255,255,255,0.2); letter-spacing:2px; text-transform:uppercase;">
+        2 • 3 • 10 מיוחדים &nbsp;|&nbsp; 7 = לא מעל &nbsp;|&nbsp; 8 = דלג
+    </div>
+</div>
+
+<!-- LOG -->
+<div id="logWindow"></div>
+<button onclick="toggleLog()" class="log-btn">📜 LOG</button>
+
+
+<!-- TOAST -->
+<div id="gameMessage"></div>
+
+<!-- RESULT -->
+<div id="resultOverlay" style="display:none;">
+    <div class="result-title">תוצאות</div>
+    <div class="leaderboard-card" id="leaderboardList"></div>
+    <div id="endGameBtns" style="display:flex;flex-direction:column;gap:10px;align-items:center;width:100%;margin-top:8px;">
+        <button onclick="requestNewGame()" class="new-game-btn" id="newGameBtn" style="width:240px;">🔄 משחק חדש באותו חדר</button>
+        <button onclick="leaveToMenu()" class="new-game-btn" id="leaveBtn" style="width:240px;background:linear-gradient(135deg,#374151,#1f2937);color:#fff;">🚪 צא לתפריט הראשי</button>
+        <div id="waitingRestart" style="display:none;font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:1px;">ממתין למארח...</div>
+        <div id="waitingCount" style="display:none;font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;"></div>
+    </div>
+</div>
+
+<!-- GAME -->
+<div class="game-container">
+    <div id="pos-top"></div>
+    <div id="pile-wrapper">
+        <div id="pos-left" class=""></div>
+        <div id="pos-right" class=""></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div class="draw-pile-area">
+                <div class="draw-deck" id="drawCountDisplay">0</div>
+                <div class="pile-label">קופה</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center">
+                <div id="turnTimerDisplay" style="display:none;font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:var(--gold);letter-spacing:3px;text-align:center;min-width:60px;transition:color 0.3s,transform 0.15s;margin-bottom:4px;text-shadow:0 0 12px rgba(240,192,64,0.5);"></div>
+                <div id="pile" class="pile-area"></div>
+                <div id="pileStatus">ריק</div>
+                <button id="peekBtn" class="hidden" onmousedown="startPeek()" onmouseup="stopPeek()" ontouchstart="startPeek(event)" ontouchend="stopPeek()">👁️ הצץ</button>
+            </div>
+        </div>
+    </div>
+    <div id="playerArea">
+        <div id="playerTable"></div>
+        <div id="actionButtons" class="hidden">
+            <button id="swapDoneBtn" onclick="endSwapPhase()" class="action-btn">✅ סיום החלפה</button>
+            <button id="playBtn" onclick="humanPlay()" class="action-btn">▶ שחק</button>
+            <button id="takeBtn" onclick="humanTake()" class="action-btn">↙ קח</button>
+            <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;">⚡ התפרץ!</button>
+        </div>
+        <div id="gameTopBar" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:8px;display:none;gap:5px;z-index:1002;align-items:center;">
+            <button onclick="toggleSound()" id="soundBtn" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;opacity:0.5;">🔇</button>
+            <button onclick="confirmLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;letter-spacing:0.5px;">EXIT</button>
+            <button id="emojiToggleBtn" onclick="toggleEmojiPicker()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;">😊</button>
+        </div>
+        <div id="emojiPicker" style="display:none;position:fixed;top:calc(env(safe-area-inset-top) + 50px);right:8px;background:rgba(20,20,40,0.97);border:1px solid #444;border-radius:12px;padding:10px;z-index:1002;display:none;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+                <button onclick="sendReaction('😂')" class="react-btn">😂</button>
+                <button onclick="sendReaction('😡')" class="react-btn">😡</button>
+                <button onclick="sendReaction('😤')" class="react-btn">😤</button>
+                <button onclick="sendReaction('😛')" class="react-btn">😛</button>
+                <button onclick="sendReaction('🤯')" class="react-btn">🤯</button>
+                <button onclick="sendReaction('👏')" class="react-btn">👏</button>
+                <button onclick="sendReaction('🔥')" class="react-btn">🔥</button>
+                <button onclick="sendReaction('😎')" class="react-btn">😎</button>
+                <button onclick="sendReaction('💩')" class="react-btn">💩</button>
+                <button onclick="sendReaction('💀')" class="react-btn">💀</button>
+                <button onclick="sendReaction('🙈')" class="react-btn">🙈</button>
+                <button onclick="sendReaction('👎')" class="react-btn">👎</button>
+            </div>
+        </div>
+        <div id="reactionDisplay" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-align:center;">
+            <div id="reactionEmoji" style="font-size:90px;text-shadow:0 4px 24px rgba(0,0,0,0.9);line-height:1;"></div>
+            <div id="reactionName" style="font-size:14px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.9);margin-top:4px;font-weight:600;letter-spacing:1px;"></div>
+        </div>
+        <div id="playerHand" dir="ltr"></div>
+    </div>
+</div>
+
+<script>
+'use strict';
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let players = [], pile = [], drawPile = [], currentPlayer = 0;
+let isSwapPhase = true, selectedHandIndices = [], selectedTableIndices = [];
+let selectedTimer = 0, timerSelected = false;
+let winnersOrder = [], isPeeking = false, revealedFaceDownIndex = null;
+let animating = false;
+let soundEnabled = false;
+let fastMode = false;
+let gameOver = false;
+// AI interrupt state
+let aiInterrupt = null; // null | { type:'add'|'burn', rank:string, needed:int, timer:id }
+
+const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+function pileTopRank() {
+    for (let i = pile.length-1; i >= 0; i--)
+        if (pile[i].slice(0,-1) !== '3') return pile[i].slice(0,-1);
+    return null;
+}
+function pileStreak() {
+    const r = pileTopRank(); if (!r) return 0;
+    let s = 0;
+    // Count matching rank from top, skipping 3s (transparent)
+    for (let i = pile.length-1; i >= 0; i--) {
+        const cr = pile[i].slice(0,-1);
+        if (cr === r) s++;
+        else if (cr === '3') continue; // skip transparent
+        else break;
+    }
+    return s;
+}
+// customSort: lower index = weaker. We prefer playing weaker cards first to save strong ones.
+const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
+const posMap = { 2: {1:'pos-top'}, 3: {1:'pos-left',2:'pos-right'}, 4: {1:'pos-left',2:'pos-top',3:'pos-right'} };
+const medals = ['🥇','🥈','🥉'];
+const SPECIAL = { '2': 'reset', '3': 'transparent', '7': 'below', '8': 'skip', '10': 'burn' };
+
+// ══════════════════════════════════════════════════════
+//  AUDIO
+// ══════════════════════════════════════════════════════
+function playSound(type) {
+    if (!soundEnabled) return;
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const gain = ctx.createGain();
+        gain.connect(ctx.destination);
+        if (type === 'burn') {
+            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < buf.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / buf.length, 1.5);
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 400;
+            src.connect(filter); filter.connect(gain);
+            gain.gain.setValueAtTime(0.4, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+            src.start();
+        } else if (type === 'play') {
+            const osc = ctx.createOscillator(); osc.type = 'sine';
+            osc.frequency.setValueAtTime(660, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+            osc.connect(gain); osc.start(); osc.stop(ctx.currentTime + 0.15);
+        } else if (type === 'take') {
+            const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+            osc.connect(gain); osc.start(); osc.stop(ctx.currentTime + 0.2);
+        }
+    } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════
+//  LOG + TOAST
+// ══════════════════════════════════════════════════════
+function log(msg) {
+    const l = document.getElementById('logWindow');
+    l.innerHTML = `<div style="margin-bottom:3px;padding-bottom:3px;border-bottom:1px solid rgba(255,255,255,0.05)">${msg}</div>` + l.innerHTML;
+}
+function toggleLog() {
+    const l = document.getElementById('logWindow');
+    l.style.display = l.style.display === 'block' ? 'none' : 'block';
+}
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+    const btn = document.getElementById('soundBtn');
+    btn.textContent = soundEnabled ? '🔊' : '🔇';
+    btn.style.opacity = soundEnabled ? '1' : '0.5';
+}
+let toastTimer;
+function showToast(msg, duration = 900) {
+    const el = document.getElementById('gameMessage');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ══════════════════════════════════════════════════════
+//  GAME SETUP
+// ══════════════════════════════════════════════════════
+let lastAIPlayerCount = 2; // remember for restart
+function startGame(count) {
+    lastAIPlayerCount = count;
+    document.getElementById('setupOverlay').style.display = 'none';
+    document.getElementById('actionButtons').classList.remove('hidden');
+    document.getElementById('gameTopBar').style.display = 'flex';
+
+    // Reset global state
+    pile = []; winnersOrder = []; gameOver = false; fastMode = false;
+    isSwapPhase = true; selectedHandIndices = []; selectedTableIndices = [];
+    isPeeking = false; revealedFaceDownIndex = null; animating = false;
+    if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
+    aiInterrupt = null;
+
+    let deck = [];
+    for (const s of ['♠','♥','♦','♣']) for (const r of ranks) deck.push(r+s);
+    deck.sort(() => Math.random() - 0.5);
+
+    players = Array.from({length: count}, (_, i) => ({
+        id: i,
+        name: i === 0 ? 'אתה' : `מחשב ${i}`,
+        hand: deck.splice(0, 3),
+        faceUp: deck.splice(0, 3),
+        faceDown: deck.splice(0, 3),
+        isAI: i !== 0,
+        finished: false
+    }));
+    drawPile = deck;
+
+    // AI swap: put 3 strongest cards as faceUp (specials first, then high ranks)
+    players.forEach(p => {
+        if (p.isAI) {
+            const all = [...p.hand, ...p.faceUp];
+            // Score each card for faceUp desirability
+            const scored = all.map(c => {
+                const r = c.slice(0,-1);
+                let s = 0;
+                if (r === '2')  s = 100; // always playable
+                if (r === '3')  s = 90;  // transparent
+                if (r === '10') s = 95;  // burn
+                if (r === '8')  s = 70;  // skip
+                if (r === '7')  s = 60;  // force low
+                if (r === 'A')  s = 55;
+                if (r === 'K')  s = 50;
+                if (r === 'Q')  s = 45;
+                if (r === 'J')  s = 40;
+                if (r === '9')  s = 35;
+                if (r === '6')  s = 20;
+                if (r === '5')  s = 15;
+                if (r === '4')  s = 10;
+                return { c, s };
+            }).sort((a,b) => b.s - a.s);
+            p.faceUp = scored.slice(0,3).map(x=>x.c);
+            p.hand   = scored.slice(3).map(x=>x.c);
+        }
+    });
+
+    render();
+}
+
+// ══════════════════════════════════════════════════════
+//  PEEK
+// ══════════════════════════════════════════════════════
+function startPeek(e) { if(e) e.preventDefault(); isPeeking = true; onlineMode ? renderOnline(onlineState) : render(); }
+function stopPeek() { isPeeking = false; onlineMode ? renderOnline(onlineState) : render(); }
+
+// ══════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════
+function getHandCardSize(count) {
+    if (count >= 12) return { w: '36px', h: '52px' };
+    if (count >= 8)  return { w: '42px', h: '62px' };
+    return { w: '52px', h: '76px' };
+}
+
+
+function getPileStreak(pileArr) {
+    if (!pileArr.length) return 0;
+    const topRank = pileArr[pileArr.length - 1].slice(0, -1);
+    let count = 0;
+    for (let i = pileArr.length - 1; i >= 0; i--) {
+        if (pileArr[i].slice(0, -1) === topRank) count++;
+        else break;
+    }
+    return count;
+}
+function render() {
+    if (!players.length) return;
+    const count = players.length;
+
+    // clear AI slots
+    ['pos-top','pos-left','pos-right'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.innerHTML = ''; el.classList.remove('active-turn-player'); }
+    });
+
+    // render AI players
+    const mapping = posMap[count];
+    players.forEach((p, i) => {
+        if (i !== 0) {
+            const slotId = mapping[i];
+            if (!slotId) return;
+            renderAI(p, slotId);
+            if (currentPlayer === i && !isSwapPhase)
+                document.getElementById(slotId).classList.add('active-turn-player');
+        }
+    });
+
+    // player active highlight
+    const pArea = document.getElementById('playerArea');
+    if (currentPlayer === 0 && !isSwapPhase)
+        pArea.classList.add('active-turn-player');
+    else
+        pArea.classList.remove('active-turn-player');
+
+    // player hand
+    const handDiv = document.getElementById('playerHand');
+    handDiv.innerHTML = '';
+    const handSize = getHandCardSize(players[0].hand.length);
+    // Build sorted list preserving original indices (handles duplicate cards correctly)
+    const sortedHand = players[0].hand
+        .map((c, i) => ({ c, i }))
+        .sort((a, b) => customSort.indexOf(a.c.slice(0,-1)) - customSort.indexOf(b.c.slice(0,-1)));
+
+    sortedHand.forEach(({ c, i: origIdx }) => {
+        const el = renderCard(c, false, false);
+        el.style.width = handSize.w;
+        el.style.height = handSize.h;
+        if (handSize.w !== '52px') el.style.fontSize = handSize.w === '36px' ? '0.65rem' : '0.75rem';
+        else el.style.fontSize = '';
+        if (selectedHandIndices.includes(origIdx)) el.classList.add('selected');
+        if (!isSwapPhase && currentPlayer === 0 && !isPeeking && !aiInterrupt) {
+            if (canPlay(c)) el.classList.add('playable-hint');
+            else el.classList.add('not-playable');
+        } else if (!isSwapPhase && aiInterrupt) {
+            // During interrupt window: highlight only matching rank
+            if (c.slice(0,-1) === aiInterrupt.rank) el.classList.add('playable-hint');
+            else el.classList.add('not-playable');
+        }
+        el.onclick = () => {
+            if (animating) return;
+            if (revealedFaceDownIndex !== null) return;
+            if (isSwapPhase) {
+                selectedHandIndices = [origIdx]; handleSwap();
+            } else if (aiInterrupt) {
+                // Interrupt mode: only select matching rank
+                if (players[0].hand[origIdx]?.slice(0,-1) !== aiInterrupt.rank) return;
+                if (selectedHandIndices.includes(origIdx))
+                    selectedHandIndices = selectedHandIndices.filter(x => x !== origIdx);
+                else selectedHandIndices.push(origIdx);
+                render();
+                return;
+            } else {
+                // Toggle this card; only allow same-rank multi-select
+                const clickedRank = players[0].hand[origIdx].slice(0,-1);
+                const alreadySelected = selectedHandIndices.includes(origIdx);
+                if (alreadySelected) {
+                    // Deselect just this card
+                    selectedHandIndices = selectedHandIndices.filter(i => i !== origIdx);
+                } else {
+                    // If switching to a different rank, clear selection first
+                    if (selectedHandIndices.length > 0) {
+                        const curRank = players[0].hand[selectedHandIndices[0]]?.slice(0,-1);
+                        if (curRank !== clickedRank) selectedHandIndices = [];
+                    }
+                    // Add just this card
+                    selectedHandIndices.push(origIdx);
+                }
+                render();
+            }
+        };
+        handDiv.appendChild(el);
+    });
+
+    // player table
+    const tableDiv = document.getElementById('playerTable');
+    tableDiv.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+        const stack = document.createElement('div');
+        stack.className = 'table-stack';
+
+        if (players[0].faceDown[i]) {
+            const isRev = (revealedFaceDownIndex === i);
+            const b = renderCard(isRev ? players[0].faceDown[i] : null, !isRev, false);
+            if (isRev) b.classList.add('revealed');
+            b.onclick = () => {
+                if (isSwapPhase) return;
+                // Only in faceDown phase (no hand, no faceUp)
+                if (players[0].hand.length > 0 || players[0].faceUp.some(c=>c)) return;
+                // Move faceDown card to hand immediately (anytime, any turn)
+                if (revealedFaceDownIndex === null && !isRev) {
+                    players[0].hand.push(players[0].faceDown[i]);
+                    players[0].faceDown[i] = null;
+                    playSound('play');
+                    render();
+                }
+            };
+            stack.appendChild(b);
+        }
+        if (players[0].faceUp[i]) {
+            const u = renderCard(players[0].faceUp[i], false, false);
+            u.classList.add('face-up');
+            if (selectedTableIndices.includes(i)) u.classList.add('selected');
+            const fuRankAI = players[0].faceUp[i]?.slice(0,-1);
+            const handRank0 = players[0].hand[0]?.slice(0,-1);
+            const handAllSameAI = players[0].hand.length > 0 && drawPile.length === 0
+                && fuRankAI === handRank0
+                && players[0].hand.every(c => c.slice(0,-1) === handRank0);
+            if (!isSwapPhase && currentPlayer === 0 && !isPeeking) {
+                if (players[0].hand.length === 0) {
+                    if (canPlay(players[0].faceUp[i])) u.classList.add('playable-hint');
+                    else u.classList.add('not-playable');
+                } else if (handAllSameAI && canPlay(players[0].faceUp[i])) {
+                    u.classList.add('playable-hint');
+                } else if (handAllSameAI) {
+                    u.classList.add('not-playable');
+                }
+            }
+            u.onclick = () => {
+                if (animating) return;
+                if (revealedFaceDownIndex !== null) return;
+                if (isSwapPhase) { selectedTableIndices = [i]; handleSwap(); return; }
+                if (players[0].hand.length > 0) {
+                    if (drawPile.length > 0) return;
+                    // Recalculate at click time (hand may have changed due to selection)
+                    const clickRank = players[0].faceUp[i]?.slice(0,-1);
+                    const allHandSame = players[0].hand.every(c => c.slice(0,-1) === clickRank);
+                    if (!allHandSame) return;
+                }
+                toggleSel(selectedTableIndices, i, players[0].faceUp, true); render();
+            };
+            stack.appendChild(u);
+        }
+        tableDiv.appendChild(stack);
+    }
+
+    // pile display
+    const pDiv = document.getElementById('pile');
+    pDiv.innerHTML = '';
+    if (pile.length) {
+        let displayIdx = pile.length - 1;
+        if (isPeeking) while (displayIdx >= 0 && pile[displayIdx].slice(0,-1) === '3') displayIdx--;
+        if (displayIdx >= 0) {
+            const cardEl = renderCard(pile[displayIdx], false, false);
+            if (isPeeking && pile[displayIdx].slice(0,-1) !== '3') cardEl.classList.remove('peek-transparent');
+            else if (isPeeking && displayIdx < pile.length - 1) cardEl.classList.add('peek-transparent');
+            pDiv.appendChild(cardEl);
+        }
+        // pile total count badge
+        if (pile.length > 1) {
+            const badge = document.createElement('div');
+            badge.className = 'pile-count-badge';
+            badge.textContent = pile.length;
+            pDiv.appendChild(badge);
+        }
+        // streak badge — show if 2+ identical cards on top
+        const streak = getPileStreak(pile);
+        if (streak >= 2) {
+            const sb = document.createElement('div');
+            sb.className = 'pile-streak-badge';
+            sb.textContent = 'x' + streak;
+            pDiv.appendChild(sb);
+        }
+    }
+
+    // peek button - show only when top card of pile is a 3, it's human's turn, not swap phase
+    const peekBtn = document.getElementById('peekBtn');
+    const pileTop = pile.length > 0 ? pile[pile.length - 1] : null;
+    const showPeek = !isSwapPhase
+        && currentPlayer === 0
+        && !players[0].finished
+        && pileTop !== null
+        && pileTop.slice(0, -1) === '3';
+    peekBtn.classList.toggle('hidden', !showPeek);
+
+    document.getElementById('turnTimerDisplay').style.display = 'none';
+    document.getElementById('drawCountDisplay').textContent = drawPile.length;
+    document.getElementById('pileStatus').textContent = pile.length
+        ? `עליון: ${getEffectiveTop()?.slice(0,-1) || '3'}`
+        : 'ריק';
+    document.getElementById('swapDoneBtn').style.display = isSwapPhase ? 'block' : 'none';
+    document.getElementById('playBtn').style.display = isSwapPhase ? 'none' : 'block';
+    // AI interrupt UI
+    const playBtn = document.getElementById('playBtn');
+    if (!isSwapPhase && aiInterrupt) {
+        if (aiInterrupt.type === 'burn') {
+            playBtn.textContent = '🔥 שרוף!';
+            playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
+            playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
+        } else {
+            playBtn.textContent = '⚡ התפרץ!';
+            playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
+            playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
+        }
+    } else if (!isSwapPhase) {
+        playBtn.textContent = '▶ שחק';
+        playBtn.style.background = '';
+        playBtn.style.animation = '';
+    }
+    const _inFDPhase = !isSwapPhase && players[0].hand.length===0 && players[0].faceUp.every(c=>!c) && players[0].faceDown.some(Boolean);
+    const _canTake = !isSwapPhase && pile.length > 0;
+    document.getElementById('takeBtn').style.display = (_canTake && currentPlayer===0) ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════════════
+//  CARD RENDERING
+// ══════════════════════════════════════════════════════
+function renderCard(card, isBack = false, mini = false) {
+    const el = document.createElement('div');
+    el.className = `card${mini ? ' card-mini' : ''}${isBack ? ' back' : ''}`;
+
+    if (!isBack && card) {
+        const r = card.slice(0, -1), s = card.slice(-1);
+        if (s === '♥' || s === '♦') el.classList.add('red');
+        if (SPECIAL[r]) el.classList.add(`card-special-${r}`);
+        const inner = document.createElement('div');
+        inner.className = 'card-inner';
+        inner.innerHTML = `<span class="card-rank">${r}</span><span class="card-suit">${s}</span>`;
+        el.appendChild(inner);
+    }
+    return el;
+}
+
+// ══════════════════════════════════════════════════════
+//  AI RENDERING
+// ══════════════════════════════════════════════════════
+function renderAI(p, id) {
+    const container = document.getElementById(id);
+    if (!container) return;
+
+    if (p.finished) {
+        container.innerHTML = `<div style="font-size:9px;color:var(--gold);border:1px solid var(--gold);padding:4px 8px;border-radius:20px;letter-spacing:1px">✓ סיים</div>`;
+        return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ai-player-wrap';
+
+    const nameBadge = document.createElement('div');
+    nameBadge.className = 'ai-name-badge';
+    nameBadge.textContent = `${p.name} (${p.hand.length})`;
+
+    const tableRow = document.createElement('div');
+    tableRow.style.cssText = 'display:flex;gap:6px;';
+    for (let i = 0; i < 3; i++) {
+        const st = document.createElement('div');
+        st.className = 'ai-table-stack';
+        if (p.faceDown[i]) st.appendChild(renderCard(null, true, true));
+        if (p.faceUp[i]) {
+            const u = renderCard(p.faceUp[i], false, true);
+            u.classList.add('face-up');
+            st.appendChild(u);
+        }
+        tableRow.appendChild(st);
+    }
+
+    const handRow = document.createElement('div');
+    handRow.className = 'ai-hand-container';
+    const W = 36, overlap = 18;
+    const totalW = p.hand.length > 0 ? (p.hand.length - 1) * overlap + W : 0;
+    handRow.style.width = totalW + 'px';
+    p.hand.forEach((_, idx) => {
+        const c = renderCard(null, true, true);
+        c.style.cssText = `position:absolute;left:${idx * overlap}px;z-index:${idx}`;
+        handRow.appendChild(c);
+    });
+
+    if (id === 'pos-top') {
+        wrap.appendChild(nameBadge);
+        wrap.appendChild(handRow);
+        wrap.appendChild(tableRow);
+    } else {
+        wrap.appendChild(nameBadge);
+        wrap.appendChild(tableRow);
+        wrap.appendChild(handRow);
+    }
+    container.appendChild(wrap);
+}
+
+// ══════════════════════════════════════════════════════
+//  SELECTION HELPERS
+// ══════════════════════════════════════════════════════
+function toggleSel(arr, val, list, isTable = false) {
+    // Block faceUp selection if hand has cards — EXCEPT when mixed play is allowed
+    if (isTable && players[0].hand.length > 0) {
+        const fuRank = list[val]?.slice(0,-1);
+        const mixedOk = drawPile.length === 0 && players[0].hand.every(c => c.slice(0,-1) === fuRank);
+        if (!mixedOk) return;
+    }
+    const idx = arr.indexOf(val);
+    if (idx > -1) {
+        arr.splice(idx, 1);
+    } else {
+        // Allow multi-select only for same rank
+        if (arr.length > 0 && list[arr[0]]?.slice(0,-1) !== list[val]?.slice(0,-1)) arr.length = 0;
+        arr.push(val);
+    }
+}
+
+function handleSwap() {
+    render();
+    if (selectedHandIndices.length === 1 && selectedTableIndices.length === 1) {
+        setTimeout(() => {
+            const hI = selectedHandIndices[0], tI = selectedTableIndices[0];
+            [players[0].hand[hI], players[0].faceUp[tI]] = [players[0].faceUp[tI], players[0].hand[hI]];
+            selectedHandIndices = []; selectedTableIndices = [];
+            render();
+        }, 250);
+    }
+}
+
+function _endSwapAI() {
+    isSwapPhase = false;
+    selectedHandIndices = []; selectedTableIndices = [];
+
+    // find starter: player with lowest card; tie-break by pair count; else random
+    let minRank = 99;
+    players.forEach(p => p.hand.forEach(c => {
+        const v = customSort.indexOf(c.slice(0,-1));
+        if (v < minRank) minRank = v;
+    }));
+    const minRankStr = customSort[minRank];
+    const candidates = players.filter(p => p.hand.some(c => c.slice(0,-1) === minRankStr));
+    let starter;
+    if (candidates.length === 1) {
+        starter = candidates[0].id;
+    } else {
+        // tie-break: who has more of that rank
+        const maxCount = Math.max(...candidates.map(p => p.hand.filter(c => c.slice(0,-1) === minRankStr).length));
+        const withPair = candidates.filter(p => p.hand.filter(c => c.slice(0,-1) === minRankStr).length === maxCount);
+        starter = withPair[Math.floor(Math.random() * withPair.length)].id;
+    }
+    currentPlayer = starter;
+    log(`🎮 התחלנו! ${players[starter].name} ראשון`);
+    if (players[currentPlayer].isAI) setTimeout(aiMove, 120);
+    render();
+}
+
+// ══════════════════════════════════════════════════════
+//  GAME LOGIC
+// ══════════════════════════════════════════════════════
+function getEffectiveTop() {
+    for (let i = pile.length - 1; i >= 0; i--) {
+        if (pile[i].slice(0,-1) !== '3') return pile[i];
+    }
+    return null;
+}
+
+function canPlay(card, pileArr) {
+    if (!card) return false;
+    const r = card.slice(0,-1);
+    if (['2','3','10'].includes(r)) return true;
+    const top = pileArr
+        ? (()=>{ for(let i=pileArr.length-1;i>=0;i--) if(pileArr[i].slice(0,-1)!=='3') return pileArr[i]; return null; })()
+        : getEffectiveTop();
+    if (!top) return true;
+    const topR = top.slice(0,-1);
+    if (topR === '2') return true;
+    const v = ranks.indexOf(r), tv = ranks.indexOf(topR);
+    return topR === '7' ? v <= tv : v >= tv;
+}
+
+function _humanPlayAI() {
+    if (animating) return;
+    // Handle interrupt (not player's turn)
+    if (aiInterrupt) {
+
+        const sel = selectedHandIndices.map(i => players[0].hand[i]);
+        if (!sel.length) { showToast('בחר קלף תחילה'); return; }
+        if (!sel.every(c => c.slice(0,-1) === aiInterrupt.rank)) {
+            showToast('בחר קלפי ' + aiInterrupt.rank + ' בלבד'); return;
+        }
+        if (aiInterrupt.type === 'burn' && sel.length !== aiInterrupt.needed) {
+            showToast('בחר בדיוק ' + aiInterrupt.needed + ' קלפים לשריפה'); return;
+        }
+        // Cancel AI timer
+        clearTimeout(aiInterrupt.timer);
+        aiInterrupt = null;
+        // Remove hand cards from hand
+        sel.forEach(c => { const i = players[0].hand.indexOf(c); if (i !== -1) players[0].hand.splice(i, 1); });
+        selectedHandIndices = [];
+        // Add cards to pile
+        sel.forEach(c => pile.push(c));
+        const topR = pileTopRank();
+        const isBurned = topR === '10' || (pile.length >= 4 && pileStreak() >= 4);
+        if (isBurned) {
+            playSound('burn');
+            showToast('🔥 שרפת את הערימה!');
+            setTimeout(() => {
+                pile = [];
+                drawUpToThree(0);
+                checkWin(0);
+                currentPlayer = 0;
+                render();
+                if (!gameOver && players[0].isAI) aiMove();
+            }, 600);
+        } else {
+            showToast('⚡ התפרצת!');
+            drawUpToThree(0);
+            checkWin(0);
+            if (gameOver) { render(); return; }
+            // Re-check: can player add more or burn?
+            const intRank2 = sel[0]?.slice(0,-1);
+            const topR2 = pileTopRank();
+            const streak2 = pileStreak();
+            const needed2 = topR2 ? 4 - streak2 : 0;
+            const canBurn2 = needed2 > 0 && needed2 <= players[0].hand.filter(c=>c.slice(0,-1)===topR2).length;
+            const canAdd2 = intRank2 && players[0].hand.some(c=>c.slice(0,-1)===intRank2);
+            if (canAdd2 || canBurn2) {
+                aiInterrupt = {
+                    type: canBurn2 ? 'burn' : 'add',
+                    rank: canBurn2 ? topR2 : intRank2,
+                    needed: canBurn2 ? needed2 : 0,
+                    timer: setTimeout(() => {
+                        aiInterrupt = null;
+                        nextTurn(); // pass turn to AI after window closes
+                    }, 3000)
+                };
+                render();
+            } else {
+                nextTurn(); // pass turn to next player (AI)
+            }
+        }
+        return;
+    }
+    if (currentPlayer !== 0) return;
+
+    let cards = [];
+    const hasHand = players[0].hand.length > 0;
+    const hasFuSel = selectedTableIndices.length > 0;
+    const hasHandSel = selectedHandIndices.length > 0;
+
+    if (hasHand) {
+        // Determine the rank being played
+        let playRank = null;
+        if (hasHandSel) playRank = players[0].hand[selectedHandIndices[0]]?.slice(0,-1);
+        else if (hasFuSel) playRank = players[0].faceUp[selectedTableIndices[0]]?.slice(0,-1);
+        else { showToast('בחר קלף תחילה'); return; }
+
+        if (!playRank) { showToast('בחר קלף תחילה'); return; }
+
+        // Mixed play: allowed when drawPile empty AND all hand cards are same rank
+        const allHandSameRank = players[0].hand.every(c => c.slice(0,-1) === playRank);
+        const isMixed = drawPile.length === 0 && allHandSameRank && hasFuSel;
+
+        if (isMixed) {
+            // Validate faceUp selection
+            const fuValid = selectedTableIndices.every(i => players[0].faceUp[i]?.slice(0,-1) === playRank);
+            if (!fuValid) { showToast('בחר קלפי ' + playRank + ' בלבד'); return; }
+            if (!canPlay(players[0].faceUp[selectedTableIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
+            // Take ALL hand cards + selected faceUp
+            cards.push(...players[0].hand);
+            players[0].hand = [];
+            selectedTableIndices.sort((a,b) => b - a).forEach(i => {
+                cards.push(players[0].faceUp[i]);
+                players[0].faceUp[i] = null;
+            });
+        } else {
+            // Normal hand play
+            if (!hasHandSel) { showToast('בחר קלף תחילה'); return; }
+            if (!canPlay(players[0].hand[selectedHandIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
+            selectedHandIndices.sort((a,b) => b - a).forEach(i => cards.push(players[0].hand.splice(i, 1)[0]));
+        }
+    } else {
+        if (!selectedTableIndices.length) { showToast('בחר קלף תחילה'); return; }
+        if (!canPlay(players[0].faceUp[selectedTableIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
+        selectedTableIndices.sort((a,b) => b - a).forEach(i => {
+            cards.push(players[0].faceUp[i]);
+            players[0].faceUp[i] = null;
+        });
+    }
+    selectedHandIndices = []; selectedTableIndices = [];
+    playSound('play');
+    executeMove(cards);
+}
+
+function _humanTakeAI() {
+    if (animating || currentPlayer !== 0) return;
+
+    // faceUp phase: must select a faceUp card (or group) to take with pile
+    if (players[0].hand.length === 0 && players[0].faceUp.some(c => c)) {
+        if (selectedTableIndices.length === 0) {
+            showToast('בחר קלף מהשולחן לקחת עם הערימה');
+            return;
+        }
+        selectedTableIndices.sort((a,b) => b-a).forEach(i => {
+            players[0].hand.push(players[0].faceUp[i]);
+            players[0].faceUp[i] = null;
+        });
+        selectedTableIndices = [];
+        players[0].hand.push(...pile);
+        pile = [];
+        playSound('take');
+        showToast('↙ לקחת את הערימה');
+        nextTurn();
+        return;
+    }
+    // Normal: take pile into hand
+    playSound('take');
+    showToast('↙ לקחת את הערימה');
+    players[0].hand.push(...pile);
+    pile = [];
+    nextTurn();
+}
+
+function animateCardToPile(played, callback) {
+    const pileEl = document.getElementById('pile');
+    const pileRect = pileEl.getBoundingClientRect();
+    const pileCx = pileRect.left + pileRect.width / 2;
+    const pileCy = pileRect.top + pileRect.height / 2;
+
+    // Source position
+    let srcX, srcY;
+    if (currentPlayer === 0) {
+        const handEl = document.getElementById('playerHand');
+        const rect = handEl.getBoundingClientRect();
+        srcX = rect.left + rect.width / 2;
+        srcY = rect.top + 38;
+    } else {
+        const posMap2 = {2:{1:'pos-top'},3:{1:'pos-left',2:'pos-right'},4:{1:'pos-left',2:'pos-top',3:'pos-right'}};
+        const sid = posMap2[players.length]?.[currentPlayer] || 'pos-top';
+        const rect = document.getElementById(sid)?.getBoundingClientRect() || pileRect;
+        srcX = rect.left + rect.width / 2;
+        srcY = rect.top + rect.height / 2;
+    }
+
+    const cardW = 52, cardH = 76;
+    const flyDuration = 380;
+    const landPause = 80;   // קלף נוחת ונשאר רגע לפני שנעלם
+    const fadeDuration = 120;
+    let done = 0;
+
+    played.forEach((card, idx) => {
+        setTimeout(() => {
+            const el = renderCard(card, false, false);
+            const layer = document.getElementById('animLayer');
+            const rot = (Math.random() * 18 - 9).toFixed(1);
+
+            Object.assign(el.style, {
+                position: 'fixed',
+                pointerEvents: 'none',
+                zIndex: String(9000 + idx),
+                width: cardW + 'px',
+                height: cardH + 'px',
+                left: (srcX - cardW / 2) + 'px',
+                top:  (srcY - cardH / 2) + 'px',
+                borderRadius: '6px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+                transform: 'rotate(0deg) scale(1)',
+                opacity: '1',
+                transition: 'none',
+                willChange: 'left, top, transform',
+            });
+            layer.appendChild(el);
+
+            // Two rAF: paint at source first, then start flying
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                el.style.transition = [
+                    `left ${flyDuration}ms cubic-bezier(0.25, 0.1, 0.25, 1)`,
+                    `top ${flyDuration}ms cubic-bezier(0.25, 0.1, 0.25, 1)`,
+                    `transform ${flyDuration}ms cubic-bezier(0.25, 0.1, 0.25, 1)`,
+                ].join(', ');
+                el.style.left      = (pileCx - cardW / 2) + 'px';
+                el.style.top       = (pileCy - cardH / 2) + 'px';
+                el.style.transform = `rotate(${rot}deg) scale(0.9)`;
+
+                // After landing: update state (render draws pile card underneath),
+                // then remove the flying card — no fade, seamless handoff
+                setTimeout(() => {
+                    done++;
+                    if (done === played.length) {
+                        callback();                    // render() redraws pile card in same spot
+                        requestAnimationFrame(() => el.remove()); // remove fly card one frame later
+                    } else {
+                        el.remove();
+                    }
+                }, flyDuration + landPause);
+            }));
+        }, idx * 90);
+    });
+}
+
+function executeMove(played) {
+    animating = true;
+    render(); // cards already removed from hand/faceUp — update display before animation
+    animateCardToPile(played, () => {
+        animating = false;
+        _doExecuteMove(played);
+    });
+}
+
+function _doExecuteMove(played) {
+    log(`${players[currentPlayer].name}: ${played.join(', ')}`);
+    played.forEach(c => pile.push(c));
+    const r = played[0].slice(0,-1);
+
+    // Check burn: 10, or 4-of-a-kind
+    const isBurned = r === '10' || (pile.length >= 4 && pile.slice(-4).every(c => c.slice(0,-1) === r));
+
+    if (isBurned) {
+        playSound('burn');
+        showToast('🔥 שריפה!');
+        log(`🔥 שריפה! תור נוסף ל-${players[currentPlayer].name}`);
+        animating = true;
+        const pileEl = document.getElementById('pile');
+        pileEl.classList.add('burn-effect');
+        setTimeout(() => {
+            pile = [];
+            pileEl.classList.remove('burn-effect');
+            animating = false;
+            drawUpToThree(currentPlayer);
+            checkWin(currentPlayer);
+            if (!players[currentPlayer].finished) {
+                if (players[currentPlayer].isAI) setTimeout(aiMove, 120);
+            } else {
+                nextTurn();
+            }
+            render();
+        }, 600);
+        return;
+    }
+
+    drawUpToThree(currentPlayer);
+    checkWin(currentPlayer);
+
+    // 8 = skip
+    const skips = r === '8' ? played.length + 1 : 1;
+
+    // If human just played, open 3s add-on interrupt window (can add same rank)
+    if (!fastMode && !isSwapPhase && currentPlayer === 0 && !players[0].finished
+        && r !== '8' && players[0].hand.some(c => c.slice(0,-1) === r)) {
+        // Open add-on window
+        if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
+        aiInterrupt = {
+            type: 'self-add',
+            rank: r,
+            needed: 0,
+            timer: setTimeout(() => {
+                aiInterrupt = null;
+                render();
+                nextTurn(skips);
+            }, 3000)
+        };
+        render();
+        return;
+    }
+
+    nextTurn(skips);
+}
+
+function drawUpToThree(playerIdx) {
+    while (players[playerIdx].hand.length < 3 && drawPile.length > 0)
+        players[playerIdx].hand.push(drawPile.shift());
+}
+
+// ══════════════════════════════════════════════════════
+//  SMART AI
+// ══════════════════════════════════════════════════════
+// ── SMART AI ──
+// Evaluate how "expensive" it is to play a card (higher = save for later)
+// 2, 3, 10 are the MOST valuable — playable on anything, save for last resort
+function aiCardValue(card) {
+    const r = card.slice(0,-1);
+    if (r === '2')  return 30;  // universal — most valuable, save
+    if (r === '3')  return 28;  // transparent — very valuable, save
+    if (r === '10') return 26;  // burn — very valuable, save unless pile big
+    if (r === '8')  return 18;  // skip — tactical, save
+    if (r === '7')  return 14;  // force-low — defensive, save
+    if (r === 'A')  return 12;
+    if (r === 'K')  return 10;
+    if (r === 'Q')  return 8;
+    if (r === 'J')  return 6;
+    if (r === '9')  return 4;
+    if (r === '6')  return 3;
+    if (r === '5')  return 2;
+    if (r === '4')  return 1;
+    return 5;
+}
+
+// Get total hand strength (lower = weaker hand)
+function aiHandStrength(hand) {
+    return hand.reduce((s, c) => s + aiCardValue(c), 0);
+}
+
+// Would playing this rank leave pile in a state opponent can easily answer?
+function aiPileAfterPlay(rank) {
+    // If we play 7, opponent must play ≤7 — good for us if they have high cards
+    // If we play a high card, pile top is high — easy for anyone to answer
+    if (rank === '7') return -5;  // good: forces opponent low
+    if (rank === '8') return -3;  // good: skips opponent
+    return ranks.indexOf(rank);   // higher pile top = easier to answer = bad for us
+}
+
+function aiGetBestPlay(validCards, hand) {
+    if (!validCards.length) return null;
+
+    const groups = {};
+    validCards.forEach(c => {
+        const r = c.slice(0,-1);
+        if (!groups[r]) groups[r] = [];
+        groups[r].push(c);
+    });
+
+    const pileTop = getEffectiveTop();
+    const pileSize = pile.length;
+    const myHand = hand || [];
+    const opponents = players.filter((_, i) => i !== currentPlayer && !players[i].finished);
+    const inLateGame = drawPile.length === 0;
+
+    // Evaluate each opponent's danger level
+    const oppData = opponents.map(p => ({
+        handCount: p.hand.length,
+        faceUpCount: p.faceUp.filter(Boolean).length,
+        faceDownCount: p.faceDown.filter(Boolean).length,
+        inFaceUpPhase: p.hand.length === 0 && p.faceUp.some(Boolean),
+        inFaceDownPhase: p.hand.length === 0 && p.faceUp.every(c=>!c) && p.faceDown.some(Boolean),
+        totalCards: p.hand.length + p.faceUp.filter(Boolean).length + p.faceDown.filter(Boolean).length
+    }));
+    const anyOppInFaceUpPhase = oppData.some(o => o.inFaceUpPhase);
+    const minOppTotal = Math.min(...oppData.map(o => o.totalCards));
+    const maxOppHand = Math.max(0, ...oppData.map(o => o.handCount));
+
+    const scored = Object.entries(groups).map(([rank, cards]) => {
+        let score = 0;
+        const numCards = cards.length;
+        const inPile = pile.filter(c => c.slice(0,-1) === rank).length;
+
+        // ── Base: prefer cheap cards, save specials ──
+        score += aiCardValue(cards[0]) * 2;
+
+        // ── Always burn when possible ──
+        if (inPile + numCards >= 4) { score -= 100; }
+
+        // ── Reward playing multiples ──
+        score -= (numCards - 1) * 12;
+
+        // ── OPPONENT IN FACE-UP PHASE: be aggressive, make pile big/hard ──
+        if (anyOppInFaceUpPhase) {
+            // Pile up high cards to force opponent to take pile
+            const rankIdx = ranks.indexOf(rank);
+            // High cards on pile = opponent can't play → forced to take
+            if (rankIdx >= ranks.indexOf('9') && !['2','3','10','8'].includes(rank)) {
+                score -= 20; // push high cards aggressively
+            }
+            // 7 is excellent: forces them to play LOW on faceUp cards
+            if (rank === '7') score -= 30;
+            // 10 only if pile is big enough to hurt them
+            if (rank === '10' && pileSize >= 4) score -= 40;
+            if (rank === '10' && pileSize < 4) score += 15; // save for bigger pile
+            // Avoid low cards — they let opponent answer easily
+            if (['4','5','6'].includes(rank)) score += 25;
+            // 2 resets pile — bad when we want to build pressure
+            if (rank === '2' && pileSize >= 4) score += 10;
+        } else {
+            // ── Normal game: context-aware specials ──
+            if (rank === '10') {
+                if (pileSize >= 6) score -= 60;
+                else if (pileSize >= 3) score -= 20;
+                else if (inLateGame) score -= 15;
+                else score += 25;
+            }
+            if (rank === '2') {
+                if (pileSize >= 5) score -= 30;
+                else if (pileSize >= 3) score -= 10;
+                else score += 20;
+            }
+            if (rank === '7') {
+                if (maxOppHand > 4) score -= 18;
+                else if (maxOppHand <= 2) score += 8;
+            }
+        }
+
+        if (rank === '3') score += 15; // always save 3s
+        if (rank === '8') {
+            if (minOppTotal <= 2) score -= 20; // skip opponent almost done
+            else if (anyOppInFaceUpPhase) score -= 15; // skip is great pressure
+            else score -= 5;
+        }
+
+        // ── Late game: dump low cards now (hard to play from faceUp) ──
+        if (inLateGame && !anyOppInFaceUpPhase) {
+            if (aiCardValue(cards[0]) < 10) score -= 10;
+            score -= numCards * 5;
+        }
+
+        // ── Build toward 4-of-a-kind ──
+        if (inPile >= 2) score -= 15;
+
+        // ── Pile difficulty: leave hard-to-answer tops ──
+        score += aiPileAfterPlay(rank);
+
+        // ── Save A/K/Q early ──
+        if (['A','K','Q'].includes(rank) && pileSize <= 1 && !inLateGame && myHand.length > 4) {
+            if (!anyOppInFaceUpPhase) score += 10;
+        }
+
+        return { rank, cards, score };
+    });
+
+    scored.sort((a, b) => a.score - b.score);
+    return [scored[0].rank, scored[0].cards];
+}
+
+function aiMove() {
+    if (gameOver) return;
+    if (animating) { setTimeout(aiMove, fastMode ? 80 : 400); return; }
+    const p = players[currentPlayer];
+
+    let toPlay = [];
+
+    if (p.hand.length > 0) {
+        const valid = p.hand.filter(c => canPlay(c));
+        if (valid.length) {
+            const best = aiGetBestPlay(valid, p.hand);
+            if (best) {
+                const [bestRank, bestCards] = best;
+                toPlay = bestCards;
+                p.hand = p.hand.filter(c => !toPlay.includes(c));
+            }
+        }
+    } else if (p.faceUp.some(c => c)) {
+        const valid = p.faceUp.filter(c => c && canPlay(c));
+        if (valid.length) {
+            const best = aiGetBestPlay(valid, p.hand);
+            if (best) {
+                const [, bestCards] = best;
+                toPlay = bestCards;
+                p.faceUp.forEach((c, i) => { if (toPlay.includes(c)) p.faceUp[i] = null; });
+            }
+        } else {
+            // Can't play from faceUp - take pile + best faceUp group
+            log(`${p.name} לא יכול לשחק - לוקח`);
+            // Pick up best available faceUp group into hand
+            const faceUpCards = p.faceUp.filter(c => c);
+            if (faceUpCards.length > 0) {
+                const best = aiGetBestPlay(faceUpCards);
+                if (best) {
+                    const [, bestCards] = best;
+                    p.faceUp.forEach((c, i) => { if (bestCards.includes(c)) p.faceUp[i] = null; });
+                    p.hand.push(...bestCards);
+                }
+            }
+            p.hand.push(...pile);
+            pile = [];
+            nextTurn();
+            return;
+        }
+    } else {
+        // faceDown phase
+        const idx = p.faceDown.findIndex(c => c);
+        if (idx !== -1) {
+            const c = p.faceDown[idx];
+            p.faceDown[idx] = null;
+            if (canPlay(c)) {
+                toPlay = [c];
+            } else {
+                log(`${p.name} הפך כסוי - לוקח`);
+                p.hand.push(c, ...pile);
+                pile = [];
+                nextTurn();
+                return;
+            }
+        }
+    }
+
+    if (toPlay.length) {
+        playSound('play');
+        executeMove(toPlay);
+    } else {
+        // No valid play
+        log(`${p.name} לוקח את הערימה`);
+        playSound('take');
+        p.hand.push(...pile);
+        pile = [];
+        nextTurn();
+    }
+}
+
+// ══════════════════════════════════════════════════════
+//  WIN / NEXT TURN
+// ══════════════════════════════════════════════════════
+function checkWin(idx) {
+    const p = players[idx];
+    if (!p.finished &&
+        p.hand.length === 0 &&
+        p.faceUp.every(c => !c) &&
+        p.faceDown.every(c => !c)) {
+        p.finished = true;
+        winnersOrder.push(p.id);
+        log(`🏁 ${p.name} סיים במקום ${winnersOrder.length}!`);
+        showToast(`🏁 ${p.name} סיים!`);
+        if (idx === 0) fastMode = true; // human finished → speed up AI
+        if (winnersOrder.length >= players.length - 1) {
+            setTimeout(showResults, 800);
+        }
+    }
+}
+
+function showResults() {
+    gameOver = true;
+    const last = players.find(p => !p.finished);
+    if (last) winnersOrder.push(last.id);
+    const list = document.getElementById('leaderboardList');
+    list.innerHTML = winnersOrder.map((pid, i) => {
+        const name = players[pid].name;
+        const isLast = i === winnersOrder.length - 1;
+        const medal = isLast ? '💩' : (medals[i] || '');
+        return `<div class="lb-row">
+            <div class="lb-pos">${i + 1}</div>
+            <div class="lb-name">${name}</div>
+            <div class="lb-medal">${medal}</div>
+        </div>`;
+    }).join('');
+    // Show AI-mode buttons
+    document.getElementById('newGameBtn').textContent = '🔄 משחק חדש';
+    document.getElementById('newGameBtn').style.display = 'block';
+    document.getElementById('leaveBtn').style.display = 'block';
+    document.getElementById('waitingRestart').style.display = 'none';
+    document.getElementById('waitingCount').style.display = 'none';
+    document.getElementById('resultOverlay').style.display = 'flex';
+}
+
+function nextTurn(skips = 1) {
+    if (gameOver) return;
+    const prevPlayer = currentPlayer;
+    const prevWasAI = players[currentPlayer]?.isAI;
+    const playedRank = pile.length ? pile[pile.length-1].slice(0,-1) : null;
+    const n = players.length;
+    for (let i = 0; i < skips; i++) {
+        let attempts = 0;
+        do {
+            currentPlayer = (currentPlayer + 1) % n;
+            attempts++;
+            if (attempts > n) break;
+        } while (players[currentPlayer].finished);
+    }
+    // Clear any previous interrupt (but keep revealedFaceDownIndex — player keeps seeing their card)
+    if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
+    aiInterrupt = null;
+
+    // Check interrupt window for human player (player 0):
+    // 1. Burn: human can complete 4-of-a-kind on pile
+    // 2. Add-on: human can add same rank as card just played (only when prev player was NOT human)
+    if (!isSwapPhase && !players[0].finished && currentPlayer !== 0) {
+        const topR = pileTopRank();
+        const streak = pileStreak();
+        const needed = topR ? 4 - streak : 0;
+        const canBurn = needed > 0 && needed <= players[0].hand.filter(c => c.slice(0,-1) === topR).length;
+        if (canBurn) {
+            if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
+            aiInterrupt = {
+                type: 'burn',
+                rank: topR,
+                needed: needed,
+                timer: setTimeout(() => {
+                    aiInterrupt = null;
+                    render();
+                    if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
+                        aiMove();
+                }, 3000)
+            };
+            render();
+            return; // delay AI move until window closes
+        }
+    }
+
+    // AI interrupt: check if any AI player can burn when human just played
+    if (!isSwapPhase && prevPlayer === 0 && !players[prevPlayer].finished) {
+        const topR = pileTopRank();
+        const streak = pileStreak();
+        const needed = topR ? 4 - streak : 0;
+        // Check each AI player for burn possibility
+        for (let pi = 1; pi < players.length; pi++) {
+            if (players[pi].finished || !players[pi].isAI) continue;
+            const canBurnAI = needed > 0 && needed <= players[pi].hand.filter(c => c.slice(0,-1) === topR).length;
+            const canAddAI = playedRank && playedRank !== '10' && playedRank !== '8'
+                && players[pi].hand.some(c => c.slice(0,-1) === playedRank);
+            if (canBurnAI || canAddAI) {
+                // AI decides to interrupt (smart: always interrupt if can burn, or if add-on leads to burn)
+                const intRank = canBurnAI ? topR : playedRank;
+                const intCards = players[pi].hand.filter(c => c.slice(0,-1) === intRank);
+                const takeCount = canBurnAI ? needed : intCards.length;
+                const toPlay = intCards.slice(0, takeCount);
+                toPlay.forEach(c => { const i = players[pi].hand.indexOf(c); if (i !== -1) players[pi].hand.splice(i, 1); });
+                toPlay.forEach(c => pile.push(c));
+                const newTopR = pileTopRank();
+                const isBurned2 = newTopR === '10' || pileStreak() >= 4;
+                if (isBurned2) {
+                    playSound('burn');
+                    showToast(`🔥 ${players[pi].name} שרף!`);
+                    const pileEl = document.getElementById('pile');
+                    pileEl.classList.add('burn-effect');
+                    animating = true;
+                    setTimeout(() => {
+                        pile = [];
+                        pileEl.classList.remove('burn-effect');
+                        animating = false;
+                        drawUpToThree(pi);
+                        checkWin(pi);
+                        // After AI burn: AI gets the turn
+                        currentPlayer = pi;
+                        render();
+                        if (!gameOver && !players[pi].finished)
+                            setTimeout(aiMove, 120);
+                    }, 600);
+                } else {
+                    showToast(`⚡ ${players[pi].name} התפרץ!`);
+                    drawUpToThree(pi);
+                    checkWin(pi);
+                    render();
+                    // Continue to next player's turn
+                    if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
+                        setTimeout(aiMove, 120);
+                }
+                return;
+            }
+        }
+    }
+
+    render();
+    if (!players[currentPlayer].finished && players[currentPlayer].isAI)
+        setTimeout(aiMove, 120); // AI plays immediately (no delay unless interrupt window)
+}
+
+
+// ══════════════════════════════════════════════════════
+//  ONLINE MODE
+// ══════════════════════════════════════════════════════
+let socket = null;
+let onlineMode = false;
+let mySlotIdx = null;
+let onlineState = null;
+
+function requireName(nextMenu) {
+    const n = (document.getElementById('playerNameInput')?.value || '').trim();
+    if (!n) {
+        const inp = document.getElementById('playerNameInput');
+        if (inp) {
+            inp.style.borderColor = '#ef4444';
+            inp.placeholder = '⚠️ חובה להזין שם';
+            inp.focus();
+            setTimeout(() => { inp.style.borderColor=''; inp.placeholder='השם שלך'; }, 2000);
+        }
+        return;
+    }
+    localStorage.setItem('shitheadPlayerName', n);
+    showMenu(nextMenu);
+}
+
+function showMenu(id) {
+    if (id === 'menuOnline') {
+        const saved = localStorage.getItem('shitheadPlayerName');
+        if (saved) setTimeout(() => {
+            const inp = document.getElementById('playerNameInput');
+            if (inp && !inp.value) inp.value = saved;
+        }, 50);
+    }
+    if (id === 'menuCreate') {
+        // Reset timer + player buttons every time we enter this menu
+        selectedTimer = 0; timerSelected = false;
+        selectedRoomType = 'public';
+        ['0','20','30','60'].forEach(v => {
+            const b = document.getElementById('timerBtn'+v);
+            if (b) b.style.borderColor = '';
+        });
+        ['2','3','4','Open'].forEach(v => {
+            const b = document.getElementById('playerBtn'+v);
+            if (b) { b.disabled = true; b.style.opacity = '0.35'; b.style.cursor = 'not-allowed'; }
+        });
+        // Default: public selected
+        setTimeout(() => {
+            const pub = document.getElementById('roomTypePublic');
+            const prv = document.getElementById('roomTypePrivate');
+            if (pub) pub.style.borderColor = 'var(--gold)';
+            if (prv) prv.style.borderColor = '';
+        }, 10);
+    }
+    if (id === 'menuJoinPublic') {
+        refreshPublicRooms();
+    }
+    ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby'].forEach(m => {
+        const el = document.getElementById(m);
+        if (el) el.classList.toggle('hidden', el.id !== id);
+    });
+}
+
+function getMyName() {
+    const n = (document.getElementById('playerNameInput')?.value || '').trim();
+    if (!n) { showToast('הכנס שם תחילה'); return null; }
+    return n;
+}
+
+function initSocket() {
+    if (socket) return;
+    socket = io();
+
+    socket.on('roomCreated', ({ code, slotIdx }) => {
+        mySlotIdx = slotIdx;
+        document.getElementById('lobbyCode').textContent = code;
+        document.getElementById('lobbyStatus').textContent = 'ממתין לשחקנים...';
+        showMenu('menuLobby');
+    });
+    socket.on('openRoomCreated', ({ code, slotIdx }) => {
+        mySlotIdx = slotIdx;
+        document.getElementById('lobbyCode').textContent = code;
+        showMenu('menuLobby');
+    });
+
+    socket.on('roomJoined', ({ code, slotIdx }) => {
+        mySlotIdx = slotIdx;
+        document.getElementById('lobbyCode').textContent = code;
+        showMenu('menuLobby');
+    });
+
+    socket.on('state', (state) => {
+        onlineState = state;
+        const overlay = document.getElementById('setupOverlay');
+        if (overlay.style.display !== 'none') {
+            updateLobby(state);
+            if (state.allJoined) {
+                overlay.style.display = 'none';
+                document.getElementById('actionButtons').classList.remove('hidden');
+                document.getElementById('gameTopBar').style.display = 'flex';
+                onlineMode = true;
+            }
+        }
+        if (onlineMode) renderOnline(state);
+    });
+
+    socket.on('toast', msg => { showToast(msg, 800); log(msg); });
+    socket.on('reaction', ({ emoji, name }) => showReactionLocal(emoji, name));
+    socket.on('publicRooms', (rooms) => {
+        const list = document.getElementById('publicRoomsList');
+        if (!list) return;
+        if (!rooms.length) { list.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px;text-align:center;padding:16px;">אין חדרים פתוחים כרגע</div>'; return; }
+        list.innerHTML = rooms.map(r => {
+            const clickable = r.available;
+            return `<div onclick="${clickable ? `joinPublicRoom('${r.code}')` : ''}"
+                style="padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,${clickable?'0.07':'0.03'});border-radius:8px;cursor:${clickable?'pointer':'default'};border:1px solid rgba(255,255,255,${clickable?'0.15':'0.05'});opacity:${clickable?'1':'0.45'};">
+                <span style="color:${clickable?'var(--gold)':'rgba(255,255,255,0.3)'};font-weight:700;letter-spacing:2px;">${r.code}</span>
+                <span style="color:rgba(255,255,255,0.5);font-size:11px;margin-right:8px;">${r.players}/${r.max} שחקנים • ${r.timerLabel}</span>
+                ${r.inProgress ? '<span style="font-size:10px;color:rgba(255,100,100,0.6);margin-right:4px;">● במשחק</span>' : r.isFull ? '<span style="font-size:10px;color:rgba(255,180,0,0.7);margin-right:4px;">● מלא</span>' : '<span style="font-size:10px;color:rgba(100,255,100,0.7);margin-right:4px;">● פתוח</span>'}
+             </div>`;
+        }).join('');
+    });
+    socket.on('burn', () => {
+        playSound('burn');
+        showToast('🔥 שריפה!');
+        const pileEl = document.getElementById('pile');
+        pileEl.classList.add('burn-effect');
+        setTimeout(() => pileEl.classList.remove('burn-effect'), 600);
+    });
+    socket.on('cardPlayed', ({ playerIdx, cards }) => {
+        if (playerIdx !== mySlotIdx) playSound('play');
+        if (onlineState) {
+            const pName = onlineState.players?.[playerIdx]?.name || `שחקן ${playerIdx+1}`;
+            if (cards?.length) log(`${pName}: ${cards.join(', ')}`);
+        }
+    });
+    socket.on('swapTick', ({ remaining }) => {
+        const display = document.getElementById('turnTimerDisplay');
+        if (!display) return;
+        if (remaining <= 0) { display.style.display = 'none'; return; }
+        display.style.display = 'block';
+        const isLow = remaining <= 10;
+        display.textContent = (isLow ? '⚠️ ' : '🔄 ') + remaining + 's';
+        display.style.color = isLow ? '#ef4444' : 'rgba(255,255,255,0.6)';
+        display.style.textShadow = isLow ? '0 0 16px rgba(239,68,68,0.8)' : 'none';
+    });
+
+    socket.on('timerTick', ({ remaining, currentPlayer }) => {
+        const display = document.getElementById('turnTimerDisplay');
+        if (!display) return;
+        if (remaining <= 0) {
+            display.style.display = 'none';
+            display.textContent = '';
+            return;
+        }
+        display.style.display = 'block';
+        // Format: show clock emoji + seconds
+        const isLow = remaining <= 5;
+        display.textContent = (isLow ? '⚠️ ' : '⏱ ') + remaining + 's';
+        display.style.color = isLow ? '#ef4444' : 'var(--gold)';
+        display.style.textShadow = isLow
+            ? '0 0 16px rgba(239,68,68,0.8)'
+            : '0 0 12px rgba(240,192,64,0.5)';
+        if (isLow) {
+            display.style.transform = 'scale(1.2)';
+            setTimeout(() => { if (display) display.style.transform = 'scale(1)'; }, 150);
+        }
+    });
+
+    socket.on('gameOver', (names) => {
+        document.getElementById('leaderboardList').innerHTML =
+            names.map((n,i) => { const isLast=i===names.length-1; const m=isLast?'💩':(i===0?'🥇':i===1?'🥈':i===2?'🥉':''); return `<div class="lb-row"><div class="lb-pos">${i+1}</div><div class="lb-name">${n}</div><div class="lb-medal">${m}</div></div>`; }).join('');
+        document.getElementById('resultOverlay').style.display = 'flex';
+        document.getElementById('newGameBtn').style.display = 'block';
+        document.getElementById('leaveBtn').style.display = 'block';
+        document.getElementById('waitingRestart').style.display = 'none';
+        document.getElementById('waitingCount').style.display = 'none';
+    });
+
+    socket.on('playerWantsRestart', ({ readyCount, totalCount }) => {
+        document.getElementById('waitingCount').style.display = 'block';
+        document.getElementById('waitingCount').textContent = `${readyCount}/${totalCount} רוצים לשחק שוב`;
+    });
+    socket.on('error', msg => showToast('❌ ' + msg));
+
+    socket.on('gameRestarted', () => {
+        if (!onlineMode) return; // already left to menu
+        revealedFaceDownIndex = null;
+        selectedHandIndices = [];
+        selectedTableIndices = [];
+        document.getElementById('resultOverlay').style.display = 'none';
+        document.getElementById('actionButtons').classList.remove('hidden');
+        document.getElementById('gameTopBar').style.display = 'flex';
+        showToast('🔄 משחק חדש!');
+    });
+
+    socket.on('playerLeft', ({ name, newPlayerCount }) => {
+        showToast(`🚪 ${name} יצא — 🤖 ממשיך במקומו`);
+        // Server replaces leaving player with bot — stay in game
+    });
+
+    socket.io.on('reconnect', () => {
+        if (!onlineMode) return;
+        const code = document.getElementById('lobbyCode')?.textContent?.trim();
+        const name = document.getElementById('playerNameInput')?.value?.trim();
+        if (code && code.length === 4 && name) {
+            showToast('🔄 מתחבר מחדש...');
+            socket.emit('rejoinRoom', { code, name });
+        }
+    });
+}
+
+function updateLobby(state) {
+    const c = document.getElementById('lobbyPlayers');
+    if (!c) return;
+    c.innerHTML = state.players.map((p,i) =>
+        `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px;">
+            ${i===0?'👑 ':'👤 '}<span style="color:${i===mySlotIdx?'var(--gold)':'#fff'}">${p.name||'?'}</span>
+         </div>`
+    ).join('');
+    const s = document.getElementById('lobbyStatus');
+    const startBtn = document.getElementById('startOpenBtn');
+    const waitMore = document.getElementById('waitingMore');
+    if (state.openRoom) {
+        // Open room — host controls start
+        const count = state.players.length;
+        if (s) s.textContent = `${count} שחקנים מחוברים (עד 4)`;
+        if (mySlotIdx === 0) {
+            // I am host
+            if (count >= 2) {
+                if (startBtn) startBtn.classList.remove('hidden');
+                if (waitMore) waitMore.style.display = 'none';
+            } else {
+                if (startBtn) startBtn.classList.add('hidden');
+                if (waitMore) waitMore.style.display = 'block';
+            }
+        } else {
+            if (startBtn) startBtn.classList.add('hidden');
+            if (waitMore) waitMore.style.display = 'none';
+            if (s) s.textContent = `${count} שחקנים | ממתין למארח...`;
+        }
+    } else {
+        if (startBtn) startBtn.classList.add('hidden');
+        if (waitMore) waitMore.style.display = 'none';
+        const joined = state.players.filter(p => p.connected).length;
+        const total = state.players.length;
+        if (s) s.textContent = `${joined}/${total} שחקנים מחוברים`;
+    }
+}
+
+let selectedRoomType = 'public';
+
+function setRoomType(type) {
+    selectedRoomType = type;
+    const pub = document.getElementById('roomTypePublic');
+    const prv = document.getElementById('roomTypePrivate');
+    if (pub) pub.style.borderColor = type === 'public' ? 'var(--gold)' : '';
+    if (prv) prv.style.borderColor = type === 'private' ? 'var(--gold)' : '';
+}
+
+function refreshPublicRooms() {
+    if (!socket) initSocket();
+    socket.emit('getPublicRooms');
+}
+
+function setTimer(secs) {
+    selectedTimer = secs;
+    timerSelected = true;
+    ['0','20','30','60'].forEach(v => {
+        const b = document.getElementById('timerBtn'+v);
+        if (b) b.style.borderColor = (parseInt(v)===secs) ? 'var(--gold)' : '';
+    });
+    // Enable player count buttons
+    ['2','3','4','Open'].forEach(v => {
+        const b = document.getElementById('playerBtn'+v);
+        if (b) { b.disabled = false; b.style.opacity = '1'; b.style.cursor = 'pointer'; }
+    });
+}
+
+function createOnlineRoom(count) {
+    const name = getMyName(); if (!name) return;
+    initSocket();
+    socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public' });
+}
+
+function createOpenRoom() {
+    const name = getMyName(); if (!name) return;
+    initSocket();
+    socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public' });
+}
+
+function hostStartGame() {
+    if (socket) socket.emit('hostStart');
+}
+
+function joinPublicRoom(code) {
+    const name = getMyName(); if (!name) return;
+    if (!socket) initSocket();
+    socket.emit('joinRoom', { code, name });
+}
+
+function joinOnlineRoom() {
+    const name = getMyName(); if (!name) return;
+    const code = (document.getElementById('roomCodeInput')?.value||'').trim().toUpperCase();
+    if (code.length !== 4) { showToast('קוד חדר חייב להיות 4 תווים'); return; }
+    initSocket();
+    socket.emit('joinRoom', { code, name });
+}
+
+// ── Turn timer ──
+function startTurnTimer(state) {} // handled by server timerTick
+
+// ── Online render ──
+function renderOnline(state) {
+    if (!state || !onlineMode) return;
+    const n = state.players.length;
+    const myIdx = mySlotIdx;
+    const relMap = {2:{1:'pos-top'},3:{1:'pos-right',2:'pos-left'},4:{1:'pos-right',2:'pos-top',3:'pos-left'}};
+
+    // Clear slots
+    ['pos-top','pos-left','pos-right'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.innerHTML=''; el.classList.remove('active-turn-player'); }
+    });
+
+    // Render other players in slots
+    for (let off = 1; off < n; off++) {
+        const theirIdx = (myIdx + off) % n;
+        const p = state.players[theirIdx];
+        const slotId = relMap[n]?.[off];
+        if (!slotId) continue;
+        const slot = document.getElementById(slotId);
+        if (!slot) continue;
+        const wrap = document.createElement('div'); wrap.className = 'ai-player-wrap';
+        const badge = document.createElement('div'); badge.className = 'ai-name-badge';
+        badge.textContent = `${p.name||'?'} (${p.handCount})`;
+        if (!p.connected) badge.style.opacity = '0.4';
+        const tableRow = document.createElement('div'); tableRow.style.cssText='display:flex;gap:6px;';
+        for (let i=0;i<3;i++) {
+            const st = document.createElement('div'); st.className='ai-table-stack';
+            if (p.faceDownCount>i) st.appendChild(renderCard(null,true,true));
+            if (p.faceUp[i]) { const u=renderCard(p.faceUp[i],false,true); u.classList.add('face-up'); st.appendChild(u); }
+            tableRow.appendChild(st);
+        }
+        const handRow = document.createElement('div'); handRow.className='ai-hand-container';
+        const W=36,ov=18, tw=p.handCount>0?(p.handCount-1)*ov+W:0;
+        handRow.style.width=tw+'px';
+        for (let i=0;i<p.handCount;i++) {
+            const c=renderCard(null,true,true); c.style.cssText=`position:absolute;left:${i*ov}px;z-index:${i}`; handRow.appendChild(c);
+        }
+        wrap.appendChild(badge); wrap.appendChild(tableRow); wrap.appendChild(handRow);
+        slot.appendChild(wrap);
+        if (state.currentPlayer===theirIdx && !state.isSwapPhase) slot.classList.add('active-turn-player');
+    }
+
+    const isMyTurn = state.currentPlayer === myIdx && !state.isSwapPhase;
+    // Type 1: same-player add-on interrupt
+    const canAddInterrupt = !!(state.interruptWindow
+        && state.lastPlayerIdx === myIdx
+        && state.currentPlayer !== myIdx
+        && state.myHand.some(c => c.slice(0,-1) === state.lastPlayedRank));
+    // Type 2: burn interrupt — any player completing 4-of-a-kind
+    const burnNeeded = state.burnInterruptCount || 0;
+    const canBurnInterrupt = !!(burnNeeded > 0
+        && state.currentPlayer !== myIdx
+        && !state.isSwapPhase
+        && state.pileTopRank
+        && state.myHand.filter(c => c.slice(0,-1) === state.pileTopRank).length >= burnNeeded);
+    const canInterrupt = canAddInterrupt || canBurnInterrupt;
+    const me = state.players[myIdx];
+
+    // My area highlight
+    const pArea = document.getElementById('playerArea');
+    pArea.classList.toggle('active-turn-player', isMyTurn || canInterrupt);
+
+    // My hand
+    const handDiv = document.getElementById('playerHand');
+    handDiv.innerHTML='';
+    const handSize = getHandCardSize(state.myHand.length);
+    const sorted = state.myHand.map((c,i)=>({c,i}))
+        .sort((a,b)=>customSort.indexOf(a.c.slice(0,-1))-customSort.indexOf(b.c.slice(0,-1)));
+    sorted.forEach(({c,i:orig})=>{
+        const el=renderCard(c,false,false);
+        el.style.width = handSize.w;
+        el.style.height = handSize.h;
+        if (handSize.w !== '52px') el.style.fontSize = handSize.w === '36px' ? '0.65rem' : '0.75rem';
+        else el.style.fontSize = '';
+        if (selectedHandIndices.includes(orig)) el.classList.add('selected');
+        if (isMyTurn && canPlay(c,state.pile)) el.classList.add('playable-hint');
+        else if (isMyTurn) el.classList.add('not-playable');
+        else if (canAddInterrupt && c.slice(0,-1) === state.lastPlayedRank) el.classList.add('playable-hint');
+        else if (canBurnInterrupt && c.slice(0,-1) === state.pileTopRank) el.classList.add('playable-hint');
+        else if (canInterrupt) el.classList.add('not-playable');
+        el.onclick=()=>{
+            if (state.isSwapPhase) {
+                selectedHandIndices=[orig];
+                if (selectedTableIndices.length===1) { onlineSwap(); } else { renderOnline(state); }
+                return;
+            }
+            if (!isMyTurn && !canInterrupt) return;
+            const cardRank = state.myHand[orig]?.slice(0,-1);
+            if (canAddInterrupt && !isMyTurn && cardRank !== state.lastPlayedRank) return;
+            if (canBurnInterrupt && !isMyTurn && cardRank !== state.pileTopRank) return;
+            const rank=state.myHand[orig]?.slice(0,-1);
+            if (selectedHandIndices.includes(orig)) { selectedHandIndices=selectedHandIndices.filter(x=>x!==orig); }
+            else {
+                if (selectedHandIndices.length>0 && state.myHand[selectedHandIndices[0]]?.slice(0,-1)!==rank) selectedHandIndices=[];
+                selectedHandIndices.push(orig);
+            }
+            renderOnline(state);
+        };
+        handDiv.appendChild(el);
+    });
+
+    // Player name label below hand
+    const existingNameLbl = document.getElementById('onlinePlayerName');
+    if (existingNameLbl) existingNameLbl.remove();
+    const nameLbl = document.createElement('div');
+    nameLbl.id = 'onlinePlayerName';
+    nameLbl.style.cssText = 'font-family:"Bebas Neue",sans-serif;font-size:1.1rem;letter-spacing:3px;color:var(--gold);text-align:center;width:100%;margin-top:4px;';
+    nameLbl.textContent = me?.name || '';
+    handDiv.after(nameLbl);
+
+    // My table
+    const tableDiv=document.getElementById('playerTable');
+    tableDiv.innerHTML='';
+    tableDiv.style.cssText='display:flex;gap:16px;margin-bottom:10px;align-items:flex-end;justify-content:center;';
+    for (let i=0;i<3;i++) {
+        const stack=document.createElement('div'); stack.className='table-stack';
+        if (state.myFaceDown[i]) {
+            const isRev=(revealedFaceDownIndex===i);
+            const b=renderCard(isRev?state.myFaceDown[i]:null,!isRev,false);
+            if (isRev) b.classList.add('revealed');
+            b.onclick=()=>{
+                if (state.myHand.length>0||state.myFaceUp.some(Boolean)) return;
+                // Flip faceDown to hand anytime (any turn)
+                if (!isRev){
+                    socket.emit('flipFaceDown',{cardIdx:i});
+                }
+            };
+            stack.appendChild(b);
+        }
+        if (state.myFaceUp[i]) {
+            const u=renderCard(state.myFaceUp[i],false,false); u.classList.add('face-up');
+            if (selectedTableIndices.includes(i)) u.classList.add('selected');
+            const fuRank2 = state.myFaceUp[i]?.slice(0,-1);
+            const handAllSame = state.myHand.length > 0 && state.drawPileCount === 0 && state.myHand.every(c => c.slice(0,-1) === fuRank2);
+            if (isMyTurn && (state.myHand.length===0 || handAllSame)) {
+                if (canPlay(state.myFaceUp[i],state.pile)) u.classList.add('playable-hint');
+                else if (state.myHand.length===0) u.classList.add('not-playable');
+            }
+            u.onclick=()=>{
+                if (state.isSwapPhase){
+                    selectedTableIndices=[i];
+                    if (selectedHandIndices.length===1) { onlineSwap(); } else { renderOnline(state); }
+                    return;
+                }
+                if (!isMyTurn||revealedFaceDownIndex!==null) return;
+                // Allow selecting faceUp together with hand cards if all hand cards are same rank as this faceUp
+                if (state.myHand.length > 0) {
+                    if (state.drawPileCount > 0) return; // can't touch faceUp while draw pile has cards
+                    const fuRank = state.myFaceUp[i]?.slice(0,-1);
+                    const allSameRank = state.myHand.every(c => c.slice(0,-1) === fuRank);
+                    if (!allSameRank) return; // can't mix different ranks
+                }
+                const idx2=selectedTableIndices.indexOf(i);
+                if (idx2>-1) selectedTableIndices.splice(idx2,1); else selectedTableIndices.push(i);
+                renderOnline(state);
+            };
+            stack.appendChild(u);
+        }
+        tableDiv.appendChild(stack);
+    }
+
+    // Pile
+    const pDiv=document.getElementById('pile'); pDiv.innerHTML='';
+    if (state.pile.length) {
+        let di=state.pile.length-1;
+        if (isPeeking) while(di>=0&&state.pile[di].slice(0,-1)==='3') di--;
+        if (di>=0) {
+            const ce=renderCard(state.pile[di],false,false);
+            if (isPeeking&&di<state.pile.length-1) ce.classList.add('peek-transparent');
+            pDiv.appendChild(ce);
+        }
+        if (state.pile.length>1) {
+            const b=document.createElement('div'); b.className='pile-count-badge'; b.textContent=state.pile.length; pDiv.appendChild(b);
+        }
+        const streak2=getPileStreak(state.pile);
+        if (streak2>=2) {
+            const sb=document.createElement('div'); sb.className='pile-streak-badge'; sb.textContent='x'+streak2; pDiv.appendChild(sb);
+        }
+    }
+
+    // Peek
+    const peekBtn=document.getElementById('peekBtn');
+    const pTop=state.pile.length>0?state.pile[state.pile.length-1]:null;
+    peekBtn.classList.toggle('hidden',!(isMyTurn&&pTop?.slice(0,-1)==='3'));
+
+    document.getElementById('drawCountDisplay').textContent=state.drawPileCount;
+    document.getElementById('pileStatus').textContent=state.pile.length
+        ?`עליון: ${(()=>{for(let i=state.pile.length-1;i>=0;i--) if(state.pile[i].slice(0,-1)!=='3') return state.pile[i].slice(0,-1); return '3';})()}`:'ריק';
+
+    // Buttons
+    const swapBtn=document.getElementById('swapDoneBtn');
+    swapBtn.style.display=state.isSwapPhase?'block':'none';
+    swapBtn.textContent='✅ סיום החלפה';
+    document.getElementById('playBtn').style.display=(state.isSwapPhase)?'none':'block';
+    const inFaceDownPhase = !state.isSwapPhase && state.myHand.length === 0 && state.myFaceUp.every(c=>!c) && state.myFaceDown.some(Boolean);
+    const canTake = !state.isSwapPhase && (state.pile.length > 0 || (inFaceDownPhase && revealedFaceDownIndex !== null));
+    document.getElementById('takeBtn').style.display=(canTake&&state.currentPlayer===mySlotIdx)?'block':'none';
+
+    // Flash playBtn for interrupts
+    const playBtn = document.getElementById('playBtn');
+    if (canBurnInterrupt) {
+        playBtn.textContent = '🔥 שרוף!';
+        playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
+        playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
+    } else if (canAddInterrupt) {
+        playBtn.textContent = '⚡ התפרץ!';
+        playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
+        playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
+    } else {
+        playBtn.textContent = '▶ שחק';
+        playBtn.style.background = '';
+        playBtn.style.animation = '';
+    }
+    document.getElementById('interruptBtn').classList.add('hidden');
+}
+
+function onlineSwap() {
+    if (selectedHandIndices.length===1&&selectedTableIndices.length===1) {
+        socket.emit('swap',{handIdx:selectedHandIndices[0],tableIdx:selectedTableIndices[0]});
+        selectedHandIndices=[]; selectedTableIndices=[];
+    }
+}
+
+// ── Route action buttons ──
+function endSwapPhase() {
+    if (onlineMode) { socket.emit('endSwap'); return; }
+    _endSwapAI();
+}
+
+function humanPlay() {
+    if (!onlineMode) { _humanPlayAI(); return; }
+    const s = onlineState;
+    if (!s) return;
+
+    // Burn interrupt — any player completing 4-of-a-kind
+    const myBurnInterrupt = !!(s.burnInterruptCount > 0 && s.currentPlayer !== mySlotIdx && !s.isSwapPhase && s.pileTopRank
+        && s.myHand.filter(c=>c.slice(0,-1)===s.pileTopRank).length >= s.burnInterruptCount);
+    if (myBurnInterrupt) {
+        if (!selectedHandIndices.length) { showToast(`בחר ${s.burnInterruptCount} קלפי ${s.pileTopRank} לשריפה`); return; }
+        const cards = selectedHandIndices.map(i => s.myHand[i]);
+        if (cards.length !== s.burnInterruptCount || !cards.every(c=>c.slice(0,-1)===s.pileTopRank)) {
+            showToast(`צריך בדיוק ${s.burnInterruptCount} קלפי ${s.pileTopRank}`); return;
+        }
+        selectedHandIndices = [];
+        playSound('play');
+        socket.emit('playCards', { cards }); // server detects non-current player + valid burn
+        return;
+    }
+
+    // Add-on interrupt (same player who just played)
+    const myCanInterrupt = s.interruptWindow && s.lastPlayerIdx === mySlotIdx && s.currentPlayer !== mySlotIdx;
+    if (myCanInterrupt) {
+        if (!selectedHandIndices.length) { showToast('בחר קלף זהה להתפרצות'); return; }
+        const cards = selectedHandIndices.map(i => s.myHand[i]);
+        if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast('רק קלף ' + s.lastPlayedRank + ' להתפרצות'); return; }
+        selectedHandIndices = [];
+        playSound('play');
+        socket.emit('playCards', { cards, isInterrupt: true });
+        return;
+    }
+
+    if (s.currentPlayer !== mySlotIdx) return;
+
+    if (revealedFaceDownIndex !== null) {
+        const idx = revealedFaceDownIndex;
+        revealedFaceDownIndex = null;
+        socket.emit('playCards', { cards: [s.myFaceDown[idx]], faceDownIdx: idx });
+        return;
+    }
+    let cards = [];
+    if (s.myHand.length > 0) {
+        if (!selectedHandIndices.length) { showToast('בחר קלף תחילה'); return; }
+        cards = selectedHandIndices.map(i => s.myHand[i]);
+        // Also include selected faceUp cards if same rank
+        if (selectedTableIndices.length > 0) {
+            const rank = cards[0].slice(0,-1);
+            const fuCards = selectedTableIndices.map(i => s.myFaceUp[i]).filter(c => c && c.slice(0,-1) === rank);
+            cards = [...cards, ...fuCards];
+        }
+    } else {
+        if (!selectedTableIndices.length) { showToast('בחר קלף תחילה'); return; }
+        cards = selectedTableIndices.map(i => s.myFaceUp[i]);
+    }
+    selectedHandIndices = []; selectedTableIndices = [];
+    playSound('play');
+    socket.emit('playCards', { cards });
+}
+
+function humanTake() {
+    if (!onlineMode) { _humanTakeAI(); return; }
+    if (!onlineState || onlineState.currentPlayer !== mySlotIdx) return;
+    const s = onlineState;
+
+    if (revealedFaceDownIndex !== null) {
+        const fdCard = s.myFaceDown[revealedFaceDownIndex];
+        const idx = revealedFaceDownIndex;
+        revealedFaceDownIndex = null;
+        playSound('take');
+        socket.emit('takePile', { faceUpCards: [], faceDownCard: fdCard, faceDownIdx: idx });
+        return;
+    }
+    if (s.myHand.length === 0 && s.myFaceUp.some(Boolean)) {
+        if (!selectedTableIndices.length) { showToast('בחר קלף מהשולחן לקחת עם הערימה'); return; }
+        const faceUpCards = selectedTableIndices.map(i => s.myFaceUp[i]);
+        selectedTableIndices = [];
+        playSound('take');
+        socket.emit('takePile', { faceUpCards });
+        return;
+    }
+    playSound('take');
+    socket.emit('takePile', { faceUpCards: [] });
+    selectedHandIndices = []; selectedTableIndices = [];
+}
+
+function humanInterrupt() {
+    if (!onlineState) return;
+    const s = onlineState;
+    if (!s.interruptWindow || s.lastPlayerIdx !== mySlotIdx) return;
+    // Find matching cards in hand
+    const matchCards = s.myHand.filter(c => c.slice(0,-1) === s.lastPlayedRank);
+    if (!matchCards.length) { showToast('אין קלף זהה להתפרצות'); return; }
+    // Use selected cards if they match, otherwise use first match
+    let cards;
+    if (selectedHandIndices.length > 0) {
+        const sel = selectedHandIndices.map(i => s.myHand[i]);
+        if (sel.every(c => c.slice(0,-1) === s.lastPlayedRank)) {
+            cards = sel;
+        } else {
+            cards = [matchCards[0]];
+        }
+    } else {
+        cards = [matchCards[0]];
+    }
+    selectedHandIndices = [];
+    playSound('play');
+    socket.emit('playCards', { cards, isInterrupt: true });
+}
+
+function requestNewGame() {
+    if (!onlineMode || !socket) {
+        // AI mode — restart with same player count
+        document.getElementById('resultOverlay').style.display = 'none';
+        startGame(lastAIPlayerCount);
+        return;
+    }
+    socket.emit('voteRestart');
+    document.getElementById('newGameBtn').style.display = 'none';
+    document.getElementById('leaveBtn').style.display = 'none';
+    document.getElementById('waitingRestart').style.display = 'block';
+}
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+}
+
+function leaveLobby() {
+    // If still in lobby (not yet in game) — tell server to close room
+    if (socket && !onlineMode) {
+        socket.emit('playerLeaving');
+        setTimeout(() => {
+            if (socket) { socket.disconnect(); socket = null; }
+        }, 400);
+    }
+    showMenu('menuOnline');
+}
+
+function leaveToMenu() {
+    document.getElementById('resultOverlay').style.display = 'none';
+    document.getElementById('gameTopBar').style.display = 'none';
+    document.getElementById('setupOverlay').style.display = 'flex';
+    showMenu('menuMain');
+    if (socket) {
+        socket.emit('playerLeaving'); // dedicated event — server handles before disconnect
+        setTimeout(() => {
+            if (socket) { socket.disconnect(); socket = null; }
+            onlineMode = false;
+        }, 400); // wait 400ms for server to receive
+    } else {
+        onlineMode = false;
+    }
+}
+
+function confirmLeave() {
+    if (confirm('לצאת למסך הראשי?')) leaveToMenu();
+}
+
+function toggleEmojiPicker() {
+    const p = document.getElementById('emojiPicker');
+    p.style.display = p.style.display === 'none' || !p.style.display ? 'block' : 'none';
+}
+
+let reactionCooldown = false;
+function sendReaction(emoji) {
+    if (reactionCooldown) { showToast('המתן 10 שניות בין תגובות'); return; }
+    reactionCooldown = true;
+    // Start cooldown visual on emoji button
+    const btn = document.getElementById('emojiToggleBtn');
+    if (btn) { btn.style.opacity = '0.4'; btn.title = 'המתן...'; }
+    setTimeout(() => {
+        reactionCooldown = false;
+        if (btn) { btn.style.opacity = '1'; btn.title = ''; }
+    }, 10000);
+    if (onlineMode && socket) {
+        // Server broadcasts to ALL players including sender
+        socket.emit('reaction', { emoji });
+    } else {
+        // AI mode — show locally
+        showReactionLocal(emoji, 'אתה');
+    }
+    const picker = document.getElementById('emojiPicker');
+    if (picker) picker.style.display = 'none';
+}
+
+function showReactionLocal(emoji, name) {
+    const picker = document.getElementById('emojiPicker');
+    if (picker) picker.style.display = 'none';
+    const el = document.getElementById('reactionDisplay');
+    const emojiEl = document.getElementById('reactionEmoji');
+    const nameEl = document.getElementById('reactionName');
+    if (emojiEl) emojiEl.textContent = emoji;
+    if (nameEl) nameEl.textContent = name;
+    // Position over the draw pile dynamically
+    // Position over the קופה (draw deck)
+    const drawEl = document.getElementById('drawCountDisplay') || document.querySelector('.draw-deck');
+    if (drawEl) {
+        const rect = drawEl.getBoundingClientRect();
+        el.style.top = (rect.top + rect.height/2) + 'px';
+        el.style.left = (rect.left + rect.width/2) + 'px';
+        el.style.transform = 'translate(-50%,-50%)';
+        el.style.position = 'fixed';
+    }
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+</script>
+</body>
+</html>
