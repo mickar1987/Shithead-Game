@@ -303,6 +303,81 @@ function checkWin(room, idx) {
 }
 
 // ── Next turn ──
+// ── Bot play logic ──
+function doBotTurn(room) {
+    if (room.gameOver || room.isSwapPhase) return;
+    const idx = room.currentPlayer;
+    const p = room.slots[idx];
+    if (!p || !p.isBot || p.finished) return;
+
+    const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
+
+    setTimeout(() => {
+        if (room.gameOver || room.currentPlayer !== idx) return;
+
+        // Play from hand
+        if (p.hand.length > 0) {
+            const valid = p.hand.filter(c => canPlay(c, room.pile));
+            if (valid.length > 0) {
+                valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
+                const card = valid[0];
+                p.hand = p.hand.filter(c => c !== card);
+                executeMove(room, idx, [card]);
+            } else {
+                // Take pile
+                p.hand.push(...room.pile);
+                room.pile = [];
+                broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
+                emitStateToAll(room);
+                nextTurn(room);
+            }
+            return;
+        }
+
+        // Play from faceUp
+        const faceUpCards = p.faceUp.filter(c => c);
+        if (faceUpCards.length > 0 && room.drawPile.length === 0) {
+            const valid = faceUpCards.filter(c => canPlay(c, room.pile));
+            if (valid.length > 0) {
+                valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
+                const card = valid[0];
+                const fi = p.faceUp.indexOf(card);
+                p.faceUp[fi] = null;
+                executeMove(room, idx, [card]);
+            } else {
+                p.hand.push(...room.pile, ...faceUpCards);
+                p.faceUp = [null, null, null];
+                room.pile = [];
+                broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
+                emitStateToAll(room);
+                nextTurn(room);
+            }
+            return;
+        }
+
+        // Flip faceDown
+        const fdIdx = p.faceDown.findIndex(c => c);
+        if (fdIdx >= 0 && p.hand.length === 0) {
+            const card = p.faceDown[fdIdx];
+            p.faceDown[fdIdx] = null;
+            p.hand.push(card);
+            if (canPlay(card, room.pile)) {
+                p.hand = p.hand.filter(c => c !== card);
+                executeMove(room, idx, [card]);
+            } else {
+                p.hand.push(...room.pile);
+                room.pile = [];
+                broadcast(room, 'toast', `🤖 ${p.name} הפך ${card.slice(0,-1)} — לוקח`);
+                emitStateToAll(room);
+                nextTurn(room);
+            }
+            return;
+        }
+
+        nextTurn(room);
+    }, 1200);
+}
+
 function nextTurn(room, skips = 1) {
     if (room.gameOver) return;
     const n = room.playerCount;
@@ -316,6 +391,11 @@ function nextTurn(room, skips = 1) {
     }
     emitStateToAll(room);
     startTurnTimer(room);
+    // If current player is a bot, trigger bot move
+    const cur = room.slots[room.currentPlayer];
+    if (cur && cur.isBot && !cur.finished && !room.gameOver) {
+        doBotTurn(room);
+    }
 }
 
 // ── Execute a move ──
@@ -688,7 +768,9 @@ io.on('connection', (socket) => {
 
         // ── Mid-game leave logic ──
         if (!room.gameOver && slot && !slot.finished) {
-            if (remaining.length <= 1) {
+            // Count active (non-finished, non-leaving) players
+            const activeAfterLeave = room.slots.filter(s => s.connected && !s.finished && s !== slot);
+            if (activeAfterLeave.length <= 1) {
                 // Only 1 (or 0) active human players left → end game
                 // Mark leaver as last (loser)
                 if (!slot.finished) {
@@ -707,7 +789,7 @@ io.on('connection', (socket) => {
                 broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
                 return;
             } else {
-                // Multiple active players remain → bot takes over
+                // 2+ active players remain → bot takes over
                 slot.isBot = true;
                 slot.name = `🤖 ${name}`;
                 broadcast(room, 'toast', `🚪 ${name} יצא — 🤖 ממשיך במקומו`);
