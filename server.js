@@ -667,6 +667,14 @@ io.on('connection', (socket) => {
     });
 
     // ── Leave room ──
+    socket.on('reaction', ({ emoji }) => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room) return;
+        const name = room.slots[slotIdx]?.name || 'שחקן';
+        broadcast(room, 'reaction', { emoji, name });
+    });
+
     socket.on('leaveRoom', () => {
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
@@ -678,6 +686,18 @@ io.on('connection', (socket) => {
         if (room.restartVotes) room.restartVotes.delete(slotIdx);
         // Count remaining connected
         const remaining = room.slots.filter(s => s.connected);
+        // Replace leaving player with bot if game in progress
+        if (!room.gameOver && remaining.length > 0 && slot) {
+            slot.isBot = true;
+            slot.name = `🤖 ${name}`;
+            broadcast(room, 'toast', `${name} יצא — מחשב ממשיך במקומו`);
+            emitStateToAll(room);
+            // If it was this player's turn, advance
+            if (room.currentPlayer === slotIdx) {
+                setTimeout(() => { if (rooms[roomCode]) nextTurn(room); }, 1000);
+            }
+            return;
+        }
         broadcast(room, 'playerLeft', { name, newPlayerCount: remaining.length });
         if (remaining.length === 0) {
             clearRoomTimer(roomCode);
