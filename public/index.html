@@ -461,7 +461,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.6</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.8</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -574,7 +574,7 @@
                 <button onclick="sendReaction('👎')" class="react-btn">👎</button>
             </div>
         </div>
-        <div id="reactionDisplay" style="position:fixed;top:42%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-align:center;">
+        <div id="reactionDisplay" style="position:fixed;top:39%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-align:center;">
             <div id="reactionEmoji" style="font-size:90px;text-shadow:0 4px 24px rgba(0,0,0,0.9);line-height:1;"></div>
             <div id="reactionName" style="font-size:14px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.9);margin-top:4px;font-weight:600;letter-spacing:1px;"></div>
         </div>
@@ -2409,14 +2409,15 @@ function sendReaction(emoji) {
 }
 
 function showReactionLocal(emoji, name) {
-    const el = document.getElementById('reactionDisplay');
-    el.textContent = emoji;
-    el.style.opacity = '1';
-    // Show name label briefly
     const picker = document.getElementById('emojiPicker');
     if (picker) picker.style.display = 'none';
-    showToast(name + ': ' + emoji);
-    setTimeout(() => { el.style.opacity = '0'; }, 1500);
+    const el = document.getElementById('reactionDisplay');
+    const emojiEl = document.getElementById('reactionEmoji');
+    const nameEl = document.getElementById('reactionName');
+    if (emojiEl) emojiEl.textContent = emoji;
+    if (nameEl) nameEl.textContent = name;
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 </script>
 </body>
