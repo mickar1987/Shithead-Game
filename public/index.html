@@ -461,7 +461,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.22</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.23</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -476,7 +476,12 @@
     </div>
     <div id="menuCreate" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">זמן לתור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
+        <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
+            <button onclick="setRoomType('public')"  id="roomTypePublic"  class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">🌐 ציבורי</button>
+            <button onclick="setRoomType('private')" id="roomTypePrivate" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;">🔒 פרטי</button>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setTimer(20)" id="timerBtn20" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">20s</button>
             <button onclick="setTimer(30)" id="timerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">30s</button>
@@ -484,14 +489,24 @@
             <button onclick="setTimer(0)"  id="timerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">♾</button>
         </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">כמה שחקנים?</div>
+        <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🎲 קבע המשך</button>
         <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">⚔️ 2 שחקנים</button>
         <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🃏 3 שחקנים</button>
         <button onclick="createOnlineRoom(4)" id="playerBtn4" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🏆 4 שחקנים</button>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">— או —</div>
-        <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🎲 קבע המשך</button>
     </div>
     <div id="menuJoin" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
+        <button onclick="showMenu('menuJoinPublic')" class="setup-btn">🌐 הצטרף לחדר ציבורי פנוי</button>
+        <button onclick="showMenu('menuJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
+    </div>
+    <div id="menuJoinPublic" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuJoin')">← חזור</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-bottom:4px;">חדרים ציבוריים פתוחים</div>
+        <div id="publicRoomsList" style="width:100%;max-width:280px;"></div>
+        <button onclick="refreshPublicRooms()" class="setup-btn" style="font-size:0.8rem;margin-top:4px;">🔄 רענן</button>
+    </div>
+    <div id="menuJoinPrivate" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuJoin')">← חזור</div>
         <input id="roomCodeInput" type="text" placeholder="קוד חדר" maxlength="4" class="setup-input" style="font-size:1.6rem;letter-spacing:8px;text-transform:uppercase;"/>
         <button onclick="joinOnlineRoom()" class="setup-btn">הצטרף ▶</button>
     </div>
@@ -1852,6 +1867,7 @@ function showMenu(id) {
     if (id === 'menuCreate') {
         // Reset timer + player buttons every time we enter this menu
         selectedTimer = 0; timerSelected = false;
+        selectedRoomType = 'public';
         ['0','20','30','60'].forEach(v => {
             const b = document.getElementById('timerBtn'+v);
             if (b) b.style.borderColor = '';
@@ -1860,8 +1876,18 @@ function showMenu(id) {
             const b = document.getElementById('playerBtn'+v);
             if (b) { b.disabled = true; b.style.opacity = '0.35'; b.style.cursor = 'not-allowed'; }
         });
+        // Default: public selected
+        setTimeout(() => {
+            const pub = document.getElementById('roomTypePublic');
+            const prv = document.getElementById('roomTypePrivate');
+            if (pub) pub.style.borderColor = 'var(--gold)';
+            if (prv) prv.style.borderColor = '';
+        }, 10);
     }
-    ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuLobby'].forEach(m => {
+    if (id === 'menuJoinPublic') {
+        refreshPublicRooms();
+    }
+    ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby'].forEach(m => {
         const el = document.getElementById(m);
         if (el) el.classList.toggle('hidden', el.id !== id);
     });
@@ -1912,6 +1938,17 @@ function initSocket() {
 
     socket.on('toast', msg => { showToast(msg, 800); log(msg); });
     socket.on('reaction', ({ emoji, name }) => showReactionLocal(emoji, name));
+    socket.on('publicRooms', (rooms) => {
+        const list = document.getElementById('publicRoomsList');
+        if (!list) return;
+        if (!rooms.length) { list.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px;text-align:center;padding:16px;">אין חדרים פתוחים כרגע</div>'; return; }
+        list.innerHTML = rooms.map(r =>
+            `<div onclick="joinPublicRoom('${r.code}')" style="padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,0.07);border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);">
+                <span style="color:var(--gold);font-weight:700;letter-spacing:2px;">${r.code}</span>
+                <span style="color:rgba(255,255,255,0.5);font-size:11px;margin-right:8px;">${r.players}/${r.max} שחקנים • ${r.timerLabel}</span>
+             </div>`
+        ).join('');
+    });
     socket.on('burn', () => {
         playSound('burn');
         showToast('🔥 שריפה!');
@@ -2040,6 +2077,21 @@ function updateLobby(state) {
     }
 }
 
+let selectedRoomType = 'public';
+
+function setRoomType(type) {
+    selectedRoomType = type;
+    const pub = document.getElementById('roomTypePublic');
+    const prv = document.getElementById('roomTypePrivate');
+    if (pub) pub.style.borderColor = type === 'public' ? 'var(--gold)' : '';
+    if (prv) prv.style.borderColor = type === 'private' ? 'var(--gold)' : '';
+}
+
+function refreshPublicRooms() {
+    if (!socket) initSocket();
+    socket.emit('getPublicRooms');
+}
+
 function setTimer(secs) {
     selectedTimer = secs;
     timerSelected = true;
@@ -2057,17 +2109,23 @@ function setTimer(secs) {
 function createOnlineRoom(count) {
     const name = getMyName(); if (!name) return;
     initSocket();
-    socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer });
+    socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public' });
 }
 
 function createOpenRoom() {
     const name = getMyName(); if (!name) return;
     initSocket();
-    socket.emit('createOpenRoom', { name, turnTimer: selectedTimer });
+    socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public' });
 }
 
 function hostStartGame() {
     if (socket) socket.emit('hostStart');
+}
+
+function joinPublicRoom(code) {
+    const name = getMyName(); if (!name) return;
+    if (!socket) initSocket();
+    socket.emit('joinRoom', { code, name });
 }
 
 function joinOnlineRoom() {
