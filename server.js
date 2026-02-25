@@ -81,21 +81,11 @@ function startTurnTimer(room) {
                 p.consecutiveTimeouts = (p.consecutiveTimeouts || 0) + 1;
                 const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
 
-                // Disqualify after 2 consecutive timeouts
+                // Disqualify after 2 consecutive timeouts = treat as leave
                 if (p.consecutiveTimeouts >= 2) {
-                    broadcast(room, 'toast', `❌ ${p.name} פסול! לא שיחק 2 תורות ברצף`);
-                    p.finished = true;
+                    broadcast(room, 'toast', `⏰ ${p.name} לא שיחק — מוכרז כיוצא`);
                     p.disqualified = true;
-                    room.winnersOrder.push(autoSlot); // goes to end
-                    if (room.winnersOrder.length >= room.playerCount - 1) {
-                        const last = room.slots.find(s => !s.finished);
-                        if (last) room.winnersOrder.push(last.id);
-                        room.gameOver = true;
-                        clearRoomTimer(room.code);
-                        broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i].name));
-                        return;
-                    }
-                    nextTurn(room);
+                    handlePlayerLeave({ roomCode: room.code, slotIdx: autoSlot });
                     return;
                 }
 
@@ -747,6 +737,63 @@ io.on('connection', (socket) => {
     });
 
     // ── Leave room ──
+    // ── Player voluntarily leaves ──
+    function handlePlayerLeave(socketData) {
+        const { roomCode, slotIdx } = socketData;
+        const room = rooms[roomCode];
+        if (!room) return;
+        const slot = room.slots[slotIdx];
+        if (!slot || slot.finished) return;
+        const name = slot.name;
+        slot.connected = false;
+        slot.socketId = null;
+        if (room.restartVotes) room.restartVotes.delete(slotIdx);
+
+        if (room.gameOver || room.isSwapPhase) {
+            // Not mid-game — just remove
+            broadcast(room, 'playerLeft', { name, newPlayerCount: room.slots.filter(s=>s.connected).length });
+            return;
+        }
+
+        // Mark as loser (last place)
+        slot.finished = true;
+        slot.disqualified = true;
+        room.winnersOrder.push(slotIdx);
+        broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
+
+        // Count still-active players
+        const active = room.slots.filter(s => !s.finished);
+
+        if (active.length <= 1) {
+            // Game over — last active player wins
+            if (active.length === 1) {
+                active[0].finished = true;
+                room.winnersOrder.unshift(active[0].id);
+            }
+            room.gameOver = true;
+            clearRoomTimer(room.code);
+            broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+        } else {
+            // Bot takes over
+            slot.isBot = true;
+            slot.finished = false; // un-finish so bot can keep playing
+            room.winnersOrder.pop();  // remove from winners — will finish naturally
+            slot.name = `🤖 ${name}`;
+            broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
+            emitStateToAll(room);
+            if (room.currentPlayer === slotIdx) {
+                setTimeout(() => { if (rooms[roomCode]) doBotTurn(room); }, 800);
+            }
+        }
+    }
+
+    socket.on('playerLeaving', () => handlePlayerLeave(socket.data));
+
+    socket.on('disconnect', () => {
+        // Also handle unexpected disconnect same way
+        if (socket.data?.roomCode) handlePlayerLeave(socket.data);
+    });
+
     socket.on('reaction', ({ emoji }) => {
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
@@ -755,7 +802,7 @@ io.on('connection', (socket) => {
         broadcast(room, 'reaction', { emoji, name });
     });
 
-    socket.on('leaveRoom', () => {
+    socket.on('leaveRoom_legacy', () => {  // disabled
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
         if (!room) return;
