@@ -42,7 +42,7 @@
         .game-container {
             display: flex; flex-direction: column;
             height: 100dvh; width: 100vw;
-            padding: max(var(--sat), 0px) 8px max(var(--sab), 8px) 8px;
+            padding: 0;
             position: relative;
             background:
                 radial-gradient(ellipse 80% 60% at 50% 50%, #0f5c35 0%, #073d22 60%, #031a0f 100%);
@@ -186,7 +186,7 @@
         #pos-top {
             height: 150px; width: 100%;
             display: flex; align-items: flex-start; justify-content: center;
-            padding-top: 8px; flex-shrink: 0;
+            padding-top: calc(env(safe-area-inset-top) + 8px); flex-shrink: 0;
         }
         #pos-left {
             position: absolute; left: -50px; top: 50%;
@@ -255,7 +255,7 @@
         #playerArea {
             margin-top: auto; width: 100%;
             display: flex; flex-direction: column; align-items: center;
-            padding-bottom: max(env(safe-area-inset-bottom), 12px); padding-top: 8px;
+            padding-bottom: max(env(safe-area-inset-bottom), 16px); padding-top: 8px; padding-left: 8px; padding-right: 8px;
             flex-shrink: 0;
         }
         #playerTable { display: flex; gap: 16px; margin-bottom: 10px; align-items: flex-end; }
@@ -326,7 +326,7 @@
 
         /* ── LOG ── */
         #logWindow {
-            display: none; position: fixed; top: calc(env(safe-area-inset-top) + 50px); left: 10px;
+            display: none; position: fixed; top: calc(env(safe-area-inset-top) + 50px); left: 8px;
             width: 200px; max-height: 220px;
             background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.1);
             border-radius: 8px; font-size: 10px; padding: 8px;
@@ -334,16 +334,9 @@
         }
         .log-btn {
             position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 8px;
-            background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15);
             color: rgba(255,255,255,0.6); font-size: 9px; padding: 4px 8px;
-            border-radius: 4px; cursor: pointer; z-index: 1001;
-        }
-        .sound-btn {
-            position: fixed; top: 8px; right: 8px;
-            background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
-            font-size: 14px; padding: 4px 8px;
-            border-radius: 4px; cursor: pointer; z-index: 1001;
-            transition: opacity 0.2s;
+            border-radius: 4px; cursor: pointer; z-index: 1002;
         }
         .sound-btn.muted { opacity: 0.4; }
 
@@ -466,7 +459,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.2</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.3</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -514,7 +507,7 @@
 <!-- LOG -->
 <div id="logWindow"></div>
 <button onclick="toggleLog()" class="log-btn">📜 LOG</button>
-<button onclick="toggleSound()" id="soundBtn" class="sound-btn muted">🔇</button>
+
 
 <!-- TOAST -->
 <div id="gameMessage"></div>
@@ -558,11 +551,12 @@
             <button id="takeBtn" onclick="humanTake()" class="action-btn">↙ קח</button>
             <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;">⚡ התפרץ!</button>
         </div>
-        <div id="gameTopBar" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:8px;display:flex;gap:6px;z-index:50;">
-            <button onclick="confirmLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:8px;padding:4px 10px;font-size:15px;cursor:pointer;">🚪</button>
-            <button onclick="toggleEmojiPicker()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:8px;padding:4px 10px;font-size:15px;cursor:pointer;">😊</button>
+        <div id="gameTopBar" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:8px;display:none;gap:5px;z-index:1002;align-items:center;">
+            <button onclick="toggleSound()" id="soundBtn" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;opacity:0.5;">🔇</button>
+            <button onclick="confirmLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;letter-spacing:0.5px;">EXIT</button>
+            <button onclick="toggleEmojiPicker()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;">😊</button>
         </div>
-        <div id="emojiPicker" style="display:none;position:fixed;top:calc(env(safe-area-inset-top) + 50px);left:8px;background:rgba(20,20,40,0.97);border:1px solid #444;border-radius:12px;padding:10px;z-index:100;display:none;">
+        <div id="emojiPicker" style="display:none;position:fixed;top:calc(env(safe-area-inset-top) + 50px);right:8px;background:rgba(20,20,40,0.97);border:1px solid #444;border-radius:12px;padding:10px;z-index:1002;display:none;">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
                 <button onclick="sendReaction('😂')" class="react-btn">😂</button>
                 <button onclick="sendReaction('😡')" class="react-btn">😡</button>
@@ -578,7 +572,7 @@
                 <button onclick="sendReaction('👎')" class="react-btn">👎</button>
             </div>
         </div>
-        <div id="reactionDisplay" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:80px;pointer-events:none;z-index:200;opacity:0;transition:opacity 0.3s;"></div>
+        <div id="reactionDisplay" style="position:fixed;top:18%;left:50%;transform:translateX(-50%);font-size:72px;pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-shadow:0 4px 20px rgba(0,0,0,0.8);"></div>
         <div id="playerHand" dir="ltr"></div>
     </div>
 </div>
@@ -674,7 +668,7 @@ function toggleSound() {
     soundEnabled = !soundEnabled;
     const btn = document.getElementById('soundBtn');
     btn.textContent = soundEnabled ? '🔊' : '🔇';
-    btn.classList.toggle('muted', !soundEnabled);
+    btn.style.opacity = soundEnabled ? '1' : '0.5';
 }
 let toastTimer;
 function showToast(msg, duration = 900) {
