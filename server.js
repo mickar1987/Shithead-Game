@@ -839,15 +839,32 @@ io.on('connection', (socket) => {
         const room = rooms[roomCode];
         if (!room) return;
         const slot = room.slots[slotIdx];
-        if (!slot || slot.finished) return;
+        if (!slot) return;
         const name = slot.name;
         slot.connected = false;
         slot.socketId = null;
         if (room.restartVotes) room.restartVotes.delete(slotIdx);
 
-        if (room.gameOver || room.isSwapPhase) {
-            // Not mid-game — just remove
-            broadcast(room, 'playerLeft', { name, newPlayerCount: room.slots.filter(s=>s.connected).length });
+        const connected = room.slots.filter(s => s.connected).length;
+
+        // If in lobby (not yet playing) → close room if empty or host left
+        if (!room.gameStarted && (room.isSwapPhase || room.openRoom)) {
+            if (connected === 0 || slotIdx === 0) {
+                // Host left or room empty → close it
+                broadcast(room, 'toast', `${slotIdx === 0 ? 'המארח יצא' : 'החדר נסגר'}`);
+                clearRoomTimer(roomCode);
+                clearRoomTimer(roomCode + '_swap');
+                delete rooms[roomCode];
+                return;
+            }
+            broadcast(room, 'playerLeft', { name, newPlayerCount: connected });
+            emitOpenLobby(room);
+            return;
+        }
+
+        if (room.gameOver) {
+            // Post-game — just remove
+            broadcast(room, 'playerLeft', { name, newPlayerCount: connected });
             return;
         }
 
@@ -896,16 +913,19 @@ io.on('connection', (socket) => {
         const list = allRooms.map(r => {
             const connected = r.slots.filter(s => s.connected).length;
             const max = r.openRoom ? 4 : r.playerCount;
-            const inProgress = r.gameStarted || (!r.openRoom && !r.isSwapPhase && !r.gameOver) || (r.isSwapPhase === false && connected > 0);
+            // inProgress = game actually started (swap done and playing)
+            const inProgress = r.gameStarted || (r.isSwapPhase === false && !r.gameOver);
             const isFull = r.openRoom ? connected >= 4 : !r.slots.some(s => !s.connected);
-            const isAvailable = !r.gameOver && !isFull && r.isSwapPhase && !inProgress;
+            // available = waiting for players (in lobby / swap phase, not yet playing)
+            const isAvailable = !r.gameOver && !inProgress && !isFull;
             return {
                 code: r.code,
                 players: connected,
                 max,
                 timerLabel: timerLabel(r.turnTimer || 0),
                 available: isAvailable,
-                inProgress: inProgress || isFull
+                inProgress,
+                isFull
             };
         });
         socket.emit('publicRooms', list);
