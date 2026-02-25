@@ -461,7 +461,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.20</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.22</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -593,6 +593,7 @@
 // ══════════════════════════════════════════════════════
 let players = [], pile = [], drawPile = [], currentPlayer = 0;
 let isSwapPhase = true, selectedHandIndices = [], selectedTableIndices = [];
+let selectedTimer = 0, timerSelected = false;
 let winnersOrder = [], isPeeking = false, revealedFaceDownIndex = null;
 let animating = false;
 let soundEnabled = false;
@@ -1847,6 +1848,18 @@ function showMenu(id) {
             const inp = document.getElementById('playerNameInput');
             if (inp && !inp.value) inp.value = saved;
         }, 50);
+    }
+    if (id === 'menuCreate') {
+        // Reset timer + player buttons every time we enter this menu
+        selectedTimer = 0; timerSelected = false;
+        ['0','20','30','60'].forEach(v => {
+            const b = document.getElementById('timerBtn'+v);
+            if (b) b.style.borderColor = '';
+        });
+        ['2','3','4','Open'].forEach(v => {
+            const b = document.getElementById('playerBtn'+v);
+            if (b) { b.disabled = true; b.style.opacity = '0.35'; b.style.cursor = 'not-allowed'; }
+        });
     }
     ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuLobby'].forEach(m => {
         const el = document.getElementById(m);
