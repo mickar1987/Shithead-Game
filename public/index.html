@@ -461,7 +461,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.17</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.18</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -2388,16 +2388,19 @@ if ('serviceWorker' in navigator) {
 }
 
 function leaveToMenu() {
-    onlineMode = false;
-    if (socket) {
-        socket.emit('leaveRoom');
-        socket.disconnect();
-        socket = null;
-    }
     document.getElementById('resultOverlay').style.display = 'none';
     document.getElementById('gameTopBar').style.display = 'none';
     document.getElementById('setupOverlay').style.display = 'flex';
     showMenu('menuMain');
+    if (socket) {
+        socket.emit('playerLeaving'); // dedicated event — server handles before disconnect
+        setTimeout(() => {
+            if (socket) { socket.disconnect(); socket = null; }
+            onlineMode = false;
+        }, 400); // wait 400ms for server to receive
+    } else {
+        onlineMode = false;
+    }
 }
 
 function confirmLeave() {
