@@ -444,9 +444,10 @@ function executeMove(room, playerIdx, cards) {
 io.on('connection', (socket) => {
 
     // ── Create room ──
-    socket.on('createRoom', ({ name, playerCount, turnTimer }) => {
+    socket.on('createRoom', ({ name, playerCount, turnTimer, isPublic }) => {
         const code = createRoom(socket.id, name, playerCount);
         rooms[code].turnTimer = turnTimer || 0;
+        rooms[code].isPublic = !!isPublic;
         const room = rooms[code];
         room.slots[0].name = name;
         room.slots[0].socketId = socket.id;
@@ -459,7 +460,7 @@ io.on('connection', (socket) => {
     });
 
     // ── Open room (host decides when to start) ──
-    socket.on('createOpenRoom', ({ name, turnTimer }) => {
+    socket.on('createOpenRoom', ({ name, turnTimer, isPublic }) => {
         const code = [...Array(4)].map(() => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*23)]).join('');
         const room = {
             code,
@@ -475,6 +476,7 @@ io.on('connection', (socket) => {
             interruptWindow: false, lastPlayedRank: null, lastPlayerIdx: null,
             turnTimer: turnTimer || 0,
             openRoom: true,  // flag: host controls start
+            isPublic: !!isPublic,
             hostSocketId: socket.id,
             restartVotes: new Set()
         };
@@ -865,6 +867,25 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         // Also handle unexpected disconnect same way
         if (socket.data?.roomCode) handlePlayerLeave(socket.data);
+    });
+
+    socket.on('getPublicRooms', () => {
+        const timerLabel = t => t === 0 ? '♾' : `${t}s`;
+        const list = Object.values(rooms)
+            .filter(r => r.isPublic && !r.gameOver && !r.gameStarted)
+            .filter(r => {
+                const connected = r.slots.filter(s => s.connected).length;
+                return r.openRoom
+                    ? connected < 4
+                    : r.slots.some(s => !s.connected);
+            })
+            .map(r => ({
+                code: r.code,
+                players: r.slots.filter(s => s.connected).length,
+                max: r.openRoom ? 4 : r.playerCount,
+                timerLabel: timerLabel(r.turnTimer || 0)
+            }));
+        socket.emit('publicRooms', list);
     });
 
     socket.on('reaction', ({ emoji }) => {
