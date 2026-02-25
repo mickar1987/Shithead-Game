@@ -441,6 +441,25 @@ function executeMove(room, playerIdx, cards) {
 // ══════════════════════════════════════════════
 //  SOCKET EVENTS
 // ══════════════════════════════════════════════
+// ── Cleanup stale rooms every 5 minutes ──
+setInterval(() => {
+    const now = Date.now();
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+    const EMPTY_10MIN = 10 * 60 * 1000;
+    Object.keys(rooms).forEach(code => {
+        const room = rooms[code];
+        const age = now - (room.createdAt || 0);
+        const connected = room.slots.filter(s => s.connected).length;
+        // Delete if: older than 2hrs, OR empty for 10min, OR game over and no connected
+        if (age > TWO_HOURS || (connected === 0 && age > EMPTY_10MIN) || (room.gameOver && connected === 0)) {
+            clearRoomTimer(code);
+            clearRoomTimer(code + '_swap');
+            delete rooms[code];
+            console.log(`Cleaned up stale room ${code}`);
+        }
+    });
+}, 5 * 60 * 1000);
+
 io.on('connection', (socket) => {
 
     // ── Create room ──
@@ -448,6 +467,7 @@ io.on('connection', (socket) => {
         const code = createRoom(socket.id, name, playerCount);
         rooms[code].turnTimer = turnTimer || 0;
         rooms[code].isPublic = !!isPublic;
+        rooms[code].createdAt = Date.now();
         const room = rooms[code];
         room.slots[0].name = name;
         room.slots[0].socketId = socket.id;
@@ -477,6 +497,7 @@ io.on('connection', (socket) => {
             turnTimer: turnTimer || 0,
             openRoom: true,  // flag: host controls start
             isPublic: !!isPublic,
+            createdAt: Date.now(),
             hostSocketId: socket.id,
             restartVotes: new Set()
         };
@@ -871,20 +892,22 @@ io.on('connection', (socket) => {
 
     socket.on('getPublicRooms', () => {
         const timerLabel = t => t === 0 ? '♾' : `${t}s`;
-        const list = Object.values(rooms)
-            .filter(r => r.isPublic && !r.gameOver && !r.gameStarted)
-            .filter(r => {
-                const connected = r.slots.filter(s => s.connected).length;
-                return r.openRoom
-                    ? connected < 4
-                    : r.slots.some(s => !s.connected);
-            })
-            .map(r => ({
+        const allRooms = Object.values(rooms).filter(r => r.isPublic);
+        const list = allRooms.map(r => {
+            const connected = r.slots.filter(s => s.connected).length;
+            const max = r.openRoom ? 4 : r.playerCount;
+            const inProgress = r.gameStarted || (!r.openRoom && !r.isSwapPhase && !r.gameOver) || (r.isSwapPhase === false && connected > 0);
+            const isFull = r.openRoom ? connected >= 4 : !r.slots.some(s => !s.connected);
+            const isAvailable = !r.gameOver && !isFull && r.isSwapPhase && !inProgress;
+            return {
                 code: r.code,
-                players: r.slots.filter(s => s.connected).length,
-                max: r.openRoom ? 4 : r.playerCount,
-                timerLabel: timerLabel(r.turnTimer || 0)
-            }));
+                players: connected,
+                max,
+                timerLabel: timerLabel(r.turnTimer || 0),
+                available: isAvailable,
+                inProgress: inProgress || isFull
+            };
+        });
         socket.emit('publicRooms', list);
     });
 
