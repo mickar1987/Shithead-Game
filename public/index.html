@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Shithead Pro Deluxe</title>
+    <title>שיט-הד 🃏</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="שיט-הד">
+    <link rel="apple-touch-icon" href="/icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rubik:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -394,6 +400,16 @@
             70%  { filter: brightness(3) sepia(1) saturate(12) hue-rotate(-60deg); transform: scale(1.25) rotate(-2deg); opacity: 0.8; }
             100% { filter: brightness(0); transform: scale(0.3) rotate(10deg); opacity: 0; }
         }
+        .react-btn {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .react-btn:active { transform: scale(1.3); }
         .burn-effect { animation: burnAnim 0.6s ease-out forwards; }
 
         @keyframes floatIn {
@@ -541,6 +557,27 @@
             <button id="takeBtn" onclick="humanTake()" class="action-btn">↙ קח</button>
             <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;">⚡ התפרץ!</button>
         </div>
+        <div id="gameTopBar" style="position:fixed;top:8px;left:8px;display:flex;gap:6px;z-index:50;">
+            <button onclick="confirmLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:8px;padding:4px 10px;font-size:15px;cursor:pointer;">🚪</button>
+            <button onclick="toggleEmojiPicker()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:8px;padding:4px 10px;font-size:15px;cursor:pointer;">😊</button>
+        </div>
+        <div id="emojiPicker" style="display:none;position:fixed;top:46px;left:8px;background:rgba(20,20,40,0.97);border:1px solid #444;border-radius:12px;padding:10px;z-index:100;display:none;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+                <button onclick="sendReaction('😂')" class="react-btn">😂</button>
+                <button onclick="sendReaction('😡')" class="react-btn">😡</button>
+                <button onclick="sendReaction('😤')" class="react-btn">😤</button>
+                <button onclick="sendReaction('😛')" class="react-btn">😛</button>
+                <button onclick="sendReaction('🤯')" class="react-btn">🤯</button>
+                <button onclick="sendReaction('👏')" class="react-btn">👏</button>
+                <button onclick="sendReaction('🔥')" class="react-btn">🔥</button>
+                <button onclick="sendReaction('😎')" class="react-btn">😎</button>
+                <button onclick="sendReaction('🤦')" class="react-btn">🤦</button>
+                <button onclick="sendReaction('💀')" class="react-btn">💀</button>
+                <button onclick="sendReaction('🙈')" class="react-btn">🙈</button>
+                <button onclick="sendReaction('👎')" class="react-btn">👎</button>
+            </div>
+        </div>
+        <div id="reactionDisplay" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:80px;pointer-events:none;z-index:200;opacity:0;transition:opacity 0.3s;"></div>
         <div id="playerHand" dir="ltr"></div>
     </div>
 </div>
@@ -655,6 +692,7 @@ function startGame(count) {
     lastAIPlayerCount = count;
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('actionButtons').classList.remove('hidden');
+    document.getElementById('gameTopBar').style.display = 'flex';
 
     // Reset global state
     pile = []; winnersOrder = []; gameOver = false; fastMode = false;
@@ -1841,7 +1879,7 @@ function initSocket() {
         if (onlineMode) renderOnline(state);
     });
 
-    socket.on('toast', msg => showToast(msg, 800));
+    socket.on('toast', msg => { showToast(msg, 800); log(msg); });
     socket.on('burn', () => {
         playSound('burn');
         showToast('🔥 שריפה!');
@@ -1849,8 +1887,12 @@ function initSocket() {
         pileEl.classList.add('burn-effect');
         setTimeout(() => pileEl.classList.remove('burn-effect'), 600);
     });
-    socket.on('cardPlayed', ({ playerIdx }) => {
+    socket.on('cardPlayed', ({ playerIdx, cards }) => {
         if (playerIdx !== mySlotIdx) playSound('play');
+        if (onlineState) {
+            const pName = onlineState.players?.[playerIdx]?.name || `שחקן ${playerIdx+1}`;
+            if (cards?.length) log(`${pName}: ${cards.join(', ')}`);
+        }
     });
     socket.on('swapTick', ({ remaining }) => {
         const display = document.getElementById('turnTimerDisplay');
@@ -2330,6 +2372,13 @@ function requestNewGame() {
     document.getElementById('waitingRestart').style.display = 'block';
 }
 
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+}
+
 function leaveToMenu() {
     onlineMode = false;
     if (socket) {
@@ -2338,8 +2387,36 @@ function leaveToMenu() {
         socket = null;
     }
     document.getElementById('resultOverlay').style.display = 'none';
+    document.getElementById('gameTopBar').style.display = 'none';
     document.getElementById('setupOverlay').style.display = 'flex';
     showMenu('menuMain');
+}
+
+function confirmLeave() {
+    if (confirm('לצאת למסך הראשי?')) leaveToMenu();
+}
+
+function toggleEmojiPicker() {
+    const p = document.getElementById('emojiPicker');
+    p.style.display = p.style.display === 'none' || !p.style.display ? 'block' : 'none';
+}
+
+function sendReaction(emoji) {
+    showReactionLocal(emoji, 'אתה');
+    if (onlineMode && socket) {
+        socket.emit('reaction', { emoji });
+    }
+}
+
+function showReactionLocal(emoji, name) {
+    const el = document.getElementById('reactionDisplay');
+    el.textContent = emoji;
+    el.style.opacity = '1';
+    // Show name label briefly
+    const picker = document.getElementById('emojiPicker');
+    if (picker) picker.style.display = 'none';
+    showToast(name + ': ' + emoji);
+    setTimeout(() => { el.style.opacity = '0'; }, 1500);
 }
 </script>
 </body>
