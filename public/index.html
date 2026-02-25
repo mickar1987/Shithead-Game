@@ -461,7 +461,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.24</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.25</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -511,7 +511,7 @@
         <button onclick="joinOnlineRoom()" class="setup-btn">הצטרף ▶</button>
     </div>
     <div id="menuLobby" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
+        <div class="setup-back" onclick="leaveLobby()">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:2px;">קוד החדר</div>
         <div id="lobbyCode" style="font-family:'Bebas Neue',sans-serif;font-size:4rem;color:var(--gold);letter-spacing:8px;"></div>
         <div id="lobbyStatus" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-bottom:8px;"></div>
@@ -1944,11 +1944,11 @@ function initSocket() {
         if (!rooms.length) { list.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px;text-align:center;padding:16px;">אין חדרים פתוחים כרגע</div>'; return; }
         list.innerHTML = rooms.map(r => {
             const clickable = r.available;
-            return `<div onclick="${clickable ? `joinPublicRoom('${r.code}')` : ''}" 
-                style="padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,${clickable?'0.07':'0.03'});border-radius:8px;cursor:${clickable?'pointer':'default'};border:1px solid rgba(255,255,255,${clickable?'0.15':'0.05'});opacity:${clickable?'1':'0.5'};">
+            return `<div onclick="${clickable ? `joinPublicRoom('${r.code}')` : ''}"
+                style="padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,${clickable?'0.07':'0.03'});border-radius:8px;cursor:${clickable?'pointer':'default'};border:1px solid rgba(255,255,255,${clickable?'0.15':'0.05'});opacity:${clickable?'1':'0.45'};">
                 <span style="color:${clickable?'var(--gold)':'rgba(255,255,255,0.3)'};font-weight:700;letter-spacing:2px;">${r.code}</span>
                 <span style="color:rgba(255,255,255,0.5);font-size:11px;margin-right:8px;">${r.players}/${r.max} שחקנים • ${r.timerLabel}</span>
-                ${r.inProgress ? '<span style="font-size:10px;color:rgba(255,100,100,0.6);margin-right:4px;">● בתהליך</span>' : ''}
+                ${r.inProgress ? '<span style="font-size:10px;color:rgba(255,100,100,0.6);margin-right:4px;">● במשחק</span>' : r.isFull ? '<span style="font-size:10px;color:rgba(255,180,0,0.7);margin-right:4px;">● מלא</span>' : '<span style="font-size:10px;color:rgba(100,255,100,0.7);margin-right:4px;">● פתוח</span>'}
              </div>`;
         }).join('');
     });
@@ -2499,6 +2499,17 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
     });
+}
+
+function leaveLobby() {
+    // If still in lobby (not yet in game) — tell server to close room
+    if (socket && !onlineMode) {
+        socket.emit('playerLeaving');
+        setTimeout(() => {
+            if (socket) { socket.disconnect(); socket = null; }
+        }, 400);
+    }
+    showMenu('menuOnline');
 }
 
 function leaveToMenu() {
