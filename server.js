@@ -682,24 +682,45 @@ io.on('connection', (socket) => {
         const slot = room.slots[slotIdx];
         const name = slot?.name || 'שחקן';
         if (slot) { slot.connected = false; slot.socketId = null; }
-        // Remove from restart votes
         if (room.restartVotes) room.restartVotes.delete(slotIdx);
-        // Count remaining connected
-        const remaining = room.slots.filter(s => s.connected);
-        // Replace leaving player with bot if game in progress
-        if (!room.gameOver && remaining.length > 0 && slot) {
-            slot.isBot = true;
-            slot.name = `🤖 ${name}`;
-            broadcast(room, 'toast', `${name} יצא — מחשב ממשיך במקומו`);
-            emitStateToAll(room);
-            // If it was this player's turn, advance
-            if (room.currentPlayer === slotIdx) {
-                setTimeout(() => { if (rooms[roomCode]) nextTurn(room); }, 1000);
+
+        const remaining = room.slots.filter(s => s.connected && !s.finished);
+
+        // ── Mid-game leave logic ──
+        if (!room.gameOver && slot && !slot.finished) {
+            if (remaining.length <= 1) {
+                // Only 1 (or 0) active human players left → end game
+                // Mark leaver as last (loser)
+                if (!slot.finished) {
+                    slot.finished = true;
+                    room.winnersOrder.push(slotIdx);
+                }
+                // The remaining active player finishes just before leaver
+                const lastActive = room.slots.find(s => s.connected && !s.finished);
+                if (lastActive) {
+                    lastActive.finished = true;
+                    room.winnersOrder.unshift(lastActive.id); // goes one place ahead
+                }
+                room.gameOver = true;
+                clearRoomTimer(roomCode);
+                broadcast(room, 'toast', `🚪 ${name} יצא — המשחק הסתיים`);
+                broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+                return;
+            } else {
+                // Multiple active players remain → bot takes over
+                slot.isBot = true;
+                slot.name = `🤖 ${name}`;
+                broadcast(room, 'toast', `🚪 ${name} יצא — 🤖 ממשיך במקומו`);
+                emitStateToAll(room);
+                if (room.currentPlayer === slotIdx) {
+                    setTimeout(() => { if (rooms[roomCode]) nextTurn(room); }, 1000);
+                }
+                return;
             }
-            return;
         }
+
         broadcast(room, 'playerLeft', { name, newPlayerCount: remaining.length });
-        if (remaining.length === 0) {
+        if (room.slots.filter(s => s.connected).length === 0) {
             clearRoomTimer(roomCode);
             clearRoomTimer(roomCode + '_swap');
             delete rooms[roomCode];
