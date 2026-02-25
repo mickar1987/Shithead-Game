@@ -461,7 +461,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.11</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.14</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -556,7 +556,7 @@
         <div id="gameTopBar" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:8px;display:none;gap:5px;z-index:1002;align-items:center;">
             <button onclick="toggleSound()" id="soundBtn" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;opacity:0.5;">🔇</button>
             <button onclick="confirmLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;letter-spacing:0.5px;">EXIT</button>
-            <button onclick="toggleEmojiPicker()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;">😊</button>
+            <button id="emojiToggleBtn" onclick="toggleEmojiPicker()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;">😊</button>
         </div>
         <div id="emojiPicker" style="display:none;position:fixed;top:calc(env(safe-area-inset-top) + 50px);right:8px;background:rgba(20,20,40,0.97);border:1px solid #444;border-radius:12px;padding:10px;z-index:1002;display:none;">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
@@ -574,7 +574,7 @@
                 <button onclick="sendReaction('👎')" class="react-btn">👎</button>
             </div>
         </div>
-        <div id="reactionDisplay" style="position:fixed;top:48%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-align:center;">
+        <div id="reactionDisplay" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-align:center;">
             <div id="reactionEmoji" style="font-size:90px;text-shadow:0 4px 24px rgba(0,0,0,0.9);line-height:1;"></div>
             <div id="reactionName" style="font-size:14px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.9);margin-top:4px;font-weight:600;letter-spacing:1px;"></div>
         </div>
@@ -1881,6 +1881,7 @@ function initSocket() {
     });
 
     socket.on('toast', msg => { showToast(msg, 800); log(msg); });
+    socket.on('reaction', ({ emoji, name }) => showReactionLocal(emoji, name));
     socket.on('burn', () => {
         playSound('burn');
         showToast('🔥 שריפה!');
@@ -2403,11 +2404,26 @@ function toggleEmojiPicker() {
     p.style.display = p.style.display === 'none' || !p.style.display ? 'block' : 'none';
 }
 
+let reactionCooldown = false;
 function sendReaction(emoji) {
-    showReactionLocal(emoji, 'אתה');
+    if (reactionCooldown) { showToast('המתן 10 שניות בין תגובות'); return; }
+    reactionCooldown = true;
+    // Start cooldown visual on emoji button
+    const btn = document.getElementById('emojiToggleBtn');
+    if (btn) { btn.style.opacity = '0.4'; btn.title = 'המתן...'; }
+    setTimeout(() => {
+        reactionCooldown = false;
+        if (btn) { btn.style.opacity = '1'; btn.title = ''; }
+    }, 10000);
     if (onlineMode && socket) {
+        // Server broadcasts to ALL players including sender
         socket.emit('reaction', { emoji });
+    } else {
+        // AI mode — show locally
+        showReactionLocal(emoji, 'אתה');
     }
+    const picker = document.getElementById('emojiPicker');
+    if (picker) picker.style.display = 'none';
 }
 
 function showReactionLocal(emoji, name) {
@@ -2418,6 +2434,16 @@ function showReactionLocal(emoji, name) {
     const nameEl = document.getElementById('reactionName');
     if (emojiEl) emojiEl.textContent = emoji;
     if (nameEl) nameEl.textContent = name;
+    // Position over the draw pile dynamically
+    // Position over the קופה (draw deck)
+    const drawEl = document.getElementById('drawCountDisplay') || document.querySelector('.draw-deck');
+    if (drawEl) {
+        const rect = drawEl.getBoundingClientRect();
+        el.style.top = (rect.top + rect.height/2) + 'px';
+        el.style.left = (rect.left + rect.width/2) + 'px';
+        el.style.transform = 'translate(-50%,-50%)';
+        el.style.position = 'fixed';
+    }
     el.style.opacity = '1';
     setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
