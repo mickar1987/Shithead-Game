@@ -491,7 +491,7 @@ io.on('connection', (socket) => {
             }],
             playerCount: 1, // grows as players join
             drawPile: [], pile: [],
-            currentPlayer: 0, isSwapPhase: false,
+            currentPlayer: 0, isSwapPhase: null, // null = lobby, true/false = in game
             winnersOrder: [], gameOver: false,
             interruptWindow: false, lastPlayedRank: null, lastPlayerIdx: null,
             turnTimer: turnTimer || 0,
@@ -913,10 +913,11 @@ io.on('connection', (socket) => {
         const list = allRooms.map(r => {
             const connected = r.slots.filter(s => s.connected).length;
             const max = r.openRoom ? 4 : r.playerCount;
-            // inProgress = game actually started (swap done and playing)
-            const inProgress = r.gameStarted || (r.isSwapPhase === false && !r.gameOver);
+            // inProgress = game actually started
+            const inProgress = r.gameStarted ||
+                (!r.openRoom && r.isSwapPhase === false && !r.gameOver);
             const isFull = r.openRoom ? connected >= 4 : !r.slots.some(s => !s.connected);
-            // available = waiting for players (in lobby / swap phase, not yet playing)
+            // available = waiting for players
             const isAvailable = !r.gameOver && !inProgress && !isFull;
             return {
                 code: r.code,
