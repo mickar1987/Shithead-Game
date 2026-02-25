@@ -273,6 +273,16 @@ function drawUpToThree(room, idx) {
 }
 
 // ── Check win ──
+// ── Emit open lobby state ──
+function emitOpenLobby(room) {
+    const state = {
+        players: room.slots.map((s,i) => ({ name: s.name, connected: s.connected })),
+        openRoom: true,
+        gameStarted: room.gameStarted || false
+    };
+    broadcast(room, 'state', state);
+}
+
 function checkWin(room, idx) {
     const p = room.slots[idx];
     if (!p.finished &&
@@ -448,37 +458,100 @@ io.on('connection', (socket) => {
         emitStateToPlayer(room, 0);
     });
 
-    // ── Join room ──
-    socket.on('joinRoom', ({ code, name }) => {
-        const room = rooms[code.toUpperCase()];
-        if (!room) { socket.emit('error', 'חדר לא נמצא'); return; }
-        if (room.started) { socket.emit('error', 'המשחק כבר התחיל'); return; }
-
-        const freeSlot = room.slots.find(s => !s.connected);
-        if (!freeSlot) { socket.emit('error', 'החדר מלא'); return; }
-
-        freeSlot.name = name;
-        freeSlot.socketId = socket.id;
-        freeSlot.connected = true;
-        socket.join(code.toUpperCase());
-        socket.data.roomCode = code.toUpperCase();
-        socket.data.slotIdx = freeSlot.id;
-        socket.emit('roomJoined', { code: code.toUpperCase(), slotIdx: freeSlot.id });
-        emitStateToAll(room);
-
-        // Check if room is full → auto-start
-        if (room.slots.every(s => s.connected)) {
-            room.started = true;
-            broadcast(room, 'toast', '🎮 כל השחקנים הצטרפו! מתחילים...');
-            setTimeout(() => {
-                emitStateToAll(room);
-                startSwapTimer(room);
-            }, 1000);
-        } else {
-            const waiting = room.slots.filter(s => !s.connected).length;
-            broadcast(room, 'toast', `ממתין לעוד ${waiting} שחקנים...`);
-        }
+    // ── Open room (host decides when to start) ──
+    socket.on('createOpenRoom', ({ name, turnTimer }) => {
+        const code = [...Array(4)].map(() => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*23)]).join('');
+        const room = {
+            code,
+            slots: [{
+                id: 0, name, socketId: socket.id, connected: true,
+                hand: [], faceUp: [], faceDown: [], finished: false,
+                consecutiveTimeouts: 0
+            }],
+            playerCount: 1, // grows as players join
+            drawPile: [], pile: [],
+            currentPlayer: 0, isSwapPhase: false,
+            winnersOrder: [], gameOver: false,
+            interruptWindow: false, lastPlayedRank: null, lastPlayerIdx: null,
+            turnTimer: turnTimer || 0,
+            openRoom: true,  // flag: host controls start
+            hostSocketId: socket.id,
+            restartVotes: new Set()
+        };
+        rooms[code] = room;
+        socket.join(code);
+        socket.data.roomCode = code;
+        socket.data.slotIdx = 0;
+        socket.emit('openRoomCreated', { code, slotIdx: 0 });
+        emitOpenLobby(room);
     });
+
+    // ── Join open room ──
+    socket.on('joinRoom', ({ code, name }) => {
+        const room = rooms[code];
+        if (!room) { socket.emit('error', 'חדר לא נמצא'); return; }
+        if (room.openRoom && !room.gameStarted) {
+            if (room.slots.length >= 4) { socket.emit('error', 'החדר מלא (4 שחקנים)'); return; }
+            const slotIdx = room.slots.length;
+            room.slots.push({
+                id: slotIdx, name, socketId: socket.id, connected: true,
+                hand: [], faceUp: [], faceDown: [], finished: false,
+                consecutiveTimeouts: 0
+            });
+            room.playerCount = room.slots.length;
+            socket.join(code);
+            socket.data.roomCode = code;
+            socket.data.slotIdx = slotIdx;
+            socket.emit('openRoomCreated', { code, slotIdx });
+            emitOpenLobby(room);
+            return;
+        }
+        // Fixed-size room join
+        const slot = room.slots.find(s => !s.connected);
+        if (!slot) { socket.emit('error', 'החדר מלא'); return; }
+        slot.name = name; slot.socketId = socket.id; slot.connected = true;
+        socket.join(code);
+        socket.data.roomCode = code;
+        socket.data.slotIdx = slot.id;
+        socket.emit('roomJoined', { code, slotIdx: slot.id });
+        emitStateToAll(room);
+    });
+
+    // ── Host starts open room ──
+    socket.on('hostStart', () => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || !room.openRoom || slotIdx !== 0) return;
+        if (room.slots.filter(s => s.connected).length < 2) {
+            socket.emit('error', 'צריך לפחות 2 שחקנים'); return;
+        }
+        // Initialize the game with current connected players
+        room.gameStarted = true;
+        room.openRoom = false; // behave like normal room now
+        const deck = makeDeck();
+        room.slots = room.slots.filter(s => s.connected);
+        room.playerCount = room.slots.length;
+        room.slots.forEach((s, i) => {
+            s.id = i;
+            s.hand = deck.splice(0, 3);
+            s.faceUp = deck.splice(0, 3);
+            s.faceDown = deck.splice(0, 3);
+            s.finished = false;
+        });
+        room.drawPile = deck;
+        room.pile = [];
+        room.currentPlayer = 0;
+        room.isSwapPhase = true;
+        room.winnersOrder = [];
+        room.gameOver = false;
+        broadcast(room, 'toast', '🎮 המארח התחיל את המשחק!');
+        emitStateToAll(room);
+        startSwapTimer(room);
+    });
+
+    // ── Join room ──
+    // old joinRoom removed (handled above)
+;
 
     // ── Swap cards (swap phase) ──
     socket.on('swap', ({ handIdx, tableIdx }) => {
