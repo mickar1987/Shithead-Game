@@ -461,7 +461,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.14</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.15</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -568,7 +568,7 @@
                 <button onclick="sendReaction('👏')" class="react-btn">👏</button>
                 <button onclick="sendReaction('🔥')" class="react-btn">🔥</button>
                 <button onclick="sendReaction('😎')" class="react-btn">😎</button>
-                <button onclick="sendReaction('🤦')" class="react-btn">🤦</button>
+                <button onclick="sendReaction('💩')" class="react-btn">💩</button>
                 <button onclick="sendReaction('💀')" class="react-btn">💀</button>
                 <button onclick="sendReaction('🙈')" class="react-btn">🙈</button>
                 <button onclick="sendReaction('👎')" class="react-btn">👎</button>
@@ -1832,10 +1832,18 @@ function requireName(nextMenu) {
         }
         return;
     }
+    localStorage.setItem('shitheadPlayerName', n);
     showMenu(nextMenu);
 }
 
 function showMenu(id) {
+    if (id === 'menuOnline') {
+        const saved = localStorage.getItem('shitheadPlayerName');
+        if (saved) setTimeout(() => {
+            const inp = document.getElementById('playerNameInput');
+            if (inp && !inp.value) inp.value = saved;
+        }, 50);
+    }
     ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuLobby'].forEach(m => {
         const el = document.getElementById(m);
         if (el) el.classList.toggle('hidden', el.id !== id);
@@ -1957,11 +1965,8 @@ function initSocket() {
     });
 
     socket.on('playerLeft', ({ name, newPlayerCount }) => {
-        showToast(`🚪 ${name} יצא`);
-        if (newPlayerCount <= 1) {
-            // Last player standing — go to main menu
-            setTimeout(() => leaveToMenu(), 1500);
-        }
+        showToast(`🚪 ${name} יצא — 🤖 ממשיך במקומו`);
+        // Server replaces leaving player with bot — stay in game
     });
 
     socket.io.on('reconnect', () => {
