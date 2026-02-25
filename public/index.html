@@ -37,6 +37,15 @@
             color: white;
             background: var(--felt-dark);
         }
+        /* Fill safe area bottom with felt color */
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: env(safe-area-inset-bottom);
+            background: var(--felt-dark);
+            z-index: 9998;
+        }
 
         /* ── TABLE FELT ── */
         .game-container {
@@ -459,7 +468,7 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.3</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v8.5</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -572,7 +581,10 @@
                 <button onclick="sendReaction('👎')" class="react-btn">👎</button>
             </div>
         </div>
-        <div id="reactionDisplay" style="position:fixed;top:18%;left:50%;transform:translateX(-50%);font-size:72px;pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-shadow:0 4px 20px rgba(0,0,0,0.8);"></div>
+        <div id="reactionDisplay" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s;text-align:center;">
+            <div id="reactionEmoji" style="font-size:90px;text-shadow:0 4px 24px rgba(0,0,0,0.9);line-height:1;"></div>
+            <div id="reactionName" style="font-size:14px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.9);margin-top:4px;font-weight:600;letter-spacing:1px;"></div>
+        </div>
         <div id="playerHand" dir="ltr"></div>
     </div>
 </div>
