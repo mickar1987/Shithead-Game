@@ -277,7 +277,7 @@ function drawUpToThree(room, idx) {
 // ── Emit open lobby state ──
 function emitOpenLobby(room) {
     const state = {
-        players: room.slots.map((s,i) => ({ name: s.name, connected: s.connected })),
+        players: room.slots.filter(s => s.connected).map((s,i) => ({ name: s.name, connected: true })),
         openRoom: true,
         gameStarted: room.gameStarted || false
     };
