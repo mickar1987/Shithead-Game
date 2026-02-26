@@ -687,13 +687,14 @@ io.on('connection', (socket) => {
     socket.on('endSwap', () => {
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
+        console.log(`[endSwap] slot${slotIdx} isSwapPhase=${room?.isSwapPhase} _swapDone=${room?.slots[slotIdx]?._swapDone} swapDoneCount=${room?.swapDoneCount} slots:`, room?.slots.map(s=>({socketId:!!s.socketId,_swapDone:s._swapDone})));
         if (!room || !room.isSwapPhase) return;
         // Prevent double-submit from same player
         if (room.slots[slotIdx]._swapDone) return;
         room.slots[slotIdx]._swapDone = true;
         room.swapDoneCount = (room.swapDoneCount || 0) + 1;
         const needed = room.slots.filter(s => s.socketId).length;
-        console.log(`[endSwap] slot${slotIdx} done. ${room.swapDoneCount}/${needed}`);
+        console.log(`[endSwap] after mark: ${room.swapDoneCount}/${needed} allSlots:`, room.slots.map(s=>({socketId:!!s.socketId,_swapDone:s._swapDone})));
         if (room.swapDoneCount >= needed) {
             clearRoomTimer(room.code + '_swap');
             broadcast(room, 'swapTick', { remaining: 0 });
