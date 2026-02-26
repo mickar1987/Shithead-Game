@@ -40,6 +40,9 @@ function findStarter(slots) {
 function startSwapTimer(room) {
     const key = room.code + '_swap';
     clearRoomTimer(key);
+    // Reset swap tracking fresh at start of each swap phase
+    room.swapDoneCount = 0;
+    room.slots.forEach(s => { s._swapDone = false; });
     let remaining = 40;
     broadcast(room, 'swapTick', { remaining });
 
@@ -687,14 +690,16 @@ io.on('connection', (socket) => {
     socket.on('endSwap', () => {
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
-        console.log(`[endSwap] slot${slotIdx} isSwapPhase=${room?.isSwapPhase} _swapDone=${room?.slots[slotIdx]?._swapDone} swapDoneCount=${room?.swapDoneCount} slots:`, room?.slots.map(s=>({socketId:!!s.socketId,_swapDone:s._swapDone})));
         if (!room || !room.isSwapPhase) return;
-        // Prevent double-submit from same player
-        if (room.slots[slotIdx]._swapDone) return;
+        // Prevent double-submit from same player this round
+        if (room.slots[slotIdx]._swapDone) {
+            console.log(`[endSwap] slot${slotIdx} BLOCKED (already done) swapDoneCount=${room.swapDoneCount}`);
+            return;
+        }
         room.slots[slotIdx]._swapDone = true;
         room.swapDoneCount = (room.swapDoneCount || 0) + 1;
         const needed = room.slots.filter(s => s.socketId).length;
-        console.log(`[endSwap] after mark: ${room.swapDoneCount}/${needed} allSlots:`, room.slots.map(s=>({socketId:!!s.socketId,_swapDone:s._swapDone})));
+        console.log(`[endSwap] slot${slotIdx} counted: ${room.swapDoneCount}/${needed}`);
         if (room.swapDoneCount >= needed) {
             clearRoomTimer(room.code + '_swap');
             broadcast(room, 'swapTick', { remaining: 0 });
