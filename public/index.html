@@ -1977,6 +1977,7 @@ function initSocket() {
 
     socket.on('state', (state) => {
         onlineState = state;
+        console.log('[state] isSwapPhase=', state.isSwapPhase, 'allJoined=', state.allJoined, 'onlineMode=', onlineMode, 'gameOver=', state.gameOver);
         const overlay = document.getElementById('setupOverlay');
         if (overlay.style.display !== 'none') {
             updateLobby(state);
@@ -2100,6 +2101,7 @@ function initSocket() {
     socket.on('error', msg => showToast('❌ ' + msg));
 
     socket.on('gameRestarted', () => {
+        console.log('[gameRestarted] onlineMode=', onlineMode);
         if (!onlineMode) return; // already left to menu
         revealedFaceDownIndex = null;
         selectedHandIndices = [];
