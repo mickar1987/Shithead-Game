@@ -202,6 +202,7 @@ function restartRoom(room) {
     room.swapDoneCount = 0;
     clearRoomTimer(room.code);
     clearRoomTimer(room.code + '_swap');
+    console.log(`[restartRoom] slots:`, room.slots.map(s=>({name:s.name,socketId:!!s.socketId,connected:s.connected,_swapDone:s._swapDone})));
 }
 
 function createRoom(hostSocketId, hostName, playerCount) {
@@ -942,12 +943,12 @@ io.on('connection', (socket) => {
 
         // Non-public rooms: all-vote system
         room.restartVotes.add(slotIdx);
-        const connected = room.slots.filter(s => s.connected);
+        const activePlayers = room.slots.filter(s => s.socketId);
         broadcast(room, 'playerWantsRestart', {
             readyCount: room.restartVotes.size,
-            totalCount: connected.length
+            totalCount: activePlayers.length
         });
-        if (room.restartVotes.size >= connected.length) {
+        if (room.restartVotes.size >= activePlayers.length) {
             room.restartVotes = new Set();
             restartRoom(room);
             broadcast(room, 'gameRestarted', {});
