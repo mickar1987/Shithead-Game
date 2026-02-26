@@ -949,7 +949,9 @@ io.on('connection', (socket) => {
 
         // Non-public rooms: all-vote system
         room.restartVotes.add(slotIdx);
+        // Count players who are still connected (have active socket)
         const activePlayers = room.slots.filter(s => s.socketId);
+        console.log(`[voteRestart] slot${slotIdx} votes=${room.restartVotes.size} activePlayers=${activePlayers.length} slots:`, room.slots.map(s=>({name:s.name,socketId:!!s.socketId,connected:s.connected})));
         broadcast(room, 'playerWantsRestart', {
             readyCount: room.restartVotes.size,
             totalCount: activePlayers.length
