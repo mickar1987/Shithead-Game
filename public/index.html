@@ -106,8 +106,21 @@
         .setup-btn:hover::after { opacity: 1; }
         .setup-btn:active { transform: translateY(0); }
         .setup-grid { display: flex; flex-direction: column; gap: 12px; width: 100%; align-items: center; }
-        .setup-back { color: rgba(255,255,255,0.4); font-size:12px; letter-spacing:2px; cursor:pointer; padding:4px 0; text-align:center; }
-        .setup-back:hover { color: var(--gold); }
+        .setup-back { 
+            color: rgba(255,255,255,0.6); 
+            font-size:13px; 
+            letter-spacing:1px; 
+            cursor:pointer; 
+            padding:8px 16px; 
+            text-align:center;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px;
+            width: fit-content;
+            align-self: center;
+            transition: all 0.15s;
+        }
+        .setup-back:hover { color: var(--gold); border-color: var(--gold); background: rgba(240,192,64,0.08); }
         .setup-input { width:100%;max-width:280px;padding:14px 16px;border-radius:4px;border:1px solid rgba(240,192,64,0.3);background:rgba(255,255,255,0.07);color:white;font-family:'Rubik',sans-serif;font-size:1rem;text-align:center;outline:none; box-sizing:border-box; }
         .setup-input:focus { border-color: var(--gold); }
         .lobby-player { padding:8px 12px; background:rgba(255,255,255,0.06); border-radius:6px; color:white; font-size:13px; margin-bottom:6px; display:flex; align-items:center; gap:8px; width:100%; max-width:280px; box-sizing:border-box; }
@@ -463,7 +476,11 @@
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
         <div id="onlineStats" style="font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:4px;"></div>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.2</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5</div>
+    <!-- Profile button — top left, safe area aware -->
+    <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
+        <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
+    </div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -472,9 +489,8 @@
     </div>
     <div id="menuOnline" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
-        <input id="playerNameInput" type="text" placeholder="השם שלך" maxlength="12" class="setup-input"/>
-        <button onclick="requireName('menuCreate')" class="setup-btn">➕ צור חדר</button>
-        <button onclick="requireName('menuJoin')" class="setup-btn">🔗 הצטרף לחדר</button>
+        <button onclick="showMenu('menuCreate')" class="setup-btn">➕ צור חדר</button>
+        <button onclick="showMenu('menuJoin')" class="setup-btn">🔗 הצטרף לחדר</button>
     </div>
     <div id="menuCreate" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
@@ -523,6 +539,21 @@
     </div>
 
 
+</div>
+
+<!-- PROFILE / NAME MODAL -->
+<div id="nameModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10001;display:none;align-items:center;justify-content:center;">
+    <div style="background:#0d2e18;border:1px solid rgba(255,255,255,0.15);border-radius:18px;padding:28px 24px;width:90%;max-width:320px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--gold);letter-spacing:3px;margin-bottom:8px;">הפרופיל שלך</div>
+        <div id="nameModalSubtitle" style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:20px;">בחר שם שיוצג לשחקנים אחרים</div>
+        <input id="nameModalInput" type="text" maxlength="12" placeholder="השם שלך" 
+            style="width:100%;box-sizing:border-box;padding:12px;font-size:1.1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;letter-spacing:1px;outline:none;"
+            onkeydown="if(event.key==='Enter') saveProfileName()"/>
+        <button onclick="saveProfileName()" 
+            style="margin-top:16px;width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#064e1e);border:none;border-radius:10px;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:1px;">
+            ✅ שמור
+        </button>
+    </div>
 </div>
 
 <!-- HOW TO PLAY MODAL -->
@@ -1879,33 +1910,18 @@ let onlineMode = false;
 let mySlotIdx = null;
 let onlineState = null;
 
-function requireName(nextMenu) {
-    const n = (document.getElementById('playerNameInput')?.value || '').trim();
-    if (!n) {
-        const inp = document.getElementById('playerNameInput');
-        if (inp) {
-            inp.style.borderColor = '#ef4444';
-            inp.placeholder = '⚠️ חובה להזין שם';
-            inp.focus();
-            setTimeout(() => { inp.style.borderColor=''; inp.placeholder='השם שלך'; }, 2000);
-        }
-        return;
-    }
-    localStorage.setItem('shitheadPlayerName', n);
-    showMenu(nextMenu);
-}
+// requireName removed — using profile system
 
 function showMenu(id) {
     if (id === 'menuMain') {
         fetchOnlineStats();
+        const pb = document.getElementById('profileBtn');
+        if (pb) pb.style.display = 'flex';
+    } else {
+        const pb = document.getElementById('profileBtn');
+        if (pb) pb.style.display = 'none';
     }
-    if (id === 'menuOnline') {
-        const saved = localStorage.getItem('shitheadPlayerName');
-        if (saved) setTimeout(() => {
-            const inp = document.getElementById('playerNameInput');
-            if (inp && !inp.value) inp.value = saved;
-        }, 50);
-    }
+
     if (id === 'menuCreate') {
         // Reset timer + player buttons every time we enter this menu
         selectedTimer = 0; timerSelected = false;
@@ -1935,11 +1951,7 @@ function showMenu(id) {
     });
 }
 
-function getMyName() {
-    const n = (document.getElementById('playerNameInput')?.value || '').trim();
-    if (!n) { showToast('הכנס שם תחילה'); return null; }
-    return n;
-}
+// getMyName replaced by profile version above
 
 function initSocket() {
     if (socket) return;
@@ -2158,6 +2170,66 @@ function showHowToPlay() {
     document.getElementById('howToPlayModal').style.display = 'block';
 }
 
+// ── Profile management ──
+function loadProfile() {
+    const name = localStorage.getItem('shitheadPlayerName');
+    updateProfileUI(name);
+    if (!name) {
+        setTimeout(() => showNameModal(true), 300);
+    }
+}
+
+function updateProfileUI(name) {
+    const initial = document.getElementById('profileInitial');
+    if (initial) {
+        if (name) {
+            // Show first Hebrew/Latin letter
+            initial.style.fontSize = '18px';
+            initial.textContent = [...name][0].toUpperCase();
+        } else {
+            initial.style.fontSize = '22px';
+            initial.textContent = '?';
+        }
+    }
+}
+
+function showNameModal(firstTime = false) {
+    const modal = document.getElementById('nameModal');
+    const sub = document.getElementById('nameModalSubtitle');
+    const inp = document.getElementById('nameModalInput');
+    if (firstTime) {
+        sub.textContent = 'ברוך הבא! בחר שם לפני שמתחילים 👋';
+    } else {
+        sub.textContent = 'שנה את השם שלך';
+        inp.value = localStorage.getItem('shitheadPlayerName') || '';
+    }
+    modal.style.display = 'flex';
+    setTimeout(() => inp.focus(), 100);
+}
+
+function saveProfileName() {
+    const inp = document.getElementById('nameModalInput');
+    const name = inp.value.trim();
+    if (!name) {
+        inp.style.borderColor = '#ef4444';
+        setTimeout(() => inp.style.borderColor = 'rgba(255,255,255,0.2)', 1500);
+        return;
+    }
+    localStorage.setItem('shitheadPlayerName', name);
+    updateProfileUI(name);
+    document.getElementById('nameModal').style.display = 'none';
+}
+
+function editProfile() {
+    showNameModal(false);
+}
+
+function getMyName() {
+    const name = localStorage.getItem('shitheadPlayerName');
+    if (!name) { showNameModal(true); return null; }
+    return name;
+}
+
 function fetchOnlineStats() {
     if (socket) {
         socket.emit('getOnlineStats');
@@ -2175,7 +2247,7 @@ function fetchOnlineStats() {
 }
 
 // Fetch stats on page load
-window.addEventListener('load', () => setTimeout(fetchOnlineStats, 500));
+window.addEventListener('load', () => { loadProfile(); setTimeout(fetchOnlineStats, 500); });
 
 function setRoomType(type) {
     selectedRoomType = type;
