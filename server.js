@@ -855,7 +855,11 @@ io.on('connection', (socket) => {
             room.restartVotes = new Set();
             restartRoom(room);
             broadcast(room, 'gameRestarted', {});
-            setTimeout(() => { emitStateToAll(room); startSwapTimer(room); }, 300);
+            setTimeout(() => {
+                console.log(`[RESTART] room ${room.code} isSwapPhase=${room.isSwapPhase} slots:`, room.slots.map(s=>({name:s.name,connected:s.connected,_swapDone:s._swapDone})));
+                emitStateToAll(room);
+                startSwapTimer(room);
+            }, 300);
         }
     });
 
@@ -1040,7 +1044,11 @@ io.on('connection', (socket) => {
             room.restartVotes = new Set();
             restartRoom(room);
             broadcast(room, 'gameRestarted', {});
-            setTimeout(() => { emitStateToAll(room); startSwapTimer(room); }, 300);
+            setTimeout(() => {
+                console.log(`[RESTART] room ${room.code} isSwapPhase=${room.isSwapPhase} slots:`, room.slots.map(s=>({name:s.name,connected:s.connected,_swapDone:s._swapDone})));
+                emitStateToAll(room);
+                startSwapTimer(room);
+            }, 300);
         } else {
             emitStateToAll(room);
         }
