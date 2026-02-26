@@ -82,11 +82,37 @@ function startTurnTimer(room) {
                 p.consecutiveTimeouts = (p.consecutiveTimeouts || 0) + 1;
                 const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
 
-                // Disqualify after 2 consecutive timeouts = treat as leave
+                // Disqualify after 2 consecutive timeouts
                 if (p.consecutiveTimeouts >= 2) {
-                    broadcast(room, 'toast', `⏰ ${p.name} לא שיחק — מוכרז כיוצא`);
+                    broadcast(room, 'toast', `⏰ ${p.name} לא שיחק — מוכרז כמפסיד`);
                     p.disqualified = true;
-                    handlePlayerLeave({ roomCode: room.code, slotIdx: autoSlot });
+                    p.finished = true;
+                    room.winnersOrder.push(autoSlot);
+
+                    const active = room.slots.filter(s => !s.finished);
+                    if (active.length <= 1) {
+                        if (active.length === 1) {
+                            active[0].finished = true;
+                            room.winnersOrder.unshift(active[0].id);
+                        }
+                        room.gameOver = true;
+                        clearRoomTimer(room.code);
+                        broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+                    } else {
+                        // Replace with bot
+                        p.isBot = true;
+                        p.finished = false;
+                        room.winnersOrder.pop();
+                        const origName = p.name;
+                        p.name = `🤖 ${origName}`;
+                        broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${origName}`);
+                        emitStateToAll(room);
+                        if (room.currentPlayer === autoSlot) {
+                            setTimeout(() => { if (rooms[room.code]) doBotTurn(room); }, 800);
+                        } else {
+                            nextTurn(room);
+                        }
+                    }
                     return;
                 }
 
@@ -464,6 +490,70 @@ setInterval(() => {
     });
 }, 5 * 60 * 1000);
 
+function handlePlayerLeave(socketData) {
+    const { roomCode, slotIdx } = socketData;
+    const room = rooms[roomCode];
+    if (!room) return;
+    const slot = room.slots[slotIdx];
+    if (!slot) return;
+    const name = slot.name;
+
+    // Check game state BEFORE marking disconnected
+    const inGame = room.gameStarted || room.isSwapPhase === false;
+    const inLobby = !inGame && !room.gameOver;
+    slot.connected = false;
+    slot.socketId = null;
+    if (room.restartVotes) room.restartVotes.delete(slotIdx);
+
+    const connected = room.slots.filter(s => s.connected).length;
+
+    if (inLobby) {
+        if (connected === 0 || slotIdx === 0) {
+            broadcast(room, 'roomClosed', { reason: slotIdx === 0 ? 'המארח יצא מהחדר' : 'החדר נסגר' });
+            clearRoomTimer(roomCode);
+            clearRoomTimer(roomCode + '_swap');
+            delete rooms[roomCode];
+            return;
+        }
+        broadcast(room, 'lobbyPlayerLeft', { name, newCount: connected });
+        emitOpenLobby(room);
+        return;
+    }
+
+    if (room.gameOver) {
+        broadcast(room, 'playerLeft', { name, newPlayerCount: connected });
+        return;
+    }
+
+    // Mark as loser
+    slot.finished = true;
+    slot.disqualified = true;
+    room.winnersOrder.push(slotIdx);
+    broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
+
+    const active = room.slots.filter(s => !s.finished);
+
+    if (active.length <= 1) {
+        if (active.length === 1) {
+            active[0].finished = true;
+            room.winnersOrder.unshift(active[0].id);
+        }
+        room.gameOver = true;
+        clearRoomTimer(room.code);
+        broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+    } else {
+        slot.isBot = true;
+        slot.finished = false;
+        room.winnersOrder.pop();
+        slot.name = `🤖 ${name}`;
+        broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
+        emitStateToAll(room);
+        if (room.currentPlayer === slotIdx) {
+            setTimeout(() => { if (rooms[roomCode]) doBotTurn(room); }, 800);
+        }
+    }
+}
+
 io.on('connection', (socket) => {
 
     // ── Create room ──
@@ -597,10 +687,9 @@ io.on('connection', (socket) => {
         if (!room || !room.isSwapPhase) return;
         // Mark this player as done swapping
         room.slots[slotIdx]._swapDone = true;
-        // Wait for ALL connected players to finish swapping
-        const connectedSlots = room.slots.filter(s => s.connected);
-        const allDone = connectedSlots.every(s => s._swapDone);
-        console.log(`[endSwap] slot${slotIdx} done. connected:${connectedSlots.length} swapDone:${connectedSlots.filter(s=>s._swapDone).length}`);
+        // Wait for ALL players with active socket connections
+        const activeSockets = room.slots.filter(s => s.socketId);
+        const allDone = activeSockets.length > 0 && activeSockets.every(s => s._swapDone);
         if (allDone) {
             clearRoomTimer(room.code + '_swap');
             broadcast(room, 'swapTick', { remaining: 0 });
@@ -868,78 +957,6 @@ emitStateToAll(room);
 
     // ── Leave room ──
     // ── Player voluntarily leaves ──
-    function handlePlayerLeave(socketData) {
-        const { roomCode, slotIdx } = socketData;
-        const room = rooms[roomCode];
-        if (!room) return;
-        const slot = room.slots[slotIdx];
-        if (!slot) return;
-        const name = slot.name;
-
-        // Check game state BEFORE marking disconnected
-        const inGame = room.gameStarted || room.isSwapPhase === false;
-        const inLobby = !inGame && !room.gameOver;
-        console.log(`[handlePlayerLeave] slot${slotIdx}=${name} inGame=${inGame} inLobby=${inLobby} gameStarted=${room.gameStarted} isSwapPhase=${room.isSwapPhase}`);
-
-        slot.connected = false;
-        slot.socketId = null;
-        if (room.restartVotes) room.restartVotes.delete(slotIdx);
-
-        const connected = room.slots.filter(s => s.connected).length;
-
-        if (inLobby) {
-            if (connected === 0 || slotIdx === 0) {
-                // Host left or room empty → close and notify all
-                broadcast(room, 'roomClosed', { reason: slotIdx === 0 ? 'המארח יצא מהחדר' : 'החדר נסגר' });
-                clearRoomTimer(roomCode);
-                clearRoomTimer(roomCode + '_swap');
-                delete rooms[roomCode];
-                return;
-            }
-            // Guest left — update lobby for remaining players
-            broadcast(room, 'lobbyPlayerLeft', { name, newCount: connected });
-            emitOpenLobby(room);
-            return;
-        }
-
-        if (room.gameOver) {
-            // Post-game — just remove
-            broadcast(room, 'playerLeft', { name, newPlayerCount: connected });
-            return;
-        }
-
-        // Mark as loser (last place)
-        slot.finished = true;
-        slot.disqualified = true;
-        room.winnersOrder.push(slotIdx);
-        broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
-
-        // Count still-active players
-        const active = room.slots.filter(s => !s.finished);
-
-        if (active.length <= 1) {
-            // Game over — last active player wins
-            if (active.length === 1) {
-                active[0].finished = true;
-                room.winnersOrder.unshift(active[0].id);
-            }
-            room.gameOver = true;
-            clearRoomTimer(room.code);
-            broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
-        } else {
-            // Bot takes over
-            slot.isBot = true;
-            slot.finished = false; // un-finish so bot can keep playing
-            room.winnersOrder.pop();  // remove from winners — will finish naturally
-            slot.name = `🤖 ${name}`;
-            broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
-            emitStateToAll(room);
-            if (room.currentPlayer === slotIdx) {
-                setTimeout(() => { if (rooms[roomCode]) doBotTurn(room); }, 800);
-            }
-        }
-    }
-
     socket.on('playerLeaving', () => handlePlayerLeave(socket.data));
 
     socket.on('disconnect', () => {
