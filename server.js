@@ -53,6 +53,7 @@ function startSwapTimer(room) {
             const starter = findStarter(room.slots);
             room.isSwapPhase = false;
             room.gameStarted = true;
+            room.swapDoneCount = 0;
             room.currentPlayer = starter;
             broadcast(room, 'swapTick', { remaining: 0 }); // hide timer on all clients
             broadcast(room, 'toast', `⏰ זמן ההחלפה נגמר! ${room.slots[starter].name} ראשון`);
@@ -198,6 +199,7 @@ function restartRoom(room) {
     room.lastPlayedRank = null;
     room.lastPlayerIdx = null;
     room.restartVotes = new Set();
+    room.swapDoneCount = 0;
     clearRoomTimer(room.code);
     clearRoomTimer(room.code + '_swap');
 }
@@ -685,12 +687,13 @@ io.on('connection', (socket) => {
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
         if (!room || !room.isSwapPhase) return;
-        // Mark this player as done swapping
+        // Prevent double-submit from same player
+        if (room.slots[slotIdx]._swapDone) return;
         room.slots[slotIdx]._swapDone = true;
-        // Wait for ALL players with active socket connections
-        const activeSockets = room.slots.filter(s => s.socketId);
-        const allDone = activeSockets.length > 0 && activeSockets.every(s => s._swapDone);
-        if (allDone) {
+        room.swapDoneCount = (room.swapDoneCount || 0) + 1;
+        const needed = room.slots.filter(s => s.socketId).length;
+        console.log(`[endSwap] slot${slotIdx} done. ${room.swapDoneCount}/${needed}`);
+        if (room.swapDoneCount >= needed) {
             clearRoomTimer(room.code + '_swap');
             broadcast(room, 'swapTick', { remaining: 0 });
             room.isSwapPhase = false;
@@ -701,7 +704,7 @@ io.on('connection', (socket) => {
             emitStateToAll(room);
             startTurnTimer(room);
         } else {
-            const waiting = activeSockets.filter(s => !s._swapDone).length;
+            const waiting = needed - room.swapDoneCount;
             broadcast(room, 'toast', `${room.slots[slotIdx].name} סיים החלפה. ממתין לעוד ${waiting}...`);
         }
     });
