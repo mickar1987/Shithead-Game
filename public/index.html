@@ -460,8 +460,10 @@
     <div id="menuMain" class="setup-grid">
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
+        <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
+        <div id="onlineStats" style="font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:4px;"></div>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.1</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.2</div>
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -520,14 +522,11 @@
         <div id="waitingMore" style="display:none;font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;">ממתין לשחקן נוסף לפחות...</div>
     </div>
 
-    <div style="margin-top:24px;display:flex;flex-direction:column;align-items:center;gap:8px;">
-        <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;">❓ איך משחקים</button>
-        <div id="onlineStats" style="font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;"></div>
-    </div>
+
 </div>
 
 <!-- HOW TO PLAY MODAL -->
-<div id="howToPlayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:3000;overflow-y:auto;padding:env(safe-area-inset-top,20px) 20px 20px;">
+<div id="howToPlayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;overflow-y:auto;padding:env(safe-area-inset-top,20px) 20px 20px;">
     <div style="max-width:360px;margin:0 auto;padding-top:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold);letter-spacing:3px;">איך משחקים?</div>
@@ -2160,19 +2159,23 @@ function showHowToPlay() {
 }
 
 function fetchOnlineStats() {
-    if (!socket) {
-        // Use temp socket just for stats
-        const tmpSocket = io({ autoConnect: true });
-        tmpSocket.on('onlineStats', ({ online, inGame }) => {
-            const el = document.getElementById('onlineStats');
-            if (el) el.textContent = `${online} משתמשים מחוברים • ${inGame} במשחק`;
-            tmpSocket.disconnect();
-        });
-        tmpSocket.emit('getOnlineStats');
+    if (socket) {
+        socket.emit('getOnlineStats');
         return;
     }
-    socket.emit('getOnlineStats');
+    // Lightweight temp connection just for stats
+    const tmpSocket = io({ autoConnect: true, reconnection: false });
+    tmpSocket.once('connect', () => tmpSocket.emit('getOnlineStats'));
+    tmpSocket.once('onlineStats', ({ online, inGame }) => {
+        const el = document.getElementById('onlineStats');
+        if (el) el.textContent = `${online} משתמשים מחוברים • ${inGame} במשחק`;
+        tmpSocket.disconnect();
+    });
+    setTimeout(() => { if (tmpSocket.connected) tmpSocket.disconnect(); }, 5000);
 }
+
+// Fetch stats on page load
+window.addEventListener('load', () => setTimeout(fetchOnlineStats, 500));
 
 function setRoomType(type) {
     selectedRoomType = type;
