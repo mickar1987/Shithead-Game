@@ -469,14 +469,14 @@
 <!-- SETUP -->
 <div id="setupOverlay">
     <div class="setup-title">SHITHEAD</div>
+    <div id="onlineStats" style="font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-bottom:4px;min-height:14px;"></div>
 
     <div id="menuMain" class="setup-grid">
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
-        <div id="onlineStats" style="font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-top:4px;"></div>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.13</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.15</div>
     <!-- Profile button — top left, safe area aware -->
     <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
         <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
@@ -501,9 +501,9 @@
         </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
+            <button onclick="setTimer(10)" id="timerBtn10" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">10s</button>
             <button onclick="setTimer(20)" id="timerBtn20" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">20s</button>
-            <button onclick="setTimer(30)" id="timerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">30s</button>
-            <button onclick="setTimer(60)" id="timerBtn60" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">60s</button>
+            <button onclick="setTimer(40)" id="timerBtn40" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40s</button>
             <button onclick="setTimer(0)"  id="timerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">♾</button>
         </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">כמה שחקנים?</div>
@@ -800,19 +800,25 @@ function startGame(count) {
             const scored = all.map(c => {
                 const r = c.slice(0,-1);
                 let s = 0;
-                if (r === '2')  s = 100; // always playable
-                if (r === '3')  s = 90;  // transparent
-                if (r === '10') s = 95;  // burn
-                if (r === '8')  s = 70;  // skip
-                if (r === '7')  s = 60;  // force low
-                if (r === 'A')  s = 55;
-                if (r === 'K')  s = 50;
-                if (r === 'Q')  s = 45;
-                if (r === 'J')  s = 40;
-                if (r === '9')  s = 35;
-                if (r === '6')  s = 20;
-                if (r === '5')  s = 15;
-                if (r === '4')  s = 10;
+                // faceUp priority: cards that are ALWAYS playable or powerful specials
+                // 2 and 3 are best — playable on anything, never get stuck
+                // 8 great — skip opponent from faceUp
+                // 7 good — force opponent low
+                // 10 is powerful but better played from HAND (context-aware burn)
+                //    so slightly lower priority for faceUp than 2/3/8
+                if (r === '2')  s = 100; // always playable — best faceUp
+                if (r === '3')  s = 95;  // transparent — second best
+                if (r === '8')  s = 75;  // skip — great from faceUp
+                if (r === '7')  s = 65;  // force low — good from faceUp
+                if (r === '10') s = 60;  // burn — good but better from hand
+                if (r === 'A')  s = 45;
+                if (r === 'K')  s = 38;
+                if (r === 'Q')  s = 32;
+                if (r === 'J')  s = 26;
+                if (r === '9')  s = 20;
+                if (r === '6')  s = 12;
+                if (r === '5')  s = 8;
+                if (r === '4')  s = 4;
                 return { c, s };
             }).sort((a,b) => b.s - a.s);
             p.faceUp = scored.slice(0,3).map(x=>x.c);
@@ -1582,6 +1588,8 @@ function aiGetBestPlay(validCards, hand) {
         totalCards: p.hand.length + p.faceUp.filter(Boolean).length + p.faceDown.filter(Boolean).length
     }));
     const anyOppInFaceUpPhase = oppData.some(o => o.inFaceUpPhase);
+    const anyOppInFaceDownPhase = oppData.some(o => o.inFaceDownPhase);
+    const anyOppNearEnd = anyOppInFaceUpPhase || anyOppInFaceDownPhase;
     const minOppTotal = Math.min(...oppData.map(o => o.totalCards));
     const maxOppHand = Math.max(0, ...oppData.map(o => o.handCount));
 
@@ -1599,23 +1607,31 @@ function aiGetBestPlay(validCards, hand) {
         // ── Reward playing multiples ──
         score -= (numCards - 1) * 12;
 
-        // ── OPPONENT IN FACE-UP PHASE: be aggressive, make pile big/hard ──
-        if (anyOppInFaceUpPhase) {
-            // Pile up high cards to force opponent to take pile
+        // ── OPPONENT NEAR END (faceUp or faceDown phase): AGGRESSIVELY push pile ──
+        if (anyOppNearEnd) {
             const rankIdx = ranks.indexOf(rank);
-            // High cards on pile = opponent can't play → forced to take
+            // High cards on pile = opponent can't play from faceUp/faceDown → must take pile
             if (rankIdx >= ranks.indexOf('9') && !['2','3','10','8'].includes(rank)) {
-                score -= 20; // push high cards aggressively
+                score -= 25; // push high cards hard
             }
-            // 7 is excellent: forces them to play LOW on faceUp cards
-            if (rank === '7') score -= 30;
-            // 10 only if pile is big enough to hurt them
-            if (rank === '10' && pileSize >= 4) score -= 40;
-            if (rank === '10' && pileSize < 4) score += 15; // save for bigger pile
-            // Avoid low cards — they let opponent answer easily
-            if (['4','5','6'].includes(rank)) score += 25;
-            // 2 resets pile — bad when we want to build pressure
-            if (rank === '2' && pileSize >= 4) score += 10;
+            // 7 = force them to play ≤7 from faceUp — very likely they can't
+            if (rank === '7') score -= 35;
+            // 8 = skip — especially good vs faceDown phase (they skip and still face tough pile)
+            if (rank === '8') score -= 25;
+            // 10 = burn only if pile is already big (maximize pile they must swallow)
+            if (rank === '10' && pileSize >= 5) score -= 50;
+            if (rank === '10' && pileSize < 5) score += 20; // save, build pile first
+            // 2 resets pile = BAD when we want to torture them with big pile
+            if (rank === '2') score += 30;
+            // 3 is transparent = doesn't change pile top = neutral/ok
+            if (rank === '3') score += 5;
+            // Low cards = opponent can answer easily = bad
+            if (['4','5','6'].includes(rank)) score += 30;
+            // faceDown phase = even more aggressive — they're basically blind
+            if (anyOppInFaceDownPhase) {
+                // Any non-reset card that builds pile is good
+                if (!['2','3'].includes(rank) && pileSize < 8) score -= 15;
+            }
         } else {
             // ── Normal game: context-aware specials ──
             if (rank === '10') {
@@ -1635,7 +1651,7 @@ function aiGetBestPlay(validCards, hand) {
             }
         }
 
-        if (rank === '3') score += 15; // always save 3s
+        if (rank === '3' && !anyOppNearEnd) score += 15; // save 3s in normal game
         if (rank === '8') {
             if (minOppTotal <= 2) score -= 20; // skip opponent almost done
             else if (anyOppInFaceUpPhase) score -= 15; // skip is great pressure
@@ -1901,20 +1917,15 @@ let onlineState = null;
 // requireName removed — using profile system
 
 function showMenu(id) {
-    if (id === 'menuMain') {
-        fetchOnlineStats();
-        const pb = document.getElementById('profileBtn');
-        if (pb) pb.style.display = 'flex';
-    } else {
-        const pb = document.getElementById('profileBtn');
-        if (pb) pb.style.display = 'none';
-    }
+    fetchOnlineStats();
+    const pb = document.getElementById('profileBtn');
+    if (pb) pb.style.display = (id === 'menuMain') ? 'flex' : 'none';
 
     if (id === 'menuCreate') {
         // Reset timer + player buttons every time we enter this menu
         selectedTimer = 0; timerSelected = false;
         selectedRoomType = 'public';
-        ['0','20','30','60'].forEach(v => {
+        ['0','10','20','40'].forEach(v => {
             const b = document.getElementById('timerBtn'+v);
             if (b) b.style.borderColor = '';
         });
@@ -2259,7 +2270,7 @@ function refreshPublicRooms() {
 function setTimer(secs) {
     selectedTimer = secs;
     timerSelected = true;
-    ['0','20','30','60'].forEach(v => {
+    ['0','10','20','40'].forEach(v => {
         const b = document.getElementById('timerBtn'+v);
         if (b) b.style.borderColor = (parseInt(v)===secs) ? 'var(--gold)' : '';
     });
