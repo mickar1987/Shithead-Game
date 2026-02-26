@@ -158,6 +158,8 @@ function restartRoom(room) {
         finished: false,
         connected: s.connected,
         consecutiveTimeouts: 0,
+        _swapDone: false,
+        isBot: false,
     }));
     room.drawPile = deck;
     room.pile = [];
