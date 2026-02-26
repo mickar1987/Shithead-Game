@@ -701,7 +701,7 @@ io.on('connection', (socket) => {
             emitStateToAll(room);
             startTurnTimer(room);
         } else {
-            const waiting = connectedSlots.filter(s => !s._swapDone).length;
+            const waiting = activeSockets.filter(s => !s._swapDone).length;
             broadcast(room, 'toast', `${room.slots[slotIdx].name} סיים החלפה. ממתין לעוד ${waiting}...`);
         }
     });
