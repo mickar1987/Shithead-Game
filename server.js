@@ -924,34 +924,9 @@ io.on('connection', (socket) => {
         if (!room || !room.gameOver) return;
         if (!room.restartVotes) room.restartVotes = new Set();
 
-        // Public rooms: host reopens lobby — others can join, then host starts
-        if (room.isPublic && slotIdx === 0) {
-            room.gameOver = false;
-            room.gameStarted = false;
-            room.openRoom = true;
-            room.isSwapPhase = null;
-            room.winnersOrder = [];
-            room.restartVotes = new Set();
-            room.pile = [];
-            room.drawPile = [];
-            // Keep connected players, clear card data
-            room.slots.forEach(s => {
-                s.hand = []; s.faceUp = [null,null,null]; s.faceDown = [null,null,null];
-                s.finished = false; s.isBot = false;
-                if (s.name && s.name.startsWith('🤖 ')) s.name = s.name.slice(3);
-            });
-            room.playerCount = room.slots.filter(s => s.connected).length;
-            broadcast(room, 'toast', '🔄 המארח פתח לובי חדש!');
-            broadcast(room, 'lobbyReopened', { code: room.code });
-            emitOpenLobby(room);
-            return;
-        }
-
-        // Non-public rooms: all-vote system
+        // All rooms: everyone must vote to restart
         room.restartVotes.add(slotIdx);
-        // Count players who are still connected (have active socket)
         const activePlayers = room.slots.filter(s => s.socketId);
-        console.log(`[voteRestart] slot${slotIdx} votes=${room.restartVotes.size} activePlayers=${activePlayers.length} slots:`, room.slots.map(s=>({name:s.name,socketId:!!s.socketId,connected:s.connected})));
         broadcast(room, 'playerWantsRestart', {
             readyCount: room.restartVotes.size,
             totalCount: activePlayers.length
@@ -961,7 +936,7 @@ io.on('connection', (socket) => {
             restartRoom(room);
             broadcast(room, 'gameRestarted', {});
             setTimeout(() => {
-emitStateToAll(room);
+                emitStateToAll(room);
                 startSwapTimer(room);
             }, 300);
         }
