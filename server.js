@@ -934,6 +934,14 @@ io.on('connection', (socket) => {
         if (socket.data?.roomCode) handlePlayerLeave(socket.data);
     });
 
+    socket.on('getOnlineStats', () => {
+        const allRooms = Object.values(rooms);
+        const inGame = allRooms.filter(r => r.gameStarted || (r.isSwapPhase === false && !r.gameOver))
+            .reduce((sum, r) => sum + r.slots.filter(s => s.connected).length, 0);
+        const online = io.engine.clientsCount;
+        socket.emit('onlineStats', { online, inGame });
+    });
+
     socket.on('getPublicRooms', () => {
         const timerLabel = t => t === 0 ? '♾' : `${t}s`;
         const allRooms = Object.values(rooms).filter(r => r.isPublic);
