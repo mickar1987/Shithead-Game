@@ -49,9 +49,10 @@ function startSwapTimer(room) {
         if (remaining <= 0) {
             clearRoomTimer(key);
             // Auto-end swap for all players who haven't ended yet
-            room.slots.forEach(s => { s._swapDone = true; });
+            room.slots.forEach(s => { if (s.connected) s._swapDone = true; });
             const starter = findStarter(room.slots);
             room.isSwapPhase = false;
+            room.gameStarted = true;
             room.currentPlayer = starter;
             broadcast(room, 'swapTick', { remaining: 0 }); // hide timer on all clients
             broadcast(room, 'toast', `⏰ זמן ההחלפה נגמר! ${room.slots[starter].name} ראשון`);
@@ -596,11 +597,13 @@ io.on('connection', (socket) => {
         if (!room || !room.isSwapPhase) return;
         // Mark this player as done swapping
         room.slots[slotIdx]._swapDone = true;
-        const allDone = room.slots.every(s => s._swapDone);
+        // Only wait for connected (human) players — ignore disconnected slots
+        const allDone = room.slots.every(s => !s.connected || s._swapDone);
         if (allDone) {
             clearRoomTimer(room.code + '_swap');
             broadcast(room, 'swapTick', { remaining: 0 }); // hide timer on all clients
             room.isSwapPhase = false;
+            room.gameStarted = true;
             // Find starter: lowest card with tie-break
             const starter = findStarter(room.slots);
             room.currentPlayer = starter;
@@ -856,8 +859,7 @@ io.on('connection', (socket) => {
             restartRoom(room);
             broadcast(room, 'gameRestarted', {});
             setTimeout(() => {
-                console.log(`[RESTART] room ${room.code} isSwapPhase=${room.isSwapPhase} slots:`, room.slots.map(s=>({name:s.name,connected:s.connected,_swapDone:s._swapDone})));
-                emitStateToAll(room);
+emitStateToAll(room);
                 startSwapTimer(room);
             }, 300);
         }
@@ -879,7 +881,9 @@ io.on('connection', (socket) => {
         const connected = room.slots.filter(s => s.connected).length;
 
         // If in lobby (not yet playing)
-        const inLobby = !room.gameStarted && (room.isSwapPhase === null || room.isSwapPhase === true || room.openRoom);
+        // inGame = swap phase done and playing, OR gameStarted flag set (open rooms)
+        const inGame = room.gameStarted || room.isSwapPhase === false;
+        const inLobby = !inGame && !room.gameOver;
         if (inLobby) {
             if (connected === 0 || slotIdx === 0) {
                 // Host left or room empty → close and notify all
@@ -1045,8 +1049,7 @@ io.on('connection', (socket) => {
             restartRoom(room);
             broadcast(room, 'gameRestarted', {});
             setTimeout(() => {
-                console.log(`[RESTART] room ${room.code} isSwapPhase=${room.isSwapPhase} slots:`, room.slots.map(s=>({name:s.name,connected:s.connected,_swapDone:s._swapDone})));
-                emitStateToAll(room);
+emitStateToAll(room);
                 startSwapTimer(room);
             }, 300);
         } else {
