@@ -476,7 +476,7 @@
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.17</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.20</div>
     <!-- Profile button — top left, safe area aware -->
     <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
         <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
@@ -1557,11 +1557,26 @@ function aiHandStrength(hand) {
     return hand.reduce((s, c) => s + aiCardValue(c), 0);
 }
 
+// Can cardRank play on a pile topped with topRank?
+function aiCardCanPlay(cardRank, topRank) {
+    if (!topRank) return true;
+    if (['2','3','10'].includes(cardRank)) return true;
+    if (topRank === '7') return ranks.indexOf(cardRank) <= ranks.indexOf('7');
+    return ranks.indexOf(cardRank) >= ranks.indexOf(topRank);
+}
+
 // Estimate how many cards ≤ rank opponent likely has in their visible faceUp
 function aiOppCanAnswerRank(rank, opp) {
     const rankIdx = ranks.indexOf(rank);
     if (['2','3','10'].includes(rank)) return true; // specials always answerable
     // check faceUp cards
+    if (rank === '7') {
+        return opp.faceUp.some(c => {
+            if (!c) return false;
+            const r = c.slice(0,-1);
+            return ['2','3','10'].includes(r) || ranks.indexOf(r) <= ranks.indexOf('7');
+        });
+    }
     return opp.faceUp.some(c => {
         if (!c) return false;
         const r = c.slice(0,-1);
@@ -1648,8 +1663,13 @@ function aiGetBestPlay(validCards, hand) {
             if (rankIdx >= ranks.indexOf('9') && !['2','3','10','8'].includes(rank)) {
                 score -= 30;
             }
-            // 7 = forces them to need ≤7 faceUp card — often impossible
-            if (rank === '7') score -= 40;
+            // 7 = forces them to need ≤7 faceUp card — check if they're stuck
+            if (rank === '7') {
+                const oppStuck7near = oppData.filter(o =>
+                    (o.inFaceUpPhase || o.inFaceDownPhase) && !aiOppCanAnswerRank('7', o)
+                ).length;
+                score -= oppStuck7near > 0 ? 60 : 38;
+            }
             // 8 = skip is devastating when opponent is at faceUp/faceDown
             if (rank === '8') score -= 30;
             // 10 = burn only if pile is already large (more painful)
@@ -1688,14 +1708,14 @@ function aiGetBestPlay(validCards, hand) {
 
             // 7: force-low — best when opponent has high hand, bad when they have low cards
             if (rank === '7') {
-                // Check if any opponent's visible faceUp has mostly high cards
-                const oppHighFaceUp = oppData.filter(o =>
-                    o.inFaceUpPhase && o.faceUp.filter(c => c && !['2','3','7','8','10'].includes(c.slice(0,-1)) && ranks.indexOf(c.slice(0,-1)) < ranks.indexOf('7')).length > 0
+                // Best when opponent faceUp has no card ≤7 (they'll be stuck)
+                const oppStuck7 = oppData.filter(o =>
+                    o.inFaceUpPhase && !aiOppCanAnswerRank('7', o)
                 ).length;
-                if (maxOppHand > 5) score -= 25;      // big hand → likely high cards
-                else if (maxOppHand > 3) score -= 12;
-                else if (maxOppHand <= 2 && !inLateGame) score += 10; // small hand = they can play low
-                if (oppHighFaceUp > 0) score -= 20;   // faceUp player has high cards = 7 traps them
+                if (oppStuck7 > 0)       score -= 50; // will trap them!
+                else if (maxOppHand > 5) score -= 20;
+                else if (maxOppHand > 3) score -= 10;
+                else if (maxOppHand <= 2 && !inLateGame) score += 10;
             }
 
             // 8: skip — best when targeting opponent close to winning
