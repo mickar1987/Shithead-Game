@@ -476,7 +476,7 @@
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.18</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.18b</div>
     <!-- Profile button — top left, safe area aware -->
     <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
         <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
@@ -1675,9 +1675,10 @@ function aiGetBestPlay(validCards, hand) {
     const myHandSize = myHand.length;
     const opponents = players.filter((_, i) => i !== currentPlayer && !players[i].finished);
     const inLateGame = drawPile.length === 0;
+    const _me = players[currentPlayer];
     const myTotal = myHand.length
-        + players[currentPlayer].faceUp.filter(Boolean).length
-        + players[currentPlayer].faceDown.filter(Boolean).length;
+        + (_me ? _me.faceUp.filter(Boolean).length : 0)
+        + (_me ? _me.faceDown.filter(Boolean).length : 0);
 
     const oppData = opponents.map(p => ({
         hand: p.hand,
@@ -1704,7 +1705,7 @@ function aiGetBestPlay(validCards, hand) {
         const allCopies = myHand.filter(c => c.slice(0,-1) === rank).length;
 
         // ── 1. ALWAYS burn if possible ──
-        if (wouldBurn) return { rank, cards, score: -999 };
+        if (wouldBurn) { score = -999; return { rank, cards, score }; }
 
         // ── 2. Base value: cost of using this card ──
         score += aiCardValue(cards[0]) * 2;
@@ -1714,19 +1715,19 @@ function aiGetBestPlay(validCards, hand) {
         else if (numCards < allCopies) score += 15; // strongly penalize partial play
 
         // ── 4. Hand composition: what does our hand look like AFTER playing this? ──
-        const handAfter = myHand.filter(c => !cards.includes(c));
-        const compAfter = aiHandCompositionScore(handAfter);
-        score += compAfter * 0.5; // improve hand composition
+        const handAfter = myHand.filter(hc => !cards.includes(hc));
+        if (handAfter.length > 0) {
+            const compAfter = aiHandCompositionScore(handAfter);
+            score += compAfter * 0.5;
+        }
 
         // ── 5. Forward-looking: can we still play next turn? ──
-        // Estimate pile top after playing this rank
         const newTop = (rank === '2' || rank === '10') ? null : (rank === '3' ? (pileTop ? pileTop.slice(0,-1) : null) : rank);
-        // How many of our remaining cards can answer if opponent plays back?
         if (inLateGame && handAfter.length > 0) {
             const playableAfter = aiPlayableCount(handAfter, newTop);
             const playableRatio = playableAfter / handAfter.length;
-            if (playableRatio < 0.3) score += 25; // bad — will likely get stuck
-            else if (playableRatio > 0.6) score -= 10; // great — flexible hand after
+            if (playableRatio < 0.3) score += 25;
+            else if (playableRatio > 0.6) score -= 10;
         }
 
         // ── 6. Near-end opponent: maximize pile pain ──
