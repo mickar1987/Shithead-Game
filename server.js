@@ -69,18 +69,23 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://shithead_user:Mickar87
 const mongoClient = new MongoClient(MONGO_URI);
 let usersCol = null;
 
-async function connectMongo() {
-    try {
-        await mongoClient.connect();
-        const db = mongoClient.db('shithead');
-        usersCol = db.collection('users');
-        await usersCol.createIndex({ username: 1 }, { unique: true });
-        console.log('[mongo] Connected to MongoDB Atlas ✅');
-    } catch(e) {
-        console.error('[mongo] Connection failed:', e.message);
+async function connectMongo(retries = 5) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await mongoClient.connect();
+            const db = mongoClient.db('shithead');
+            usersCol = db.collection('users');
+            await usersCol.createIndex({ username: 1 }, { unique: true });
+            console.log('[mongo] Connected to MongoDB Atlas ✅');
+            return true;
+        } catch(e) {
+            console.error(`[mongo] Connection attempt ${i+1} failed: ${e.message}`);
+            if (i < retries - 1) await new Promise(r => setTimeout(r, 2000));
+        }
     }
+    console.error('[mongo] All connection attempts failed!');
+    return false;
 }
-connectMongo();
 
 async function getUser(username) {
     if (!usersCol) return null;
@@ -210,6 +215,11 @@ app.post('/api/daily-status', async (req, res) => {
     } catch(e) { res.json({ ok: false }); }
 });
 
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true, mongo: !!usersCol, time: new Date().toISOString() });
+});
 
 // Debug: check specific user raw data
 app.get('/api/debug/user', async (req, res) => {
@@ -1414,4 +1424,13 @@ emitStateToAll(room);
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🃏 Shithead server running on port ${PORT}`));
+// Start server only after MongoDB is ready
+connectMongo().then(connected => {
+    if (!connected) {
+        console.error('[fatal] Could not connect to MongoDB. Exiting.');
+        process.exit(1);
+    }
+    server.listen(PORT, () => {
+        console.log(`🃏 Shithead server running on port ${PORT} ✅`);
+    });
+});
