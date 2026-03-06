@@ -507,7 +507,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.14</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.15</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2124,11 +2124,14 @@ function loadAuth() {
                     updateCoinsUI();
                     checkDailyAvailable();
                 } else {
-                    console.log('[auth] token invalid, clearing');
+                    console.log('[auth] token invalid — asking user to re-login');
+                    // Don't clear immediately — show toast and redirect to auth menu
+                    showToast('⚠️ הסשן פג — התחבר מחדש');
                     authUser = null;
                     localStorage.removeItem('shithead_auth');
                     localStorage.removeItem('shithead_coins');
                     updateCoinsUI();
+                    setTimeout(() => showMenu('menuAuth'), 1200);
                 }
             }).catch(e => {
                 console.log('[auth] server unreachable, keeping cache:', e.message);
@@ -2300,6 +2303,14 @@ async function claimDaily() {
         const data = await r.json();
         console.log('[daily] response:', data);
         if (!data.ok) {
+            if (data.error === 'לא מחובר') {
+                showToast('⚠️ הסשן פג — התחבר מחדש');
+                authUser = null;
+                localStorage.removeItem('shithead_auth');
+                updateCoinsUI();
+                setTimeout(() => showMenu('menuAuth'), 1000);
+                return;
+            }
             if (data.msLeft > 0) startDailyCountdown(data.msLeft);
             else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             showToast('❌ ' + (data.error || 'שגיאה'));
