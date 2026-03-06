@@ -5,6 +5,15 @@ const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
 
+function buildDisplayName(first, last) {
+    first = (first || '').trim();
+    last  = (last  || '').trim();
+    if (!first) return last || '';
+    if (!last)  return first;
+    const initial = [...last][0].toUpperCase();
+    return `${first}.${initial}.`;
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -46,17 +55,20 @@ const users = loadUsers(); // { username: { pinHash, coins, lastDaily, token } }
 app.use(express.json());
 
 app.post('/api/register', (req, res) => {
-    const { username, pin } = req.body;
+    const { username, pin, firstName, lastName } = req.body;
     if (!username || !pin) return res.json({ ok: false, error: 'חסר שם משתמש או PIN' });
     const name = username.trim().toLowerCase();
     if (name.length < 2 || name.length > 16) return res.json({ ok: false, error: 'שם משתמש 2-16 תווים' });
     if (!/^[a-z0-9\u05d0-\u05ea_]+$/i.test(name)) return res.json({ ok: false, error: 'תווים לא חוקיים בשם' });
     if (pin.length !== 4 || !/^[0-9]{4}$/.test(pin)) return res.json({ ok: false, error: 'PIN חייב להיות 4 ספרות' });
+    const first = (firstName || '').trim();
+    if (!first) return res.json({ ok: false, error: 'חסר שם פרטי' });
     if (users[name]) return res.json({ ok: false, error: 'שם משתמש תפוס' });
     const token = makeToken();
-    users[name] = { pinHash: hashPin(pin), coins: STARTING_COINS, lastDaily: null, token };
+    users[name] = { pinHash: hashPin(pin), coins: STARTING_COINS, lastDaily: null, token, firstName: first, lastName: (lastName || '').trim() };
     saveUsers();
-    res.json({ ok: true, username: name, token, coins: STARTING_COINS });
+    const displayName = buildDisplayName(first, (lastName || '').trim());
+    res.json({ ok: true, username: name, token, coins: STARTING_COINS, firstName: first, lastName: (lastName||'').trim(), displayName });
 });
 
 app.post('/api/login', (req, res) => {
@@ -67,7 +79,9 @@ app.post('/api/login', (req, res) => {
     const token = makeToken();
     users[name].token = token;
     saveUsers();
-    res.json({ ok: true, username: name, token, coins: users[name].coins });
+    const u = users[name];
+    const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
+    res.json({ ok: true, username: name, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
 });
 
 app.post('/api/verify', (req, res) => {
@@ -75,7 +89,9 @@ app.post('/api/verify', (req, res) => {
     const name = username?.trim().toLowerCase();
     if (!name || !users[name] || users[name].token !== token)
         return res.json({ ok: false });
-    res.json({ ok: true, username: name, coins: users[name].coins });
+    const u = users[name];
+    const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
+    res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
 });
 
 app.post('/api/daily', (req, res) => {
@@ -265,6 +281,7 @@ function restartRoom(room) {
         id: i,
         name: s.name,
         socketId: s.socketId,
+        username: s.username || null,  // preserve username across restarts
         hand: deck.splice(0, 3),
         faceUp: deck.splice(0, 3),
         faceDown: deck.splice(0, 3),
@@ -280,6 +297,7 @@ function restartRoom(room) {
     room.isSwapPhase = true;
     room.winnersOrder = [];
     room.gameOver = false;
+    room.coinsSettled = false;  // allow new settlement
     room.interruptWindow = false;
     room.lastPlayedRank = null;
     room.lastPlayerIdx = null;
@@ -667,10 +685,11 @@ function handlePlayerLeave(socketData) {
         return;
     }
 
-    // Mark as loser
+    // Mark as loser (last place)
     slot.finished = true;
     slot.disqualified = true;
     room.winnersOrder.push(slotIdx);
+    console.log(`[leave] ${name} (slot=${slotIdx}, username=${slot.username}) left. winnersOrder=${room.winnersOrder}`);
     broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
 
     const active = room.slots.filter(s => !s.finished);
@@ -728,12 +747,13 @@ io.on('connection', (socket) => {
     });
 
     // ── Open room (host decides when to start) ──
-    socket.on('createOpenRoom', ({ name, turnTimer, isPublic }) => {
+    socket.on('createOpenRoom', ({ name, turnTimer, isPublic, bet, username, token }) => {
         const code = [...Array(4)].map(() => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*23)]).join('');
         const room = {
             code,
             slots: [{
                 id: 0, name, socketId: socket.id, connected: true,
+                username: null, // set after validation
                 hand: [], faceUp: [], faceDown: [], finished: false,
                 consecutiveTimeouts: 0
             }],
@@ -750,6 +770,10 @@ io.on('connection', (socket) => {
             restartVotes: new Set()
         };
         rooms[code] = room;
+        // Set username on host slot
+        const openUname = username?.trim().toLowerCase();
+        if (openUname && users[openUname] && users[openUname].token === token)
+            room.slots[0].username = openUname;
         socket.join(code);
         socket.data.roomCode = code;
         socket.data.slotIdx = 0;
@@ -821,6 +845,7 @@ io.on('connection', (socket) => {
         room.playerCount = room.slots.length;
         room.slots.forEach((s, i) => {
             s.id = i;
+            // username preserved from join — do not overwrite
             s.hand = deck.splice(0, 3);
             s.faceUp = deck.splice(0, 3);
             s.faceDown = deck.splice(0, 3);
