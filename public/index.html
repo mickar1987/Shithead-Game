@@ -491,8 +491,9 @@
         <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
             <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
             <div id="dailyCountdown" style="display:none;"></div>
-            <button onclick="showEditProfile()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);margin-top:4px;">✏️ עריכת פרופיל</button>
-            <button onclick="logoutUser()" class="setup-btn" style="font-size:0.8rem;padding:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);margin-top:4px;">התנתק</button>
+            <button onclick="showEditProfile()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);">✏️ עריכת פרופיל</button>
+            <div style="flex:1;min-height:40px;"></div>
+            <button onclick="confirmLogout()" class="setup-btn" style="font-size:0.8rem;padding:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.35);margin-top:16px;">התנתק</button>
         </div>
     </div>
 
@@ -500,11 +501,11 @@
         <!-- Coins bar — shown only when logged in -->
         <div id="mainCoinsBar" style="display:none;flex-direction:column;align-items:center;gap:4px;width:100%;max-width:280px;margin-bottom:2px;">
             <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.07);border-radius:20px;padding:6px 18px;width:100%;box-sizing:border-box;justify-content:center;">
-                <span style="font-size:20px;">🟡</span>
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:2px solid #f5c842;box-shadow:0 2px 6px rgba(245,168,35,0.5),inset 0 1px 2px rgba(255,255,255,0.4);font-size:11px;font-weight:900;color:#7a4a00;font-family:'Bebas Neue',sans-serif;letter-spacing:0;">₪</span>
                 <span id="mainCoinsAmount" style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:2px;"></span>
                 <span id="mainUsername" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"></span>
             </div>
-            <button onclick="claimDaily()" id="mainDailyBtn" class="setup-btn" style="font-size:0.8rem;padding:6px 12px;background:linear-gradient(135deg,#b45309,#78350f);width:100%;">🎁 קבל 200 מטבעות יומיים</button>
+            <button onclick="claimDaily()" id="mainDailyBtn" class="setup-btn" style="font-size:0.8rem;padding:6px 12px;background:linear-gradient(135deg,#b45309,#78350f);width:100%;margin-top:8px;">🎁 קבל 200 מטבעות יומיים</button>
             <div id="mainDailyCountdown" style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;min-height:14px;text-align:center;"></div>
         </div>
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
@@ -512,7 +513,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.26</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.27</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -542,10 +543,10 @@
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">הימור למשחק</div>
         <div style="display:flex;gap:6px;justify-content:center;width:100%;max-width:280px;flex-wrap:wrap;">
             <button onclick="setBet(0)"   id="betBtn0"   class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);">ללא</button>
-            <button onclick="setBet(50)"  id="betBtn50"  class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙50</button>
-            <button onclick="setBet(100)" id="betBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙100</button>
-            <button onclick="setBet(200)" id="betBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙200</button>
-            <button onclick="setBet(500)" id="betBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙500</button>
+            <button onclick="setBet(50)"  id="betBtn50"  class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:'Bebas Neue',sans-serif;vertical-align:middle;">₪</span>50</button>
+            <button onclick="setBet(100)" id="betBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:'Bebas Neue',sans-serif;vertical-align:middle;">₪</span>100</button>
+            <button onclick="setBet(200)" id="betBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:'Bebas Neue',sans-serif;vertical-align:middle;">₪</span>200</button>
+            <button onclick="setBet(500)" id="betBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:'Bebas Neue',sans-serif;vertical-align:middle;">₪</span>500</button>
         </div>
         <div id="betWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
@@ -2459,6 +2460,10 @@ async function saveEditProfile() {
         closeEditProfile();
         showToast(`✅ פרופיל עודכן! יוצג כ: ${authUser.displayName}`);
     } catch(e) { errEl.textContent = 'שגיאת חיבור'; }
+}
+
+function confirmLogout() {
+    if (confirm('להתנתק מהחשבון?')) logoutUser();
 }
 
 function logoutUser() {
