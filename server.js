@@ -146,7 +146,7 @@ app.post('/api/register', async (req, res) => {
         if (existing) return res.json({ ok: false, error: 'שם משתמש תפוס' });
         const token = makeToken();
         const last = (lastName || '').trim();
-        await saveUser(name, { username: name, pinHash: hashPin(pin), coins: STARTING_COINS, lastDaily: null, token, firstName: first, lastName: last });
+        await saveUser(name, { username: name, pinHash: hashPin(pin), coins: STARTING_COINS, lastDailyTs: null, token, firstName: first, lastName: last });
         const displayName = buildDisplayName(first, last);
         res.json({ ok: true, username: name, token, coins: STARTING_COINS, firstName: first, lastName: last, displayName });
     } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
@@ -159,11 +159,10 @@ app.post('/api/login', async (req, res) => {
         const u = await getUser(name);
         if (!u) return res.json({ ok: false, error: 'שם משתמש לא קיים' });
         if (u.pinHash !== hashPin(pin)) return res.json({ ok: false, error: 'PIN שגוי' });
-        const token = makeToken();
-        await saveUser(name, { token });
-        // Verify token was saved
-        const saved = await getUser(name);
-        console.log(`[login] ${name} token saved=${saved?.token === token}`);
+        // Keep existing token if valid, only create new one if missing
+        const token = u.token || makeToken();
+        if (!u.token) await saveUser(name, { token });
+        console.log(`[login] ${name} token=${u.token ? 'existing' : 'new'}`);
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
         res.json({ ok: true, username: name, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
     } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
