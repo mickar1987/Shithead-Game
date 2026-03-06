@@ -1,4 +1,11 @@
-const path = requir// ══ COINS: settle bets at end of game ══
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+const crypto = require('crypto');
+const { MongoClient } = require('mongodb');
+
+// ══ COINS: settle bets at end of game ══
 async function settleCoins(room) {
     if (room.coinsSettled || room.bet === 0) return;
     room.coinsSettled = true;
@@ -44,12 +51,6 @@ async function settleCoins(room) {
     broadcast(room, 'coinsResult', results);
 }
 
-e('path');
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const crypto = require('crypto');
-const { MongoClient } = require('mongodb');
 
 function buildDisplayName(first, last) {
     first = (first || '').trim();
