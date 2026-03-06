@@ -208,6 +208,25 @@ app.post('/api/daily', async (req, res) => {
     } catch(e) { console.error('[daily]', e); res.json({ ok: false, error: 'שגיאת שרת' }); }
 });
 
+// Update profile (name + optional new PIN)
+app.post('/api/update-profile', async (req, res) => {
+    try {
+        const { username, token, firstName, lastName, newPin } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false, error: 'לא מחובר' });
+        const first = (firstName || '').trim();
+        if (!first) return res.json({ ok: false, error: 'שם פרטי חובה' });
+        if (newPin && (newPin.length !== 4 || !/^[0-9]{4}$/.test(newPin)))
+            return res.json({ ok: false, error: 'PIN חייב להיות 4 ספרות' });
+        const updates = { firstName: first, lastName: (lastName || '').trim() };
+        if (newPin) updates.pinHash = hashPin(newPin);
+        await saveUser(name, updates);
+        console.log(`[update-profile] ${name} updated name+${newPin ? 'pin' : 'no-pin'}`);
+        res.json({ ok: true });
+    } catch(e) { console.error('[update-profile]', e); res.json({ ok: false, error: 'שגיאת שרת' }); }
+});
+
 // Check daily status
 app.post('/api/daily-status', async (req, res) => {
     try {
