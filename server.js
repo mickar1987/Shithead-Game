@@ -875,6 +875,7 @@ io.on('connection', (socket) => {
 
     // ── Open room (host decides when to start) ──
     socket.on('createOpenRoom', async ({ name, turnTimer, isPublic, bet, username, token }) => {
+        const betAmount = parseInt(bet) || 0;
         const code = [...Array(4)].map(() => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*23)]).join('');
         const room = {
             code,
@@ -890,6 +891,8 @@ io.on('connection', (socket) => {
             winnersOrder: [], gameOver: false,
             interruptWindow: false, lastPlayedRank: null, lastPlayerIdx: null,
             turnTimer: turnTimer || 0,
+            bet: betAmount,        // ✅ coins per player
+            coinsSettled: false,
             openRoom: true,  // flag: host controls start
             isPublic: !!isPublic,
             createdAt: Date.now(),
@@ -903,10 +906,11 @@ io.on('connection', (socket) => {
             const ou = await getUser(openUname);
             if (ou && ou.token === token) room.slots[0].username = openUname;
         }
+        console.log(`[createOpenRoom] code=${code} bet=${betAmount} username=${room.slots[0].username}`);
         socket.join(code);
         socket.data.roomCode = code;
         socket.data.slotIdx = 0;
-        socket.emit('openRoomCreated', { code, slotIdx: 0 });
+        socket.emit('openRoomCreated', { code, slotIdx: 0, bet: betAmount });
         emitOpenLobby(room);
     });
 
@@ -1296,6 +1300,7 @@ io.on('connection', (socket) => {
             const isFull = r.openRoom ? connected >= 4 : !r.slots.some(s => !s.connected);
             // available = waiting for players
             const isAvailable = !r.gameOver && !inProgress && !isFull;
+            const hostSlot = r.slots[0];
             return {
                 code: r.code,
                 players: connected,
@@ -1303,7 +1308,9 @@ io.on('connection', (socket) => {
                 timerLabel: timerLabel(r.turnTimer || 0),
                 available: isAvailable,
                 inProgress,
-                isFull
+                isFull,
+                bet: r.bet || 0,
+                host: hostSlot?.name || ''
             };
         });
         socket.emit('publicRooms', list);
