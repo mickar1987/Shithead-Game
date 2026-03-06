@@ -500,13 +500,13 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
-        <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
+        <div style="display:flex;gap:8px;width:100%;max-width:280px;">
+            <button onclick="showHowToPlay()" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 10px;font-size:12px;cursor:pointer;letter-spacing:1px;">❓ איך משחקים</button>
+            <button onclick="editProfile()" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 10px;font-size:12px;cursor:pointer;letter-spacing:1px;">✏️ שנה שם</button>
+        </div>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.01</div>
-    <!-- Profile button — top left, safe area aware -->
-    <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
-        <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
-    </div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.03</div>
+
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
@@ -578,13 +578,17 @@
 </div>
 
 <!-- PROFILE / NAME MODAL -->
-<div id="nameModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10001;display:none;align-items:center;justify-content:center;">
+<div id="nameModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10001;align-items:center;justify-content:center;">
     <div style="background:#0d2e18;border:1px solid rgba(255,255,255,0.15);border-radius:18px;padding:28px 24px;width:90%;max-width:320px;text-align:center;">
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--gold);letter-spacing:3px;margin-bottom:8px;">הפרופיל שלך</div>
-        <div id="nameModalSubtitle" style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:20px;">בחר שם שיוצג לשחקנים אחרים</div>
-        <input id="nameModalInput" type="text" maxlength="12" placeholder="השם שלך" 
+        <div id="nameModalSubtitle" style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:20px;">השם שיוצג לשחקנים אחרים</div>
+        <input id="nameModalFirst" type="text" maxlength="12" placeholder="שם פרטי" 
+            style="width:100%;box-sizing:border-box;padding:12px;font-size:1.1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;letter-spacing:1px;outline:none;margin-bottom:10px;"
+            onkeydown="if(event.key==='Enter') document.getElementById('nameModalLast').focus()" oninput="updateNamePreview()"/>
+        <input id="nameModalLast" type="text" maxlength="16" placeholder="שם משפחה" 
             style="width:100%;box-sizing:border-box;padding:12px;font-size:1.1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;letter-spacing:1px;outline:none;"
-            onkeydown="if(event.key==='Enter') saveProfileName()"/>
+            onkeydown="if(event.key==='Enter') saveProfileName()" oninput="updateNamePreview()"/>
+        <div id="namePreview" style="font-size:13px;color:rgba(255,200,50,0.7);margin-top:10px;min-height:18px;letter-spacing:1px;"></div>
         <button onclick="saveProfileName()" 
             style="margin-top:16px;width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#064e1e);border:none;border-radius:10px;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:1px;">
             ✅ שמור
@@ -2237,9 +2241,6 @@ function setBet(amount) {
 
 function showMenu(id) {
     fetchOnlineStats();
-    const pb = document.getElementById('profileBtn');
-    if (pb) pb.style.display = (id === 'menuMain') ? 'flex' : 'none';
-
     if (id === 'menuCreate') {
         // Reset timer + player buttons every time we enter this menu
         selectedTimer = 0; timerSelected = false; selectedBet = 0;
@@ -2420,30 +2421,35 @@ const overlay = document.getElementById('setupOverlay');
     });
 
     socket.on('coinsResult', (results) => {
-        // Update local coins if we're logged in
-        if (authUser) {
-            const mine = results.find(r => r.name && onlineState?.players?.find(p => p.name === r.name && p.id === mySlotIdx));
-            // Simpler: find by index position = mySlotIdx
+        // Find MY result by slotIdx
+        const myResult = results.find(r => r.slotIdx === mySlotIdx);
+
+        // Update my local coins (only once, only my delta)
+        if (authUser && myResult && myResult.delta !== 0) {
+            authUser.coins = Math.max(0, authUser.coins + myResult.delta);
+            saveAuthLocal();
+            updateCoinsUI();
         }
-        // Show coin changes in leaderboard
+
+        // Show coin changes in leaderboard rows
         const list = document.getElementById('leaderboardList');
         if (list && results.length) {
+            // leaderboard rows are in winnersOrder (best→worst), results are too
             const rows = list.querySelectorAll('.lb-row');
             results.forEach((r, i) => {
-                if (rows[i] && r.delta !== 0) {
+                if (!rows[i]) return;
+                if (r.delta !== 0) {
                     const coinEl = document.createElement('div');
-                    coinEl.style.cssText = `font-size:12px;color:${r.delta > 0 ? '#4ade80' : '#f87171'};font-family:'Bebas Neue',sans-serif;letter-spacing:1px;`;
+                    coinEl.style.cssText = `font-size:12px;color:${r.delta > 0 ? '#4ade80' : '#f87171'};font-family:'Bebas Neue',sans-serif;letter-spacing:1px;margin-top:2px;`;
                     coinEl.textContent = (r.delta > 0 ? '+' : '') + r.delta + ' 🪙';
                     rows[i].appendChild(coinEl);
                 }
-                // Update local coins
-                if (authUser && r.name && r.coins !== null) {
-                    // Find if this result is for us by matching username via server response
-                    if (r.delta !== 0) {
-                        authUser.coins = authUser.coins + r.delta;
-                        saveAuthLocal();
-                        updateCoinsUI();
-                    }
+                // Show updated balance for this player if available
+                if (r.coins !== null && r.slotIdx === mySlotIdx) {
+                    const balEl = document.createElement('div');
+                    balEl.style.cssText = 'font-size:11px;color:rgba(255,200,50,0.6);letter-spacing:1px;';
+                    balEl.textContent = `יתרה: 🪙${r.coins.toLocaleString()}`;
+                    rows[i].appendChild(balEl);
                 }
             });
         }
@@ -2527,52 +2533,65 @@ function showHowToPlay() {
 }
 
 // ── Profile management ──
+// Build display name: "מיקה.ר." from first="מיקה" last="רובינשטיין"
+function buildDisplayName(first, last) {
+    first = (first || '').trim();
+    last  = (last  || '').trim();
+    if (!first) return last || '';
+    if (!last)  return first;
+    const initial = [...last][0].toUpperCase();
+    return `${first}.${initial}.`;
+}
+
 function loadProfile() {
-    const name = localStorage.getItem('shitheadPlayerName');
-    updateProfileUI(name);
-    if (!name) {
+    const first = localStorage.getItem('shitheadFirstName');
+    const last  = localStorage.getItem('shitheadLastName');
+    if (!first) {
         setTimeout(() => showNameModal(true), 300);
     }
 }
 
-function updateProfileUI(name) {
-    const initial = document.getElementById('profileInitial');
-    if (initial) {
-        if (name) {
-            // Show first Hebrew/Latin letter
-            initial.style.fontSize = '18px';
-            initial.textContent = [...name][0].toUpperCase();
-        } else {
-            initial.style.fontSize = '22px';
-            initial.textContent = '?';
-        }
-    }
-}
+function updateProfileUI() { /* profileBtn removed */ }
 
 function showNameModal(firstTime = false) {
     const modal = document.getElementById('nameModal');
-    const sub = document.getElementById('nameModalSubtitle');
-    const inp = document.getElementById('nameModalInput');
+    const sub   = document.getElementById('nameModalSubtitle');
+    const inpF  = document.getElementById('nameModalFirst');
+    const inpL  = document.getElementById('nameModalLast');
     if (firstTime) {
-        sub.textContent = 'ברוך הבא! בחר שם לפני שמתחילים 👋';
+        sub.textContent = 'ברוך הבא! הכנס את שמך לפני שמתחילים 👋';
+        if (inpF) inpF.value = '';
+        if (inpL) inpL.value = '';
     } else {
-        sub.textContent = 'שנה את השם שלך';
-        inp.value = localStorage.getItem('shitheadPlayerName') || '';
+        sub.textContent = 'עדכן את שמך';
+        if (inpF) inpF.value = localStorage.getItem('shitheadFirstName') || '';
+        if (inpL) inpL.value = localStorage.getItem('shitheadLastName')  || '';
     }
+    updateNamePreview();
     modal.style.display = 'flex';
-    setTimeout(() => inp.focus(), 100);
+    setTimeout(() => inpF && inpF.focus(), 100);
+}
+
+function updateNamePreview() {
+    const first = (document.getElementById('nameModalFirst')?.value || '').trim();
+    const last  = (document.getElementById('nameModalLast')?.value  || '').trim();
+    const prev  = document.getElementById('namePreview');
+    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
 }
 
 function saveProfileName() {
-    const inp = document.getElementById('nameModalInput');
-    const name = inp.value.trim();
-    if (!name) {
-        inp.style.borderColor = '#ef4444';
-        setTimeout(() => inp.style.borderColor = 'rgba(255,255,255,0.2)', 1500);
+    const inpF = document.getElementById('nameModalFirst');
+    const inpL = document.getElementById('nameModalLast');
+    const first = (inpF?.value || '').trim();
+    const last  = (inpL?.value || '').trim();
+    if (!first) {
+        if (inpF) { inpF.style.borderColor = '#ef4444'; setTimeout(() => inpF.style.borderColor = 'rgba(255,255,255,0.2)', 1500); }
         return;
     }
-    localStorage.setItem('shitheadPlayerName', name);
-    updateProfileUI(name);
+    localStorage.setItem('shitheadFirstName', first);
+    localStorage.setItem('shitheadLastName',  last);
+    // Keep legacy key for backward compat
+    localStorage.setItem('shitheadPlayerName', buildDisplayName(first, last));
     document.getElementById('nameModal').style.display = 'none';
 }
 
@@ -2581,9 +2600,10 @@ function editProfile() {
 }
 
 function getMyName() {
-    const name = localStorage.getItem('shitheadPlayerName');
-    if (!name) { showNameModal(true); return null; }
-    return name;
+    const first = localStorage.getItem('shitheadFirstName');
+    const last  = localStorage.getItem('shitheadLastName');
+    if (!first) { showNameModal(true); return null; }
+    return buildDisplayName(first, last);
 }
 
 function fetchOnlineStats() {
