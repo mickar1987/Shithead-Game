@@ -381,13 +381,14 @@
             margin-bottom: 24px;
         }
         .lb-row {
-            display: flex; align-items: center; gap: 12px;
-            padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: grid; grid-template-columns: 1fr 40px 70px;
+            align-items: center; gap: 8px;
+            padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .lb-row:last-child { border-bottom: none; }
-        .lb-pos { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--gold); width: 32px; }
-        .lb-name { font-size: 1rem; font-weight: 700; flex: 1; }
-        .lb-medal { font-size: 1.5rem; }
+        .lb-name { font-size: 0.95rem; font-weight: 700; }
+        .lb-medal { font-size: 1.4rem; text-align: center; }
+        .lb-coins { font-family: 'Bebas Neue', sans-serif; font-size: 0.95rem; text-align: right; letter-spacing: 1px; }
         .new-game-btn {
             background: linear-gradient(135deg, var(--gold), var(--gold-dark));
             color: #000; padding: 14px 40px; border-radius: 4px; border: none;
@@ -513,7 +514,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.29</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.30</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -1999,9 +2000,9 @@ function showResults() {
         const isLast = i === winnersOrder.length - 1;
         const medal = isLast ? '💩' : (medals[i] || '');
         return `<div class="lb-row">
-            <div class="lb-pos">${i + 1}</div>
             <div class="lb-name">${name}</div>
             <div class="lb-medal">${medal}</div>
+            <div class="lb-coins"></div>
         </div>`;
     }).join('');
     // Show AI-mode buttons
@@ -2612,13 +2613,11 @@ const overlay = document.getElementById('setupOverlay');
             const clickable = r.available;
             return `<div onclick="${clickable ? `joinPublicRoom('${r.code}')` : ''}"
                 style="padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,${clickable?'0.07':'0.03'});border-radius:8px;cursor:${clickable?'pointer':'default'};border:1px solid rgba(255,255,255,${clickable?'0.15':'0.05'});opacity:${clickable?'1':'0.45'};">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span style="color:${clickable?'var(--gold)':'rgba(255,255,255,0.3)'};font-weight:700;letter-spacing:2px;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;">${r.host || r.code}</span>
-                    ${r.inProgress ? '<span style="font-size:10px;color:rgba(255,100,100,0.6);">● במשחק</span>' : r.isFull ? '<span style="font-size:10px;color:rgba(255,180,0,0.7);">● מלא</span>' : '<span style="font-size:10px;color:rgba(100,255,100,0.7);">● פתוח</span>'}
-                </div>
-                <div style="display:flex;gap:10px;margin-top:3px;">
-                    <span style="color:rgba(255,255,255,0.4);font-size:11px;">${r.players}/${r.max} • ${r.timerLabel}</span>
-                    ${r.bet > 0 ? `<span style="color:rgba(255,200,50,0.8);font-size:11px;">🪙 ${r.bet}</span>` : '<span style="color:rgba(255,255,255,0.25);font-size:11px;">ללא הימור</span>'}
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:nowrap;">
+                    <span style="color:${clickable?'var(--gold)':'rgba(255,255,255,0.3)'};font-weight:700;letter-spacing:1px;font-family:'Bebas Neue',sans-serif;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;">${r.host || r.code}</span>
+                    <span style="color:rgba(255,255,255,0.4);font-size:11px;white-space:nowrap;">${r.players}/${r.max} • ${r.timerLabel}</span>
+                    ${r.bet > 0 ? `<span style="display:inline-flex;align-items:center;gap:3px;color:rgba(255,200,50,0.85);font-size:11px;white-space:nowrap;"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;">C</span>${r.bet}</span>` : '<span style="color:rgba(255,255,255,0.2);font-size:11px;">ללא הימור</span>'}
+                    ${r.inProgress ? '<span style="font-size:10px;color:rgba(255,100,100,0.6);white-space:nowrap;">● במשחק</span>' : r.isFull ? '<span style="font-size:10px;color:rgba(255,180,0,0.7);white-space:nowrap;">● מלא</span>' : '<span style="font-size:10px;color:rgba(100,255,100,0.7);white-space:nowrap;">● פתוח</span>'}
                 </div>
              </div>`;
         }).join('');
@@ -2672,7 +2671,7 @@ const overlay = document.getElementById('setupOverlay');
 
     socket.on('gameOver', (names) => {
         document.getElementById('leaderboardList').innerHTML =
-            names.map((n,i) => { const isLast=i===names.length-1; const m=isLast?'💩':(i===0?'🥇':i===1?'🥈':i===2?'🥉':''); return `<div class="lb-row"><div class="lb-pos">${i+1}</div><div class="lb-name">${n}</div><div class="lb-medal">${m}</div></div>`; }).join('');
+            names.map((n,i) => { const isLast=i===names.length-1; const m=isLast?'💩':(i===0?'🥇':i===1?'🥈':i===2?'🥉':''); return `<div class="lb-row" data-idx="${i}"><div class="lb-name">${n}</div><div class="lb-medal">${m}</div><div class="lb-coins" id="lb-coins-${i}"></div></div>`; }).join('');
         document.getElementById('resultOverlay').style.display = 'flex';
         document.getElementById('newGameBtn').style.display = 'block';
         document.getElementById('leaveBtn').style.display = 'block';
@@ -2703,18 +2702,10 @@ const overlay = document.getElementById('setupOverlay');
             const rows = list.querySelectorAll('.lb-row');
             results.forEach((r, i) => {
                 if (!rows[i]) return;
-                if (r.delta !== 0) {
-                    const coinEl = document.createElement('div');
-                    coinEl.style.cssText = `font-size:12px;color:${r.delta > 0 ? '#4ade80' : '#f87171'};font-family:'Bebas Neue',sans-serif;letter-spacing:1px;margin-top:2px;`;
-                    coinEl.textContent = (r.delta > 0 ? '+' : '') + r.delta + ' 🪙';
-                    rows[i].appendChild(coinEl);
-                }
-                // Show updated balance for this player if available
-                if (r.coins !== null && r.slotIdx === mySlotIdx) {
-                    const balEl = document.createElement('div');
-                    balEl.style.cssText = 'font-size:11px;color:rgba(255,200,50,0.6);letter-spacing:1px;';
-                    balEl.textContent = `יתרה: 🪙${r.coins.toLocaleString()}`;
-                    rows[i].appendChild(balEl);
+                const coinCell = document.getElementById('lb-coins-' + i);
+                if (coinCell && r.delta !== 0) {
+                    coinCell.style.color = r.delta > 0 ? '#4ade80' : '#f87171';
+                    coinCell.innerHTML = (r.delta > 0 ? '+' : '') + r.delta + '&nbsp;' + `<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>`;
                 }
             });
         }
