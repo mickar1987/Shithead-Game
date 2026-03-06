@@ -360,11 +360,16 @@ function settleCoins(room) {
         const slot = room.slots[slotIdx];
         const delta = changes[slotIdx] || 0;
         if (slot.username && users[slot.username]) {
-            users[slot.username].coins = Math.max(0, users[slot.username].coins + delta);
+            const before = users[slot.username].coins;
+            users[slot.username].coins = Math.max(0, before + delta);
+            console.log(`[coins] ${slot.username}: ${before} ${delta >= 0 ? '+' : ''}${delta} = ${users[slot.username].coins}`);
             saveUsers();
+        } else if (delta !== 0) {
+            console.log(`[coins] ${slot.name} (guest, slotIdx=${slotIdx}): delta=${delta} — not saved (no account)`);
         }
-        results.push({ name: slot.name, delta, coins: slot.username ? users[slot.username]?.coins : null });
+        results.push({ name: slot.name, delta, coins: slot.username ? users[slot.username]?.coins : null, slotIdx });
     });
+    console.log('[coins] settle complete. bet='+bet+' order='+order.join(','));
 
     broadcast(room, 'coinsResult', results);
 }
