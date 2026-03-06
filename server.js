@@ -605,6 +605,7 @@ function checkWin(room, idx) {
             if (last) room.winnersOrder.push(last.id);
             room.gameOver = true;
             clearRoomTimer(room.code);
+            console.log(`[gameOver] bet=${room.bet} order=${room.winnersOrder} slots=${JSON.stringify(room.slots.map(s=>({n:s.name,u:s.username})))}`);
             settleCoins(room).catch(e => console.error('[coins error]', e.message));
             broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i].name));
         }
@@ -958,6 +959,7 @@ io.on('connection', (socket) => {
         socket.join(code);
         socket.data.roomCode = code;
         socket.data.slotIdx = slot.id;
+        console.log(`[joinRoom] code=${code} bet=${room.bet} username=${slot.username}`);
         socket.emit('roomJoined', { code, slotIdx: slot.id, bet: room.bet || 0 });
         emitStateToAll(room);
     });
