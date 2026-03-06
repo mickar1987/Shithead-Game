@@ -4,6 +4,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
+// Fix TLS for Node.js v22
+process.env.NODE_OPTIONS = process.env.NODE_OPTIONS || '';
 
 // ══ COINS: settle bets at end of game ══
 async function settleCoins(room) {
@@ -65,8 +67,13 @@ function buildDisplayName(first, last) {
 // ══════════════════════════════════════════════
 //  MONGODB
 // ══════════════════════════════════════════════
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://shithead_user:Mickar87@cluster0.kiznwpz.mongodb.net/?appName=Cluster0';
-const mongoClient = new MongoClient(MONGO_URI);
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://shithead_user:Mickar87@cluster0.kiznwpz.mongodb.net/?appName=Cluster0&tls=true&tlsAllowInvalidCertificates=false';
+const mongoClient = new MongoClient(MONGO_URI, {
+    tls: true,
+    tlsAllowInvalidCertificates: false,
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+});
 let usersCol = null;
 
 async function connectMongo(retries = 5) {
