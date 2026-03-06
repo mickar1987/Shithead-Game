@@ -471,12 +471,38 @@
     <div class="setup-title">SHITHEAD</div>
     <div id="onlineStats" style="font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-bottom:4px;min-height:14px;"></div>
 
+    <!-- AUTH MENU -->
+    <div id="menuAuth" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
+        <div id="authUserInfo" style="font-size:13px;color:var(--gold);letter-spacing:1px;margin-bottom:4px;"></div>
+        <div id="authTabs" style="display:flex;gap:8px;width:100%;max-width:280px;margin-bottom:4px;">
+            <button onclick="switchAuthTab('login')" id="tabLogin" class="setup-btn" style="flex:1;font-size:0.85rem;padding:8px 4px;border-color:var(--gold);">🔑 התחבר</button>
+            <button onclick="switchAuthTab('register')" id="tabRegister" class="setup-btn" style="flex:1;font-size:0.85rem;padding:8px 4px;">✨ הרשם</button>
+        </div>
+        <input id="authUsername" type="text" placeholder="שם משתמש" maxlength="16" class="setup-input" style="ime-mode:inactive;"/>
+        <input id="authPin" type="password" placeholder="PIN (4 ספרות)" maxlength="4" inputmode="numeric" class="setup-input"/>
+        <input id="authPin2" type="password" placeholder="אמת PIN" maxlength="4" inputmode="numeric" class="setup-input hidden" style="margin-top:0;"/>
+        <div id="authError" style="font-size:11px;color:#f87171;min-height:16px;"></div>
+        <button onclick="submitAuth()" id="authSubmitBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">🔑 התחבר</button>
+        <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
+            <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
+            <button onclick="claimDaily()" id="dailyBtn" class="setup-btn" style="font-size:0.85rem;padding:8px;background:linear-gradient(135deg,#b45309,#78350f);">🎁 קבל 200 מטבעות יומיים</button>
+            <button onclick="logoutUser()" class="setup-btn" style="font-size:0.8rem;padding:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);margin-top:4px;">התנתק</button>
+        </div>
+    </div>
+
     <div id="menuMain" class="setup-grid">
+        <div id="mainCoinsBar" style="display:none;align-items:center;gap:6px;background:rgba(255,255,255,0.07);border-radius:20px;padding:5px 14px;margin-bottom:2px;">
+            <span style="font-size:16px;">🪙</span>
+            <span id="mainCoinsAmount" style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--gold);letter-spacing:1px;"></span>
+            <span id="mainUsername" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"></span>
+        </div>
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
+        <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.24</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.0</div>
     <!-- Profile button — top left, safe area aware -->
     <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
         <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
@@ -506,7 +532,16 @@
             <button onclick="setTimer(40)" id="timerBtn40" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40s</button>
             <button onclick="setTimer(0)"  id="timerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">♾</button>
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">כמה שחקנים?</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">הימור למשחק</div>
+        <div style="display:flex;gap:6px;justify-content:center;width:100%;max-width:280px;flex-wrap:wrap;">
+            <button onclick="setBet(0)"   id="betBtn0"   class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);">ללא</button>
+            <button onclick="setBet(50)"  id="betBtn50"  class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙50</button>
+            <button onclick="setBet(100)" id="betBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙100</button>
+            <button onclick="setBet(200)" id="betBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙200</button>
+            <button onclick="setBet(500)" id="betBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;">🪙500</button>
+        </div>
+        <div id="betWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
         <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🎲 קבע המשך</button>
         <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">⚔️ 2 שחקנים</button>
         <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🃏 3 שחקנים</button>
@@ -532,6 +567,7 @@
         <div class="setup-back" onclick="leaveLobby()">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:2px;">קוד החדר</div>
         <div id="lobbyCode" style="font-family:'Bebas Neue',sans-serif;font-size:4rem;color:var(--gold);letter-spacing:8px;"></div>
+        <div id="lobbyBetInfo" style="font-size:12px;color:rgba(255,200,50,0.8);letter-spacing:1px;min-height:16px;"></div>
         <div id="lobbyStatus" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-bottom:8px;"></div>
         <div id="lobbyPlayers" style="width:100%;max-width:280px;"></div>
         <button id="startOpenBtn" onclick="hostStartGame()" class="setup-btn hidden" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;">▶ התחל משחק</button>
@@ -664,6 +700,11 @@
 let players = [], pile = [], drawPile = [], currentPlayer = 0;
 let isSwapPhase = true, selectedHandIndices = [], selectedTableIndices = [];
 let selectedTimer = 0, timerSelected = false;
+let selectedBet = 0;
+let selectedRoomType = 'public';
+// Auth state
+let authUser = null; // { username, token, coins }
+
 let mySwapDone = false;
 let winnersOrder = [], isPeeking = false, revealedFaceDownIndex = null;
 let animating = false;
@@ -2046,6 +2087,154 @@ let onlineState = null;
 
 // requireName removed — using profile system
 
+// ══════════════════════════════════════════════
+//  AUTH & COINS
+// ══════════════════════════════════════════════
+function loadAuth() {
+    try {
+        const saved = localStorage.getItem('shithead_auth');
+        if (!saved) return;
+        const { username, token } = JSON.parse(saved);
+        if (!username || !token) return;
+        fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, token }) })
+            .then(r => r.json()).then(data => {
+                if (data.ok) {
+                    authUser = { username: data.username, token, coins: data.coins };
+                    updateCoinsUI();
+                }
+            }).catch(()=>{});
+    } catch(e) {}
+}
+
+function saveAuthLocal() {
+    if (authUser) localStorage.setItem('shithead_auth', JSON.stringify({ username: authUser.username, token: authUser.token }));
+    else localStorage.removeItem('shithead_auth');
+}
+
+function updateCoinsUI() {
+    const bar = document.getElementById('mainCoinsBar');
+    const amt = document.getElementById('mainCoinsAmount');
+    const uname = document.getElementById('mainUsername');
+    const authBtn = document.getElementById('mainAuthBtn');
+    if (authUser) {
+        if (bar) { bar.style.display = 'flex'; }
+        if (amt) amt.textContent = '🪙 ' + authUser.coins.toLocaleString();
+        if (uname) uname.textContent = authUser.username;
+        if (authBtn) authBtn.textContent = '👤 ' + authUser.username;
+        // Update auth menu
+        const loggedIn = document.getElementById('authLoggedIn');
+        const coinsDisp = document.getElementById('authCoinsDisplay');
+        const tabs = document.getElementById('authTabs');
+        const form = document.querySelectorAll('#authUsername,#authPin,#authPin2,#authSubmitBtn');
+        if (loggedIn) loggedIn.classList.remove('hidden');
+        if (coinsDisp) coinsDisp.textContent = '🪙 ' + authUser.coins.toLocaleString() + ' מטבעות';
+        if (tabs) tabs.style.display = 'none';
+        form.forEach(el => el.classList.add('hidden'));
+        // Check daily
+        checkDailyAvailable();
+    } else {
+        if (bar) bar.style.display = 'none';
+        if (authBtn) authBtn.textContent = '👤 חשבון / התחבר';
+        const loggedIn = document.getElementById('authLoggedIn');
+        const tabs = document.getElementById('authTabs');
+        const form = document.querySelectorAll('#authUsername,#authPin,#authSubmitBtn');
+        if (loggedIn) loggedIn.classList.add('hidden');
+        if (tabs) tabs.style.display = 'flex';
+        form.forEach(el => el.classList.remove('hidden'));
+    }
+}
+
+function switchAuthTab(tab) {
+    const pin2 = document.getElementById('authPin2');
+    const btn = document.getElementById('authSubmitBtn');
+    const t1 = document.getElementById('tabLogin');
+    const t2 = document.getElementById('tabRegister');
+    if (tab === 'login') {
+        if (pin2) pin2.classList.add('hidden');
+        if (btn) btn.textContent = '🔑 התחבר';
+        if (t1) t1.style.borderColor = 'var(--gold)';
+        if (t2) t2.style.borderColor = '';
+    } else {
+        if (pin2) pin2.classList.remove('hidden');
+        if (btn) btn.textContent = '✨ הרשם';
+        if (t1) t1.style.borderColor = '';
+        if (t2) t2.style.borderColor = 'var(--gold)';
+    }
+    document.getElementById('authError').textContent = '';
+}
+
+async function submitAuth() {
+    const username = document.getElementById('authUsername').value.trim();
+    const pin = document.getElementById('authPin').value.trim();
+    const pin2El = document.getElementById('authPin2');
+    const errEl = document.getElementById('authError');
+    const isRegister = !pin2El.classList.contains('hidden');
+
+    if (!username || !pin) { errEl.textContent = 'מלא שם משתמש ו-PIN'; return; }
+    if (pin.length !== 4) { errEl.textContent = 'PIN חייב להיות 4 ספרות'; return; }
+    if (isRegister && pin2El.value !== pin) { errEl.textContent = 'הPIN לא תואם'; return; }
+
+    const endpoint = isRegister ? '/api/register' : '/api/login';
+    try {
+        const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, pin }) });
+        const data = await r.json();
+        if (!data.ok) { errEl.textContent = data.error; return; }
+        authUser = { username: data.username, token: data.token, coins: data.coins };
+        saveAuthLocal();
+        updateCoinsUI();
+        errEl.textContent = '';
+        showToast(isRegister ? `✨ ברוך הבא ${data.username}! יש לך 🪙${data.coins}` : `👋 שלום ${data.username}! 🪙${data.coins}`);
+    } catch(e) { errEl.textContent = 'שגיאת חיבור לשרת'; }
+}
+
+async function claimDaily() {
+    if (!authUser) return;
+    try {
+        const r = await fetch('/api/daily', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: authUser.username, token: authUser.token }) });
+        const data = await r.json();
+        if (!data.ok) { showToast('❌ ' + data.error); return; }
+        authUser.coins = data.coins;
+        saveAuthLocal();
+        updateCoinsUI();
+        showToast(`🎁 קיבלת ${data.gained} מטבעות! סה"כ: 🪙${data.coins}`);
+    } catch(e) { showToast('שגיאת חיבור'); }
+}
+
+async function checkDailyAvailable() {
+    const btn = document.getElementById('dailyBtn');
+    if (!btn || !authUser) return;
+    // Simple check via server would be ideal, but for now always show button
+    btn.disabled = false;
+    btn.style.opacity = '1';
+}
+
+function logoutUser() {
+    authUser = null;
+    saveAuthLocal();
+    updateCoinsUI();
+    showToast('👋 התנתקת');
+}
+
+// ── Bet selection ──
+function setBet(amount) {
+    const errEl = document.getElementById('betWarning');
+    if (amount > 0 && !authUser) {
+        if (errEl) errEl.textContent = 'יש להתחבר כדי לשחק בהימורים';
+        showMenu('menuAuth');
+        return;
+    }
+    if (amount > 0 && authUser && authUser.coins < amount) {
+        if (errEl) errEl.textContent = `אין מספיק מטבעות (יש לך 🪙${authUser.coins})`;
+        return;
+    }
+    selectedBet = amount;
+    if (errEl) errEl.textContent = amount > 0 ? `הימור: 🪙${amount} למשחק` : '';
+    ['0','50','100','200','500'].forEach(v => {
+        const b = document.getElementById('betBtn' + v);
+        if (b) b.style.borderColor = (parseInt(v) === amount) ? 'var(--gold)' : '';
+    });
+}
+
 function showMenu(id) {
     fetchOnlineStats();
     const pb = document.getElementById('profileBtn');
@@ -2053,7 +2242,7 @@ function showMenu(id) {
 
     if (id === 'menuCreate') {
         // Reset timer + player buttons every time we enter this menu
-        selectedTimer = 0; timerSelected = false;
+        selectedTimer = 0; timerSelected = false; selectedBet = 0;
         selectedRoomType = 'public';
         ['0','10','20','40'].forEach(v => {
             const b = document.getElementById('timerBtn'+v);
@@ -2227,6 +2416,36 @@ const overlay = document.getElementById('setupOverlay');
         document.getElementById('waitingCount').style.display = 'none';
     });
 
+    socket.on('coinsResult', (results) => {
+        // Update local coins if we're logged in
+        if (authUser) {
+            const mine = results.find(r => r.name && onlineState?.players?.find(p => p.name === r.name && p.id === mySlotIdx));
+            // Simpler: find by index position = mySlotIdx
+        }
+        // Show coin changes in leaderboard
+        const list = document.getElementById('leaderboardList');
+        if (list && results.length) {
+            const rows = list.querySelectorAll('.lb-row');
+            results.forEach((r, i) => {
+                if (rows[i] && r.delta !== 0) {
+                    const coinEl = document.createElement('div');
+                    coinEl.style.cssText = `font-size:12px;color:${r.delta > 0 ? '#4ade80' : '#f87171'};font-family:'Bebas Neue',sans-serif;letter-spacing:1px;`;
+                    coinEl.textContent = (r.delta > 0 ? '+' : '') + r.delta + ' 🪙';
+                    rows[i].appendChild(coinEl);
+                }
+                // Update local coins
+                if (authUser && r.name && r.coins !== null) {
+                    // Find if this result is for us by matching username via server response
+                    if (r.delta !== 0) {
+                        authUser.coins = authUser.coins + r.delta;
+                        saveAuthLocal();
+                        updateCoinsUI();
+                    }
+                }
+            });
+        }
+    });
+
     socket.on('playerWantsRestart', ({ readyCount, totalCount }) => {
         document.getElementById('waitingCount').style.display = 'block';
         document.getElementById('waitingCount').textContent = `${readyCount}/${totalCount} רוצים לשחק שוב`;
@@ -2299,7 +2518,6 @@ function updateLobby(state) {
     }
 }
 
-let selectedRoomType = 'public';
 
 function showHowToPlay() {
     document.getElementById('howToPlayModal').style.display = 'block';
@@ -2382,7 +2600,8 @@ function fetchOnlineStats() {
 }
 
 // Fetch stats on page load
-window.addEventListener('load', () => { loadProfile(); setTimeout(fetchOnlineStats, 500); });
+window.addEventListener('load', () => {
+    loadAuth(); loadProfile(); setTimeout(fetchOnlineStats, 500); });
 
 function setRoomType(type) {
     selectedRoomType = type;
@@ -2413,14 +2632,17 @@ function setTimer(secs) {
 
 function createOnlineRoom(count) {
     const name = getMyName(); if (!name) return;
+    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(`אין מספיק מטבעות`); return; }
     initSocket();
-    socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public' });
+    socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
 }
 
 function createOpenRoom() {
     const name = getMyName(); if (!name) return;
+    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
     initSocket();
-    socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public' });
+    socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
 }
 
 function hostStartGame() {
@@ -2430,7 +2652,7 @@ function hostStartGame() {
 function joinPublicRoom(code) {
     const name = getMyName(); if (!name) return;
     if (!socket) initSocket();
-    socket.emit('joinRoom', { code, name });
+    socket.emit('joinRoom', { code, name, username: authUser?.username, token: authUser?.token });
 }
 
 function joinOnlineRoom() {
@@ -2438,7 +2660,13 @@ function joinOnlineRoom() {
     const code = (document.getElementById('roomCodeInput')?.value||'').trim().toUpperCase();
     if (code.length !== 4) { showToast('קוד חדר חייב להיות 4 תווים'); return; }
     initSocket();
-    socket.emit('joinRoom', { code, name });
+    socket.emit('joinRoom', { code, name, username: authUser?.username, token: authUser?.token });
+}
+
+function joinPublicRoomWithAuth(code) {
+    const name = getMyName(); if (!name) return;
+    if (!socket) initSocket();
+    socket.emit('joinRoom', { code, name, username: authUser?.username, token: authUser?.token });
 }
 
 // ── Turn timer ──
