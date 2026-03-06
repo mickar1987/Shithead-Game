@@ -211,6 +211,18 @@ app.post('/api/daily-status', async (req, res) => {
 });
 
 
+// Debug: check specific user raw data
+app.get('/api/debug/user', async (req, res) => {
+    const key = req.query.key;
+    const username = req.query.u;
+    if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const u = await getUser(username);
+        if (!u) return res.json({ found: false });
+        res.json({ found: true, username: u.username, coins: u.coins, hasToken: !!u.token, tokenStart: u.token?.slice(0,12), firstName: u.firstName, lastName: u.lastName });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
 // Admin: view all users (protected by secret key)
 app.get('/api/admin/users', async (req, res) => {
     try {
