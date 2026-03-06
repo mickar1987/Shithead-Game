@@ -1,4 +1,4 @@
-const CACHE = 'shithead-v3';
+const CACHE = 'shithead-v4';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -14,8 +14,10 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-    // Network first for socket.io, cache first for assets
-    if (e.request.url.includes('socket.io')) return;
+    const url = e.request.url;
+    // Never intercept API calls or socket.io
+    if (url.includes('/api/') || url.includes('socket.io')) return;
+    // Network first for everything else
     e.respondWith(
         fetch(e.request).catch(() => caches.match(e.request))
     );
