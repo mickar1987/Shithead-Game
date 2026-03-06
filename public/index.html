@@ -490,6 +490,7 @@
         <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
             <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
             <button onclick="claimDaily()" id="dailyBtn" class="setup-btn" style="font-size:0.85rem;padding:8px;background:linear-gradient(135deg,#b45309,#78350f);">🎁 קבל 200 מטבעות יומיים</button>
+        <div id="dailyCountdown" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;text-align:center;"></div>
             <button onclick="logoutUser()" class="setup-btn" style="font-size:0.8rem;padding:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);margin-top:4px;">התנתק</button>
         </div>
     </div>
@@ -503,12 +504,9 @@
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
-        <div style="display:flex;gap:8px;width:100%;max-width:280px;">
-            <button onclick="showHowToPlay()" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 10px;font-size:12px;cursor:pointer;letter-spacing:1px;">❓ איך משחקים</button>
-            <button onclick="editProfile()" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 10px;font-size:12px;cursor:pointer;letter-spacing:1px;">✏️ שנה שם</button>
-        </div>
+        <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.07</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.09</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2224,25 +2222,80 @@ async function submitAuth() {
     } catch(e) { errEl.textContent = 'שגיאת חיבור לשרת'; }
 }
 
+let dailyCountdownInterval = null;
+
+function formatCountdown(ms) {
+    if (ms <= 0) return '';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function startDailyCountdown(msLeft) {
+    if (dailyCountdownInterval) clearInterval(dailyCountdownInterval);
+    const btn = document.getElementById('dailyBtn');
+    const cd  = document.getElementById('dailyCountdown');
+    let remaining = msLeft;
+
+    function tick() {
+        if (remaining <= 0) {
+            clearInterval(dailyCountdownInterval);
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
+                btn.textContent = '🎁 קבל 200 מטבעות יומיים';
+            }
+            if (cd) cd.textContent = '';
+            return;
+        }
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.45';
+            btn.style.background = 'rgba(255,255,255,0.08)';
+            btn.textContent = '🎁 קבל 200 מטבעות יומיים';
+        }
+        if (cd) cd.textContent = `⏳ זמין בעוד ${formatCountdown(remaining)}`;
+        remaining -= 1000;
+    }
+    tick();
+    dailyCountdownInterval = setInterval(tick, 1000);
+}
+
 async function claimDaily() {
     if (!authUser) return;
     try {
         const r = await fetch('/api/daily', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: authUser.username, token: authUser.token }) });
         const data = await r.json();
-        if (!data.ok) { showToast('❌ ' + data.error); return; }
+        if (!data.ok) {
+            if (data.msLeft) startDailyCountdown(data.msLeft);
+            showToast('❌ ' + data.error);
+            return;
+        }
         authUser.coins = data.coins;
         saveAuthLocal();
         updateCoinsUI();
-        showToast(`🎁 קיבלת ${data.gained} מטבעות! סה"כ: 🪙${data.coins}`);
+        showToast(`🎁 קיבלת 200 מטבעות! סה"כ: 🪙${data.coins}`);
+        startDailyCountdown(data.msLeft);
     } catch(e) { showToast('שגיאת חיבור'); }
 }
 
 async function checkDailyAvailable() {
-    const btn = document.getElementById('dailyBtn');
-    if (!btn || !authUser) return;
-    // Simple check via server would be ideal, but for now always show button
-    btn.disabled = false;
-    btn.style.opacity = '1';
+    if (!authUser) return;
+    try {
+        const r = await fetch('/api/daily-status', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: authUser.username, token: authUser.token }) });
+        const data = await r.json();
+        if (!data.ok) return;
+        if (data.msLeft > 0) {
+            startDailyCountdown(data.msLeft);
+        } else {
+            const btn = document.getElementById('dailyBtn');
+            const cd  = document.getElementById('dailyCountdown');
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.background = 'linear-gradient(135deg,#b45309,#78350f)'; }
+            if (cd) cd.textContent = '';
+        }
+    } catch(e) {}
 }
 
 function logoutUser() {
