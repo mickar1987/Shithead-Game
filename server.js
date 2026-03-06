@@ -88,8 +88,9 @@ async function getUser(username) {
 }
 
 async function saveUser(username, data) {
-    if (!usersCol) return;
-    await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
+    if (!usersCol) { console.error('[saveUser] no DB connection!'); return; }
+    const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
+    console.log(`[saveUser] ${username} fields=${Object.keys(data).join(',')} matched=${result.matchedCount}`);
 }
 
 async function updateCoins(username, delta) {
@@ -160,6 +161,9 @@ app.post('/api/login', async (req, res) => {
         if (u.pinHash !== hashPin(pin)) return res.json({ ok: false, error: 'PIN שגוי' });
         const token = makeToken();
         await saveUser(name, { token });
+        // Verify token was saved
+        const saved = await getUser(name);
+        console.log(`[login] ${name} token saved=${saved?.token === token}`);
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
         res.json({ ok: true, username: name, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
     } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
@@ -170,10 +174,11 @@ app.post('/api/verify', async (req, res) => {
         const { username, token } = req.body;
         const name = username?.trim().toLowerCase();
         const u = await getUser(name);
+        console.log(`[verify] user=${name} found=${!!u} tokenMatch=${u?.token === token} dbToken=${u?.token?.slice(0,8)} reqToken=${token?.slice(0,8)}`);
         if (!u || u.token !== token) return res.json({ ok: false });
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
         res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
-    } catch(e) { res.json({ ok: false }); }
+    } catch(e) { console.error('[verify error]', e); res.json({ ok: false }); }
 });
 
 app.post('/api/daily', async (req, res) => {
