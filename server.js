@@ -7,12 +7,13 @@ const { MongoClient } = require('mongodb');
 
 // ══ COINS: settle bets at end of game ══
 async function settleCoins(room) {
-    if (room.coinsSettled || room.bet === 0) return;
+    console.log(`[settleCoins] called. bet=${room.bet}, settled=${room.coinsSettled}, order=${room.winnersOrder}, slots=${JSON.stringify(room.slots.map(s=>({name:s.name,username:s.username})))}`);
+    if (room.coinsSettled || room.bet === 0) { console.log('[settleCoins] skipped.'); return; }
     room.coinsSettled = true;
     const bet = room.bet;
     const order = room.winnersOrder;
     const n = order.length;
-    if (n < 2) return;
+    if (n < 2) { console.log('[settleCoins] not enough players'); return; }
 
     const changes = {};
     order.forEach(i => { changes[i] = 0; });
@@ -117,7 +118,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ══════════════════════════════════════════════
 //  USERS — MongoDB persistent coin system
 // ══════════════════════════════════════════════
-const STARTING_COINS = 1000;
+const STARTING_COINS = 2000;
 const DAILY_COINS = 200;
 
 function hashPin(pin) {
@@ -181,12 +182,28 @@ app.post('/api/daily', async (req, res) => {
         const name = username?.trim().toLowerCase();
         const u = await getUser(name);
         if (!u || u.token !== token) return res.json({ ok: false, error: 'לא מחובר' });
-        const today = new Date().toISOString().slice(0, 10);
-        if (u.lastDaily === today) return res.json({ ok: false, error: 'כבר קיבלת מטבעות היום', coins: u.coins });
+        const now = Date.now();
+        const last = u.lastDailyTs || 0;
+        const msLeft = (last + 24 * 60 * 60 * 1000) - now;
+        if (msLeft > 0) return res.json({ ok: false, error: 'כבר קיבלת מטבעות', coins: u.coins, msLeft });
         const newCoins = (u.coins || 0) + DAILY_COINS;
-        await saveUser(name, { coins: newCoins, lastDaily: today });
-        res.json({ ok: true, coins: newCoins, gained: DAILY_COINS });
-    } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
+        await saveUser(name, { coins: newCoins, lastDailyTs: now });
+        res.json({ ok: true, coins: newCoins, gained: DAILY_COINS, msLeft: 24 * 60 * 60 * 1000 });
+    } catch(e) { console.error('[daily]', e); res.json({ ok: false, error: 'שגיאת שרת' }); }
+});
+
+// Check daily status
+app.post('/api/daily-status', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        const now = Date.now();
+        const last = u.lastDailyTs || 0;
+        const msLeft = Math.max(0, (last + 24 * 60 * 60 * 1000) - now);
+        res.json({ ok: true, msLeft, coins: u.coins });
+    } catch(e) { res.json({ ok: false }); }
 });
 
 // ══════════════════════════════════════════════
