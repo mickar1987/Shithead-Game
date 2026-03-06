@@ -206,6 +206,38 @@ app.post('/api/daily-status', async (req, res) => {
     } catch(e) { res.json({ ok: false }); }
 });
 
+
+// Admin: view all users (protected by secret key)
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        const key = req.query.key;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const allUsers = await usersCol.find({}, { projection: { pinHash: 0, token: 0 } }).toArray();
+        const sorted = allUsers.sort((a, b) => (b.coins || 0) - (a.coins || 0));
+        // Return as nice HTML table
+        const rows = sorted.map((u, i) => `
+            <tr style="border-bottom:1px solid #333">
+                <td style="padding:8px">${i+1}</td>
+                <td style="padding:8px"><b>${u.username}</b></td>
+                <td style="padding:8px">${u.firstName || ''} ${u.lastName || ''}</td>
+                <td style="padding:8px">🪙 ${(u.coins||0).toLocaleString()}</td>
+                <td style="padding:8px">${u.lastDailyTs ? new Date(u.lastDailyTs).toLocaleString('he-IL') : '—'}</td>
+            </tr>`).join('');
+        res.send(`<!DOCTYPE html>
+<html dir="rtl">
+<head><meta charset="utf-8"><title>משתמשים</title>
+<style>body{font-family:sans-serif;background:#0d1f0f;color:#fff;padding:20px}
+table{border-collapse:collapse;width:100%}th{background:#1a4a2a;padding:10px;text-align:right}
+tr:hover{background:rgba(255,255,255,0.05)}</style></head>
+<body>
+<h2 style="color:gold">🃏 SHITHEAD — משתמשים (${sorted.length})</h2>
+<table>
+<tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>מטבעות</th><th>מתנה אחרונה</th></tr>
+${rows}
+</table>
+</body></html>`);
+    } catch(e) { res.json({ error: e.message }); }
+});
 // ══════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════
