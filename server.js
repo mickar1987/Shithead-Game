@@ -259,6 +259,20 @@ app.get('/api/debug/user', async (req, res) => {
     } catch(e) { res.json({ error: e.message }); }
 });
 
+// Admin: set coins for a user
+app.get('/api/admin/set-coins', async (req, res) => {
+    try {
+        const { key, u, coins } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const amount = parseInt(coins);
+        if (isNaN(amount) || amount < 0) return res.json({ error: 'Invalid coins value' });
+        const user = await getUser(u);
+        if (!user) return res.json({ error: `User "${u}" not found` });
+        await saveUser(u, { coins: amount });
+        res.json({ ok: true, username: u, coins: amount });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
 // Admin: view all users (protected by secret key)
 app.get('/api/admin/users', async (req, res) => {
     try {
