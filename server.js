@@ -1,9 +1,55 @@
+const path = requir// ══ COINS: settle bets at end of game ══
+async function settleCoins(room) {
+    if (room.coinsSettled || room.bet === 0) return;
+    room.coinsSettled = true;
+    const bet = room.bet;
+    const order = room.winnersOrder;
+    const n = order.length;
+    if (n < 2) return;
+
+    const changes = {};
+    order.forEach(i => { changes[i] = 0; });
+
+    // 1st takes from last
+    changes[order[0]]   += bet;
+    changes[order[n-1]] -= bet;
+
+    // 2nd takes half from 3rd (4-player)
+    if (n >= 4) {
+        const half = Math.floor(bet / 2);
+        changes[order[1]] += half;
+        changes[order[2]] -= half;
+    }
+
+    const results = [];
+    for (const slotIdx of order) {
+        const slot = room.slots[slotIdx];
+        const delta = changes[slotIdx] || 0;
+        let finalCoins = null;
+        if (slot.username) {
+            try {
+                const u = await getUser(slot.username);
+                if (u) {
+                    finalCoins = Math.max(0, (u.coins || 0) + delta);
+                    await saveUser(slot.username, { coins: finalCoins });
+                    console.log(`[coins] ${slot.username}: ${u.coins} ${delta >= 0 ? '+' : ''}${delta} = ${finalCoins}`);
+                }
+            } catch(e) { console.error('[coins] error:', e.message); }
+        } else if (delta !== 0) {
+            console.log(`[coins] ${slot.name} (guest): delta=${delta} — not saved`);
+        }
+        results.push({ name: slot.name, delta, coins: finalCoins, slotIdx });
+    }
+    console.log(`[coins] settled. bet=${bet} order=${order.join(',')}`);
+    broadcast(room, 'coinsResult', results);
+}
+
+e('path');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs');
+const { MongoClient } = require('mongodb');
 
 function buildDisplayName(first, last) {
     first = (first || '').trim();
@@ -12,6 +58,51 @@ function buildDisplayName(first, last) {
     if (!last)  return first;
     const initial = [...last][0].toUpperCase();
     return `${first}.${initial}.`;
+}
+
+// ══════════════════════════════════════════════
+//  MONGODB
+// ══════════════════════════════════════════════
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://shithead_user:Mickar87@cluster0.kiznwpz.mongodb.net/?appName=Cluster0';
+const mongoClient = new MongoClient(MONGO_URI);
+let usersCol = null;
+
+async function connectMongo() {
+    try {
+        await mongoClient.connect();
+        const db = mongoClient.db('shithead');
+        usersCol = db.collection('users');
+        await usersCol.createIndex({ username: 1 }, { unique: true });
+        console.log('[mongo] Connected to MongoDB Atlas ✅');
+    } catch(e) {
+        console.error('[mongo] Connection failed:', e.message);
+    }
+}
+connectMongo();
+
+async function getUser(username) {
+    if (!usersCol) return null;
+    return usersCol.findOne({ username });
+}
+
+async function saveUser(username, data) {
+    if (!usersCol) return;
+    await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
+}
+
+async function updateCoins(username, delta) {
+    if (!usersCol) return null;
+    const result = await usersCol.findOneAndUpdate(
+        { username },
+        { $inc: { coins: delta } },
+        { returnDocument: 'after' }
+    );
+    // Ensure coins don't go below 0
+    if (result && result.coins < 0) {
+        await usersCol.updateOne({ username }, { $set: { coins: 0 } });
+        result.coins = 0;
+    }
+    return result;
 }
 
 const app = express();
@@ -23,23 +114,10 @@ const io = new Server(server, {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ══════════════════════════════════════════════
-//  USERS — persistent coin system
+//  USERS — MongoDB persistent coin system
 // ══════════════════════════════════════════════
-const USERS_FILE = path.join(__dirname, 'users.json');
 const STARTING_COINS = 1000;
 const DAILY_COINS = 200;
-
-function loadUsers() {
-    try {
-        if (fs.existsSync(USERS_FILE)) return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-    } catch(e) { console.error('loadUsers error:', e.message); }
-    return {};
-}
-
-function saveUsers() {
-    try { fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2)); }
-    catch(e) { console.error('saveUsers error:', e.message); }
-}
 
 function hashPin(pin) {
     return crypto.createHash('sha256').update('shithead_salt_' + pin).digest('hex');
@@ -49,63 +127,65 @@ function makeToken() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-const users = loadUsers(); // { username: { pinHash, coins, lastDaily, token } }
-
 // HTTP endpoints for auth
 app.use(express.json());
 
-app.post('/api/register', (req, res) => {
-    const { username, pin, firstName, lastName } = req.body;
-    if (!username || !pin) return res.json({ ok: false, error: 'חסר שם משתמש או PIN' });
-    const name = username.trim().toLowerCase();
-    if (name.length < 2 || name.length > 16) return res.json({ ok: false, error: 'שם משתמש 2-16 תווים' });
-    if (!/^[a-z0-9\u05d0-\u05ea_]+$/i.test(name)) return res.json({ ok: false, error: 'תווים לא חוקיים בשם' });
-    if (pin.length !== 4 || !/^[0-9]{4}$/.test(pin)) return res.json({ ok: false, error: 'PIN חייב להיות 4 ספרות' });
-    const first = (firstName || '').trim();
-    if (!first) return res.json({ ok: false, error: 'חסר שם פרטי' });
-    if (users[name]) return res.json({ ok: false, error: 'שם משתמש תפוס' });
-    const token = makeToken();
-    users[name] = { pinHash: hashPin(pin), coins: STARTING_COINS, lastDaily: null, token, firstName: first, lastName: (lastName || '').trim() };
-    saveUsers();
-    const displayName = buildDisplayName(first, (lastName || '').trim());
-    res.json({ ok: true, username: name, token, coins: STARTING_COINS, firstName: first, lastName: (lastName||'').trim(), displayName });
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, pin, firstName, lastName } = req.body;
+        if (!username || !pin) return res.json({ ok: false, error: 'חסר שם משתמש או PIN' });
+        const name = username.trim().toLowerCase();
+        if (name.length < 2 || name.length > 16) return res.json({ ok: false, error: 'שם משתמש 2-16 תווים' });
+        if (pin.length !== 4 || !/^[0-9]{4}$/.test(pin)) return res.json({ ok: false, error: 'PIN חייב להיות 4 ספרות' });
+        const first = (firstName || '').trim();
+        if (!first) return res.json({ ok: false, error: 'חסר שם פרטי' });
+        const existing = await getUser(name);
+        if (existing) return res.json({ ok: false, error: 'שם משתמש תפוס' });
+        const token = makeToken();
+        const last = (lastName || '').trim();
+        await saveUser(name, { username: name, pinHash: hashPin(pin), coins: STARTING_COINS, lastDaily: null, token, firstName: first, lastName: last });
+        const displayName = buildDisplayName(first, last);
+        res.json({ ok: true, username: name, token, coins: STARTING_COINS, firstName: first, lastName: last, displayName });
+    } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
 });
 
-app.post('/api/login', (req, res) => {
-    const { username, pin } = req.body;
-    const name = username?.trim().toLowerCase();
-    if (!name || !users[name]) return res.json({ ok: false, error: 'שם משתמש לא קיים' });
-    if (users[name].pinHash !== hashPin(pin)) return res.json({ ok: false, error: 'PIN שגוי' });
-    const token = makeToken();
-    users[name].token = token;
-    saveUsers();
-    const u = users[name];
-    const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
-    res.json({ ok: true, username: name, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, pin } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u) return res.json({ ok: false, error: 'שם משתמש לא קיים' });
+        if (u.pinHash !== hashPin(pin)) return res.json({ ok: false, error: 'PIN שגוי' });
+        const token = makeToken();
+        await saveUser(name, { token });
+        const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
+        res.json({ ok: true, username: name, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
+    } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
 });
 
-app.post('/api/verify', (req, res) => {
-    const { username, token } = req.body;
-    const name = username?.trim().toLowerCase();
-    if (!name || !users[name] || users[name].token !== token)
-        return res.json({ ok: false });
-    const u = users[name];
-    const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
-    res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
+app.post('/api/verify', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
+        res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
+    } catch(e) { res.json({ ok: false }); }
 });
 
-app.post('/api/daily', (req, res) => {
-    const { username, token } = req.body;
-    const name = username?.trim().toLowerCase();
-    if (!name || !users[name] || users[name].token !== token)
-        return res.json({ ok: false, error: 'לא מחובר' });
-    const today = new Date().toISOString().slice(0, 10);
-    if (users[name].lastDaily === today)
-        return res.json({ ok: false, error: 'כבר קיבלת מטבעות היום', coins: users[name].coins });
-    users[name].coins += DAILY_COINS;
-    users[name].lastDaily = today;
-    saveUsers();
-    res.json({ ok: true, coins: users[name].coins, gained: DAILY_COINS });
+app.post('/api/daily', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false, error: 'לא מחובר' });
+        const today = new Date().toISOString().slice(0, 10);
+        if (u.lastDaily === today) return res.json({ ok: false, error: 'כבר קיבלת מטבעות היום', coins: u.coins });
+        const newCoins = (u.coins || 0) + DAILY_COINS;
+        await saveUser(name, { coins: newCoins, lastDaily: today });
+        res.json({ ok: true, coins: newCoins, gained: DAILY_COINS });
+    } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
 });
 
 // ══════════════════════════════════════════════
@@ -198,7 +278,7 @@ function startTurnTimer(room) {
                         }
                         room.gameOver = true;
                         clearRoomTimer(room.code);
-                        settleCoins(room);
+                        settleCoins(room).catch(e => console.error('[coins error]', e.message));
                         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
                     } else {
                         // Replace with bot
@@ -346,51 +426,7 @@ function createRoom(hostSocketId, hostName, playerCount, bet=0) {
 }
 // ══ COINS: settle bets at end of game ══
 // winnersOrder[0]=1st, [last]=loser
-// 1st takes all coins from last
-// 2nd takes half from 3rd (rounded down)
-function settleCoins(room) {
-    if (room.coinsSettled || room.bet === 0) return;
-    room.coinsSettled = true;
-    const bet = room.bet;
-    const order = room.winnersOrder; // slot indices, best to worst
-    const n = order.length;
-    if (n < 2) return;
 
-    const changes = {}; // slotIdx -> coin delta
-    order.forEach(i => { changes[i] = 0; });
-
-    // 1st takes from last
-    const first = order[0], last = order[n-1];
-    changes[first] += bet;
-    changes[last]  -= bet;
-
-    // 2nd takes half from 3rd (if they exist)
-    if (n >= 4) {
-        const second = order[1], third = order[2];
-        const half = Math.floor(bet / 2);
-        changes[second] += half;
-        changes[third]  -= half;
-    }
-
-    // Apply changes to user accounts
-    const results = [];
-    order.forEach(slotIdx => {
-        const slot = room.slots[slotIdx];
-        const delta = changes[slotIdx] || 0;
-        if (slot.username && users[slot.username]) {
-            const before = users[slot.username].coins;
-            users[slot.username].coins = Math.max(0, before + delta);
-            console.log(`[coins] ${slot.username}: ${before} ${delta >= 0 ? '+' : ''}${delta} = ${users[slot.username].coins}`);
-            saveUsers();
-        } else if (delta !== 0) {
-            console.log(`[coins] ${slot.name} (guest, slotIdx=${slotIdx}): delta=${delta} — not saved (no account)`);
-        }
-        results.push({ name: slot.name, delta, coins: slot.username ? users[slot.username]?.coins : null, slotIdx });
-    });
-    console.log('[coins] settle complete. bet='+bet+' order='+order.join(','));
-
-    broadcast(room, 'coinsResult', results);
-}
 
 
 
@@ -486,7 +522,7 @@ function checkWin(room, idx) {
             if (last) room.winnersOrder.push(last.id);
             room.gameOver = true;
             clearRoomTimer(room.code);
-            settleCoins(room);
+            settleCoins(room).catch(e => console.error('[coins error]', e.message));
             broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i].name));
         }
     }
@@ -701,7 +737,7 @@ function handlePlayerLeave(socketData) {
         }
         room.gameOver = true;
         clearRoomTimer(room.code);
-        settleCoins(room);
+        settleCoins(room).catch(e => console.error('[coins error]', e.message));
         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
     } else {
         slot.isBot = true;
@@ -719,35 +755,42 @@ function handlePlayerLeave(socketData) {
 io.on('connection', (socket) => {
 
     // ── Create room ──
-    socket.on('createRoom', ({ name, playerCount, turnTimer, isPublic, bet, username, token }) => {
-        const betAmount = parseInt(bet) || 0;
-        // Verify coins if bet > 0
-        if (betAmount > 0) {
+    socket.on('createRoom', async ({ name, playerCount, turnTimer, isPublic, bet, username, token }) => {
+        try {
+            const betAmount = parseInt(bet) || 0;
             const uname = username?.trim().toLowerCase();
-            if (!uname || !users[uname] || users[uname].token !== token)
+            let validUser = false;
+            if (uname) {
+                const u = await getUser(uname);
+                if (u && u.token === token) {
+                    validUser = true;
+                    if (betAmount > 0 && u.coins < betAmount)
+                        return socket.emit('error', 'אין מספיק מטבעות');
+                } else if (betAmount > 0) {
+                    return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+                }
+            } else if (betAmount > 0) {
                 return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
-            if (users[uname].coins < betAmount)
-                return socket.emit('error', 'אין מספיק מטבעות');
-        }
-        const code = createRoom(socket.id, name, playerCount, betAmount);
-        rooms[code].turnTimer = turnTimer || 0;
-        rooms[code].isPublic = !!isPublic;
-        rooms[code].createdAt = Date.now();
-        const room = rooms[code];
-        const uname = username?.trim().toLowerCase();
-        room.slots[0].name = name;
-        room.slots[0].socketId = socket.id;
-        room.slots[0].connected = true;
-        room.slots[0].username = (uname && users[uname]) ? uname : null;
-        socket.join(code);
-        socket.data.roomCode = code;
-        socket.data.slotIdx = 0;
-        socket.emit('roomCreated', { code, slotIdx: 0, bet: betAmount });
-        emitStateToPlayer(room, 0);
+            }
+            const code = createRoom(socket.id, name, playerCount, betAmount);
+            rooms[code].turnTimer = turnTimer || 0;
+            rooms[code].isPublic = !!isPublic;
+            rooms[code].createdAt = Date.now();
+            const room = rooms[code];
+            room.slots[0].name = name;
+            room.slots[0].socketId = socket.id;
+            room.slots[0].connected = true;
+            room.slots[0].username = validUser ? uname : null;
+            socket.join(code);
+            socket.data.roomCode = code;
+            socket.data.slotIdx = 0;
+            socket.emit('roomCreated', { code, slotIdx: 0, bet: betAmount });
+            emitStateToPlayer(room, 0);
+        } catch(e) { console.error('[createRoom]', e.message); }
     });
 
     // ── Open room (host decides when to start) ──
-    socket.on('createOpenRoom', ({ name, turnTimer, isPublic, bet, username, token }) => {
+    socket.on('createOpenRoom', async ({ name, turnTimer, isPublic, bet, username, token }) => {
         const code = [...Array(4)].map(() => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*23)]).join('');
         const room = {
             code,
@@ -772,8 +815,10 @@ io.on('connection', (socket) => {
         rooms[code] = room;
         // Set username on host slot
         const openUname = username?.trim().toLowerCase();
-        if (openUname && users[openUname] && users[openUname].token === token)
-            room.slots[0].username = openUname;
+        if (openUname) {
+            const ou = await getUser(openUname);
+            if (ou && ou.token === token) room.slots[0].username = openUname;
+        }
         socket.join(code);
         socket.data.roomCode = code;
         socket.data.slotIdx = 0;
@@ -782,21 +827,26 @@ io.on('connection', (socket) => {
     });
 
     // ── Join open room ──
-    socket.on('joinRoom', ({ code, name, username, token }) => {
+    socket.on('joinRoom', async ({ code, name, username, token }) => {
         const room = rooms[code];
         if (!room) { socket.emit('error', 'חדר לא נמצא'); return; }
 
         // Validate coins for bet rooms
         const betAmount = room.bet || 0;
-        if (betAmount > 0) {
-            const uname = username?.trim().toLowerCase();
-            if (!uname || !users[uname] || users[uname].token !== token)
-                return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
-            if (users[uname].coins < betAmount)
-                return socket.emit('error', `אין מספיק מטבעות (נדרש: ${betAmount})`);
-        }
         const uname = username?.trim().toLowerCase();
-        const validUser = uname && users[uname] && users[uname].token === token;
+        let validUser = false;
+        if (uname) {
+            const u = await getUser(uname);
+            if (u && u.token === token) {
+                validUser = true;
+                if (betAmount > 0 && u.coins < betAmount)
+                    return socket.emit('error', `אין מספיק מטבעות (נדרש: ${betAmount})`);
+            } else if (betAmount > 0) {
+                return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+            }
+        } else if (betAmount > 0) {
+            return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+        }
 
         if (room.openRoom && !room.gameStarted) {
             if (room.slots.length >= 4) { socket.emit('error', 'החדר מלא (4 שחקנים)'); return; }
@@ -1213,7 +1263,7 @@ io.on('connection', (socket) => {
                 room.gameOver = true;
                 clearRoomTimer(roomCode);
                 broadcast(room, 'toast', `🚪 ${name} יצא — המשחק הסתיים`);
-                settleCoins(room);
+                settleCoins(room).catch(e => console.error('[coins error]', e.message));
                 broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
                 return;
             } else {
