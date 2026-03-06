@@ -482,6 +482,9 @@
         <input id="authUsername" type="text" placeholder="שם משתמש" maxlength="16" class="setup-input" style="ime-mode:inactive;"/>
         <input id="authPin" type="password" placeholder="PIN (4 ספרות)" maxlength="4" inputmode="numeric" class="setup-input"/>
         <input id="authPin2" type="password" placeholder="אמת PIN" maxlength="4" inputmode="numeric" class="setup-input hidden" style="margin-top:0;"/>
+        <input id="authFirstName" type="text" placeholder="שם פרטי" oninput="updateAuthNamePreview()" maxlength="12" class="setup-input hidden" style="margin-top:0;"/>
+        <input id="authLastName" type="text" placeholder="שם משפחה" oninput="updateAuthNamePreview()" maxlength="16" class="setup-input hidden" style="margin-top:0;"/>
+        <div id="authNamePreview" style="font-size:11px;color:rgba(255,200,50,0.7);min-height:16px;"></div>
         <div id="authError" style="font-size:11px;color:#f87171;min-height:16px;"></div>
         <button onclick="submitAuth()" id="authSubmitBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">🔑 התחבר</button>
         <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
@@ -505,7 +508,7 @@
             <button onclick="editProfile()" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 10px;font-size:12px;cursor:pointer;letter-spacing:1px;">✏️ שנה שם</button>
         </div>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.03</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.05</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2103,7 +2106,13 @@ function loadAuth() {
         fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, token }) })
             .then(r => r.json()).then(data => {
                 if (data.ok) {
-                    authUser = { username: data.username, token, coins: data.coins };
+                    authUser = { username: data.username, token, coins: data.coins, firstName: data.firstName||'', lastName: data.lastName||'', displayName: data.displayName||data.username };
+                    // Sync display name to localStorage
+                    if (authUser.firstName) {
+                        localStorage.setItem('shitheadFirstName', authUser.firstName);
+                        localStorage.setItem('shitheadLastName',  authUser.lastName);
+                        localStorage.setItem('shitheadPlayerName', authUser.displayName);
+                    }
                     updateCoinsUI();
                 }
             }).catch(()=>{});
@@ -2149,45 +2158,69 @@ function updateCoinsUI() {
 }
 
 function switchAuthTab(tab) {
-    const pin2 = document.getElementById('authPin2');
-    const btn = document.getElementById('authSubmitBtn');
-    const t1 = document.getElementById('tabLogin');
-    const t2 = document.getElementById('tabRegister');
+    const pin2  = document.getElementById('authPin2');
+    const btn   = document.getElementById('authSubmitBtn');
+    const t1    = document.getElementById('tabLogin');
+    const t2    = document.getElementById('tabRegister');
+    const fname = document.getElementById('authFirstName');
+    const lname = document.getElementById('authLastName');
+    const prev  = document.getElementById('authNamePreview');
     if (tab === 'login') {
-        if (pin2) pin2.classList.add('hidden');
-        if (btn) btn.textContent = '🔑 התחבר';
-        if (t1) t1.style.borderColor = 'var(--gold)';
-        if (t2) t2.style.borderColor = '';
+        if (pin2)  pin2.classList.add('hidden');
+        if (fname) fname.classList.add('hidden');
+        if (lname) lname.classList.add('hidden');
+        if (prev)  prev.textContent = '';
+        if (btn)   btn.textContent = '🔑 התחבר';
+        if (t1)    t1.style.borderColor = 'var(--gold)';
+        if (t2)    t2.style.borderColor = '';
     } else {
-        if (pin2) pin2.classList.remove('hidden');
-        if (btn) btn.textContent = '✨ הרשם';
-        if (t1) t1.style.borderColor = '';
-        if (t2) t2.style.borderColor = 'var(--gold)';
+        if (pin2)  pin2.classList.remove('hidden');
+        if (fname) fname.classList.remove('hidden');
+        if (lname) lname.classList.remove('hidden');
+        if (btn)   btn.textContent = '✨ הרשם';
+        if (t1)    t1.style.borderColor = '';
+        if (t2)    t2.style.borderColor = 'var(--gold)';
     }
     document.getElementById('authError').textContent = '';
 }
 
+function updateAuthNamePreview() {
+    const first = (document.getElementById('authFirstName')?.value || '').trim();
+    const last  = (document.getElementById('authLastName')?.value  || '').trim();
+    const prev  = document.getElementById('authNamePreview');
+    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
+}
+
 async function submitAuth() {
-    const username = document.getElementById('authUsername').value.trim();
-    const pin = document.getElementById('authPin').value.trim();
-    const pin2El = document.getElementById('authPin2');
-    const errEl = document.getElementById('authError');
+    const username  = document.getElementById('authUsername').value.trim();
+    const pin       = document.getElementById('authPin').value.trim();
+    const pin2El    = document.getElementById('authPin2');
+    const errEl     = document.getElementById('authError');
     const isRegister = !pin2El.classList.contains('hidden');
+    const firstName = (document.getElementById('authFirstName')?.value || '').trim();
+    const lastName  = (document.getElementById('authLastName')?.value  || '').trim();
 
     if (!username || !pin) { errEl.textContent = 'מלא שם משתמש ו-PIN'; return; }
-    if (pin.length !== 4) { errEl.textContent = 'PIN חייב להיות 4 ספרות'; return; }
+    if (pin.length !== 4)  { errEl.textContent = 'PIN חייב להיות 4 ספרות'; return; }
     if (isRegister && pin2El.value !== pin) { errEl.textContent = 'הPIN לא תואם'; return; }
+    if (isRegister && !firstName) { errEl.textContent = 'חסר שם פרטי'; return; }
 
     const endpoint = isRegister ? '/api/register' : '/api/login';
     try {
-        const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, pin }) });
+        const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, pin, firstName, lastName }) });
         const data = await r.json();
         if (!data.ok) { errEl.textContent = data.error; return; }
-        authUser = { username: data.username, token: data.token, coins: data.coins };
+        authUser = { username: data.username, token: data.token, coins: data.coins, firstName: data.firstName||'', lastName: data.lastName||'', displayName: data.displayName||data.username };
+        // Sync display name to localStorage so getMyName() works
+        if (authUser.displayName) {
+            localStorage.setItem('shitheadFirstName', authUser.firstName);
+            localStorage.setItem('shitheadLastName',  authUser.lastName);
+            localStorage.setItem('shitheadPlayerName', authUser.displayName);
+        }
         saveAuthLocal();
         updateCoinsUI();
         errEl.textContent = '';
-        showToast(isRegister ? `✨ ברוך הבא ${data.username}! יש לך 🪙${data.coins}` : `👋 שלום ${data.username}! 🪙${data.coins}`);
+        showToast(isRegister ? `✨ ברוך הבא ${authUser.displayName}! יש לך 🪙${data.coins}` : `👋 שלום ${authUser.displayName}! 🪙${data.coins}`);
     } catch(e) { errEl.textContent = 'שגיאת חיבור לשרת'; }
 }
 
@@ -2600,6 +2633,9 @@ function editProfile() {
 }
 
 function getMyName() {
+    // If logged in, always use server display name
+    if (authUser && authUser.displayName) return authUser.displayName;
+    // Guest: use localStorage
     const first = localStorage.getItem('shitheadFirstName');
     const last  = localStorage.getItem('shitheadLastName');
     if (!first) { showNameModal(true); return null; }
@@ -2664,6 +2700,7 @@ function createOnlineRoom(count) {
 function createOpenRoom() {
     const name = getMyName(); if (!name) return;
     if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast('אין מספיק מטבעות'); return; }
     initSocket();
     socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
 }
