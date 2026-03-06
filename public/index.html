@@ -491,23 +491,29 @@
         <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
             <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
             <button onclick="claimDaily()" id="dailyBtn" class="setup-btn" style="font-size:0.85rem;padding:8px;background:linear-gradient(135deg,#b45309,#78350f);">🎁 קבל 200 מטבעות יומיים</button>
-        <div id="dailyCountdown" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;text-align:center;"></div>
+            <div id="dailyCountdown" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;text-align:center;"></div>
+            <button onclick="showEditProfile()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);margin-top:4px;">✏️ עריכת פרופיל</button>
             <button onclick="logoutUser()" class="setup-btn" style="font-size:0.8rem;padding:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);margin-top:4px;">התנתק</button>
         </div>
     </div>
 
     <div id="menuMain" class="setup-grid">
-        <div id="mainCoinsBar" style="display:none;align-items:center;gap:6px;background:rgba(255,255,255,0.07);border-radius:20px;padding:5px 14px;margin-bottom:2px;">
-            <span style="font-size:16px;">🪙</span>
-            <span id="mainCoinsAmount" style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--gold);letter-spacing:1px;"></span>
-            <span id="mainUsername" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"></span>
+        <!-- Coins bar — shown only when logged in -->
+        <div id="mainCoinsBar" style="display:none;flex-direction:column;align-items:center;gap:4px;width:100%;max-width:280px;margin-bottom:2px;">
+            <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.07);border-radius:20px;padding:6px 18px;width:100%;box-sizing:border-box;justify-content:center;">
+                <span style="font-size:20px;">🟡</span>
+                <span id="mainCoinsAmount" style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:2px;"></span>
+                <span id="mainUsername" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"></span>
+            </div>
+            <button onclick="claimDaily()" id="mainDailyBtn" class="setup-btn" style="font-size:0.8rem;padding:6px 12px;background:linear-gradient(135deg,#b45309,#78350f);width:100%;">🎁 קבל 200 מטבעות יומיים</button>
+            <div id="mainDailyCountdown" style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;min-height:14px;text-align:center;"></div>
         </div>
         <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.22</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.24</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -595,6 +601,35 @@
             style="margin-top:16px;width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#064e1e);border:none;border-radius:10px;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:1px;">
             ✅ שמור
         </button>
+    </div>
+</div>
+
+<!-- EDIT PROFILE MODAL -->
+<div id="editProfileModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10001;align-items:center;justify-content:center;">
+    <div style="background:#0d2e18;border:1px solid rgba(255,255,255,0.15);border-radius:18px;padding:28px 24px;width:90%;max-width:320px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--gold);letter-spacing:3px;margin-bottom:4px;">עריכת פרופיל</div>
+        <div id="editProfileStep1">
+            <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:16px;">הכנס PIN לאימות</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:12px;" id="editProfileUsername"></div>
+            <input id="editProfilePin" type="password" placeholder="PIN (4 ספרות)" maxlength="4" inputmode="numeric"
+                style="width:100%;box-sizing:border-box;padding:12px;font-size:1.1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;outline:none;"
+                onkeydown="if(event.key==='Enter') verifyEditPin()"/>
+            <div id="editProfilePinError" style="font-size:11px;color:#f87171;min-height:16px;margin-top:6px;"></div>
+            <button onclick="verifyEditPin()" class="setup-btn" style="margin-top:12px;width:100%;background:linear-gradient(135deg,#16a34a,#064e1e);">✅ אמת PIN</button>
+        </div>
+        <div id="editProfileStep2" style="display:none;">
+            <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:16px;">עדכן פרטים</div>
+            <input id="editFirstName" type="text" placeholder="שם פרטי" maxlength="12" oninput="updateEditPreview()"
+                style="width:100%;box-sizing:border-box;padding:12px;font-size:1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;outline:none;margin-bottom:10px;"/>
+            <input id="editLastName" type="text" placeholder="שם משפחה" maxlength="16" oninput="updateEditPreview()"
+                style="width:100%;box-sizing:border-box;padding:12px;font-size:1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;outline:none;margin-bottom:10px;"/>
+            <input id="editNewPin" type="password" placeholder="PIN חדש (השאר ריק לא לשנות)" maxlength="4" inputmode="numeric"
+                style="width:100%;box-sizing:border-box;padding:12px;font-size:1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;outline:none;margin-bottom:6px;"/>
+            <div id="editPreview" style="font-size:12px;color:rgba(255,200,50,0.7);min-height:16px;margin-bottom:6px;"></div>
+            <div id="editProfileError" style="font-size:11px;color:#f87171;min-height:16px;"></div>
+            <button onclick="saveEditProfile()" class="setup-btn" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#16a34a,#064e1e);">💾 שמור שינויים</button>
+        </div>
+        <button onclick="closeEditProfile()" style="margin-top:12px;width:100%;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:rgba(255,255,255,0.4);font-size:0.85rem;cursor:pointer;">ביטול</button>
     </div>
 </div>
 
@@ -2172,7 +2207,7 @@ function updateCoinsUI() {
     const authBtn = document.getElementById('mainAuthBtn');
     if (authUser) {
         if (bar) { bar.style.display = 'flex'; }
-        if (amt) amt.textContent = '🪙 ' + authUser.coins.toLocaleString();
+        if (amt) amt.textContent = authUser.coins.toLocaleString();
         if (uname) uname.textContent = authUser.username;
         if (authBtn) authBtn.textContent = '👤 ' + authUser.username;
         // Update auth menu
@@ -2275,31 +2310,32 @@ function formatCountdown(ms) {
     return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
+function setDailyBtnsState(disabled, cdText) {
+    // Update both auth menu and main menu daily buttons
+    ['dailyBtn','mainDailyBtn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.disabled = disabled;
+        btn.style.opacity = disabled ? '0.45' : '1';
+        btn.style.background = disabled ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg,#b45309,#78350f)';
+    });
+    ['dailyCountdown','mainDailyCountdown'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = cdText;
+    });
+}
+
 function startDailyCountdown(msLeft) {
     if (dailyCountdownInterval) clearInterval(dailyCountdownInterval);
-    const btn = document.getElementById('dailyBtn');
-    const cd  = document.getElementById('dailyCountdown');
     let remaining = msLeft;
 
     function tick() {
         if (remaining <= 0) {
             clearInterval(dailyCountdownInterval);
-            if (btn) {
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                btn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
-                btn.textContent = '🎁 קבל 200 מטבעות יומיים';
-            }
-            if (cd) cd.textContent = '';
+            setDailyBtnsState(false, '');
             return;
         }
-        if (btn) {
-            btn.disabled = true;
-            btn.style.opacity = '0.45';
-            btn.style.background = 'rgba(255,255,255,0.08)';
-            btn.textContent = '🎁 קבל 200 מטבעות יומיים';
-        }
-        if (cd) cd.textContent = `⏳ זמין בעוד ${formatCountdown(remaining)}`;
+        setDailyBtnsState(true, `⏳ זמין בעוד ${formatCountdown(remaining)}`);
         remaining -= 1000;
     }
     tick();
@@ -2308,8 +2344,7 @@ function startDailyCountdown(msLeft) {
 
 async function claimDaily() {
     if (!authUser) return;
-    const btn = document.getElementById('dailyBtn');
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+    setDailyBtnsState(true, '...');
     try {
         console.log('[daily] claiming for', authUser.username);
         const r = await fetch('/api/daily', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: authUser.username, token: authUser.token }) });
@@ -2325,7 +2360,7 @@ async function claimDaily() {
                 return;
             }
             if (data.msLeft > 0) startDailyCountdown(data.msLeft);
-            else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            else setDailyBtnsState(false, '');
             showToast('❌ ' + (data.error || 'שגיאה'));
             return;
         }
@@ -2336,7 +2371,7 @@ async function claimDaily() {
         startDailyCountdown(24 * 60 * 60 * 1000);
     } catch(e) {
         showToast('שגיאת חיבור לשרת');
-        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        setDailyBtnsState(false, '');
     }
 }
 
@@ -2349,12 +2384,82 @@ async function checkDailyAvailable() {
         if (data.msLeft > 0) {
             startDailyCountdown(data.msLeft);
         } else {
-            const btn = document.getElementById('dailyBtn');
-            const cd  = document.getElementById('dailyCountdown');
-            if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.background = 'linear-gradient(135deg,#b45309,#78350f)'; }
-            if (cd) cd.textContent = '';
+            setDailyBtnsState(false, '');
         }
     } catch(e) {}
+}
+
+// ── Edit Profile ──
+function showEditProfile() {
+    const modal = document.getElementById('editProfileModal');
+    const step1 = document.getElementById('editProfileStep1');
+    const step2 = document.getElementById('editProfileStep2');
+    const pinEl = document.getElementById('editProfilePin');
+    const userEl = document.getElementById('editProfileUsername');
+    if (userEl) userEl.textContent = `👤 ${authUser?.username}`;
+    if (step1) step1.style.display = '';
+    if (step2) step2.style.display = 'none';
+    document.getElementById('editProfilePinError').textContent = '';
+    document.getElementById('editProfilePin').value = '';
+    modal.style.display = 'flex';
+    setTimeout(() => pinEl?.focus(), 100);
+}
+
+function closeEditProfile() {
+    document.getElementById('editProfileModal').style.display = 'none';
+}
+
+async function verifyEditPin() {
+    const pin = document.getElementById('editProfilePin').value.trim();
+    const errEl = document.getElementById('editProfilePinError');
+    if (pin.length !== 4) { errEl.textContent = 'PIN חייב להיות 4 ספרות'; return; }
+    try {
+        const r = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ username: authUser.username, pin }) });
+        const data = await r.json();
+        if (!data.ok) { errEl.textContent = 'PIN שגוי'; return; }
+        // Show step 2
+        document.getElementById('editProfileStep1').style.display = 'none';
+        document.getElementById('editProfileStep2').style.display = '';
+        document.getElementById('editFirstName').value = authUser.firstName || '';
+        document.getElementById('editLastName').value = authUser.lastName || '';
+        document.getElementById('editNewPin').value = '';
+        document.getElementById('editProfileError').textContent = '';
+        updateEditPreview();
+    } catch(e) { errEl.textContent = 'שגיאת חיבור'; }
+}
+
+function updateEditPreview() {
+    const first = (document.getElementById('editFirstName')?.value || '').trim();
+    const last  = (document.getElementById('editLastName')?.value  || '').trim();
+    const prev  = document.getElementById('editPreview');
+    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
+}
+
+async function saveEditProfile() {
+    const first  = (document.getElementById('editFirstName').value || '').trim();
+    const last   = (document.getElementById('editLastName').value  || '').trim();
+    const newPin = (document.getElementById('editNewPin').value    || '').trim();
+    const errEl  = document.getElementById('editProfileError');
+    if (!first) { errEl.textContent = 'שם פרטי חובה'; return; }
+    if (newPin && newPin.length !== 4) { errEl.textContent = 'PIN חדש חייב להיות 4 ספרות'; return; }
+    try {
+        const r = await fetch('/api/update-profile', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ username: authUser.username, token: authUser.token, firstName: first, lastName: last, newPin: newPin || null }) });
+        const data = await r.json();
+        if (!data.ok) { errEl.textContent = data.error || 'שגיאה'; return; }
+        // Update local auth
+        authUser.firstName = first;
+        authUser.lastName  = last;
+        authUser.displayName = buildDisplayName(first, last);
+        localStorage.setItem('shitheadFirstName', first);
+        localStorage.setItem('shitheadLastName',  last);
+        localStorage.setItem('shitheadPlayerName', authUser.displayName);
+        saveAuthLocal();
+        updateCoinsUI();
+        closeEditProfile();
+        showToast(`✅ פרופיל עודכן! יוצג כ: ${authUser.displayName}`);
+    } catch(e) { errEl.textContent = 'שגיאת חיבור'; }
 }
 
 function logoutUser() {
