@@ -476,7 +476,7 @@
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.23</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.24</div>
     <!-- Profile button — top left, safe area aware -->
     <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
         <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
@@ -793,55 +793,61 @@ function startGame(count) {
     }));
     drawPile = deck;
 
-    // AI swap: optimally distribute all 9 cards across faceDown/faceUp/hand
-    // faceDown = best specials (10,2,3,8) — want unbeatable hidden cards
-    // faceUp   = hard-to-beat normals (A,K,Q) + tactical (7,8) — visible to all
-    // hand     = weakest cards (4,5,6,9,J) — dump these first during game
+    // AI swap: optimal card placement across all 9 cards
+    //
+    // PHILOSOPHY:
+    // faceDown (hidden, last resort) = BEST specials: 10 > 2 > 3 > 8
+    //   then high cards (A,K,Q) — want max chance of surviving blindly
+    // faceUp (visible to all, mid-game) = cards easy to REACH FROM HAND:
+    //   2,3 always playable; A,K,Q hard to beat (pile pusher);
+    //   avoid 4,5,6 in faceUp — they block you when pile is high
+    // hand = keep WEAKEST cards (4,5,6,9,J) — dump these first!
     players.forEach(p => {
         if (!p.isAI) return;
-        // Include ALL 9 cards in redistribution
-        const all = [...p.hand, ...p.faceUp, ...p.faceDown];
+        const all = [...p.hand, ...p.faceUp, ...p.faceDown]; // all 9 cards
 
-        // Score for faceDown (hidden — want best possible escape cards)
+        // faceDown: best hidden cards — survive anything
         const fdScore = r => {
-            if (r === '10') return 100; // burns pile from anywhere
-            if (r === '2')  return 92;  // always playable
-            if (r === '3')  return 85;  // transparent
-            if (r === '8')  return 68;  // skip
-            if (r === 'A')  return 50;
-            if (r === 'K')  return 44;
-            if (r === 'Q')  return 38;
-            if (r === '7')  return 30;
-            if (r === 'J')  return 22;
-            if (r === '9')  return 15;
-            if (r === '6')  return 8;
-            if (r === '5')  return 5;
-            if (r === '4')  return 2;
+            if (r === '10') return 100;
+            if (r === '2')  return 95;
+            if (r === '3')  return 88;
+            if (r === '8')  return 70;
+            if (r === 'A')  return 52;
+            if (r === 'K')  return 46;
+            if (r === 'Q')  return 40;
+            if (r === '7')  return 32;
+            if (r === 'J')  return 20;
+            if (r === '9')  return 14;
+            if (r === '6')  return 7;
+            if (r === '5')  return 4;
+            if (r === '4')  return 1;
             return 10;
         };
-        const byFD = [...all].sort((a,b) => fdScore(b.slice(0,-1)) - fdScore(a.slice(0,-1)));
-        p.faceDown = byFD.slice(0,3);
-        const rest = byFD.slice(3);
+        const sortedAll = [...all].sort((a,b) => fdScore(b.slice(0,-1)) - fdScore(a.slice(0,-1)));
+        p.faceDown = sortedAll.slice(0, 3);
+        const rest = sortedAll.slice(3); // 6 remaining for faceUp + hand
 
-        // Score for faceUp (visible — want hard-to-answer + playable)
+        // faceUp: cards easy to play (high coverage) + hard to beat
+        // 2,3 = play on anything; A,K,Q = high, hard to answer
+        // 7,8 = tactical; avoid 4,5,6 — they get stuck on high piles
         const fuScore = r => {
-            if (r === '2')  return 88;
-            if (r === '3')  return 82;
-            if (r === '8')  return 65;
-            if (r === 'A')  return 58;
-            if (r === 'K')  return 52;
-            if (r === 'Q')  return 46;
-            if (r === '7')  return 40;
-            if (r === 'J')  return 28;
-            if (r === '9')  return 20;
-            if (r === '6')  return 10;
-            if (r === '5')  return 6;
+            if (r === '2')  return 90;
+            if (r === '3')  return 85;
+            if (r === 'A')  return 62;
+            if (r === 'K')  return 56;
+            if (r === 'Q')  return 50;
+            if (r === '8')  return 44;
+            if (r === '7')  return 38;
+            if (r === 'J')  return 24;
+            if (r === '9')  return 18;
+            if (r === '6')  return 8;  // low priority — blocks you from high piles
+            if (r === '5')  return 5;
             if (r === '4')  return 2;
             return 12;
         };
-        const byFU = [...rest].sort((a,b) => fuScore(b.slice(0,-1)) - fuScore(a.slice(0,-1)));
-        p.faceUp = byFU.slice(0,3);
-        p.hand   = byFU.slice(3); // weakest — dump first
+        const sortedRest = [...rest].sort((a,b) => fuScore(b.slice(0,-1)) - fuScore(a.slice(0,-1)));
+        p.faceUp = sortedRest.slice(0, 3);
+        p.hand   = sortedRest.slice(3); // the 3 weakest stay in hand — dump them ASAP
     });
 
     render();
@@ -1730,18 +1736,28 @@ function aiGetBestPlay(validCards, hand) {
                 else if (inLateGame) score += 5;       // late game: less need to save
             }
 
-            // Q/K/A: hard to beat — good for pushing pile
+            // Q/K/A: hard to beat — push pile only when pile is already substantial
+            // Don't push pile with high cards when we have weak cards to dump!
             if (['A','K','Q'].includes(rank)) {
-                if (pileSize >= 4)       score -= 18; // push pile — opp needs A/K/Q/special
-                else if (pileSize === 0) score -= 6;
-                else if (inLateGame)     score -= 14;
+                if (pileSize >= 6)       score -= 12; // only push big piles
+                else if (pileSize === 0) score -= 5;
+                else if (inLateGame)     score -= 10;
+                // If we have weak cards in hand, strongly prefer them over QKA
+                const weakInHand = myHand.filter(hc => aiCardValue(hc) <= 5).length;
+                if (weakInHand > 0 && pileSize < 6) score += weakInHand * 12;
             }
+        }
+
+        // ── Prefer dumping weak cards (always, not just late game) ──
+        const cardVal = aiCardValue(cards[0]);
+        if (cardVal <= 5 && !anyOppNearEnd) {
+            // Weak card (4,5,6,9,J) — always prefer to dump these
+            score -= 20 + (6 - Math.min(cardVal, 5)) * 4;
         }
 
         // ── Late game: urgently dump weak cards ──
         if (inLateGame && !anyOppNearEnd) {
-            const val = aiCardValue(cards[0]);
-            if (val < 10) score -= 15 + (10 - val); // the weaker the card the more we dump it
+            if (cardVal <= 7) score -= 18 + (8 - cardVal) * 3;
             score -= numCards * 6;
         }
 
