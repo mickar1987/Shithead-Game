@@ -507,7 +507,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.19</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.21</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2489,9 +2489,14 @@ const overlay = document.getElementById('setupOverlay');
             const clickable = r.available;
             return `<div onclick="${clickable ? `joinPublicRoom('${r.code}')` : ''}"
                 style="padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,${clickable?'0.07':'0.03'});border-radius:8px;cursor:${clickable?'pointer':'default'};border:1px solid rgba(255,255,255,${clickable?'0.15':'0.05'});opacity:${clickable?'1':'0.45'};">
-                <span style="color:${clickable?'var(--gold)':'rgba(255,255,255,0.3)'};font-weight:700;letter-spacing:2px;">${r.code}</span>
-                <span style="color:rgba(255,255,255,0.5);font-size:11px;margin-right:8px;">${r.players}/${r.max} שחקנים • ${r.timerLabel}</span>
-                ${r.inProgress ? '<span style="font-size:10px;color:rgba(255,100,100,0.6);margin-right:4px;">● במשחק</span>' : r.isFull ? '<span style="font-size:10px;color:rgba(255,180,0,0.7);margin-right:4px;">● מלא</span>' : '<span style="font-size:10px;color:rgba(100,255,100,0.7);margin-right:4px;">● פתוח</span>'}
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="color:${clickable?'var(--gold)':'rgba(255,255,255,0.3)'};font-weight:700;letter-spacing:2px;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;">${r.host || r.code}</span>
+                    ${r.inProgress ? '<span style="font-size:10px;color:rgba(255,100,100,0.6);">● במשחק</span>' : r.isFull ? '<span style="font-size:10px;color:rgba(255,180,0,0.7);">● מלא</span>' : '<span style="font-size:10px;color:rgba(100,255,100,0.7);">● פתוח</span>'}
+                </div>
+                <div style="display:flex;gap:10px;margin-top:3px;">
+                    <span style="color:rgba(255,255,255,0.4);font-size:11px;">${r.players}/${r.max} • ${r.timerLabel}</span>
+                    ${r.bet > 0 ? `<span style="color:rgba(255,200,50,0.8);font-size:11px;">🪙 ${r.bet}</span>` : '<span style="color:rgba(255,255,255,0.25);font-size:11px;">ללא הימור</span>'}
+                </div>
              </div>`;
         }).join('');
     });
