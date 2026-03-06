@@ -476,7 +476,7 @@
         <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.20</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v2.5.22</div>
     <!-- Profile button — top left, safe area aware -->
     <div id="profileBtn" onclick="editProfile()" style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#064e1e);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,0.4);">
         <div id="profileInitial" style="font-size:18px;font-weight:700;color:#fff;line-height:1;font-family:'Bebas Neue',sans-serif;letter-spacing:1px;">?</div>
@@ -793,40 +793,55 @@ function startGame(count) {
     }));
     drawPile = deck;
 
-    // AI swap: put 3 strongest cards as faceUp (specials first, then high ranks)
+    // AI swap — optimal placement:
+    // faceDown = hidden = put BEST cards (10 > 2 > 3 > 8 > A > K > Q)
+    // faceUp   = visible to all = hard-to-answer + useful (A,K,Q,7,8)
+    // hand     = keep WEAKEST cards to dump early
     players.forEach(p => {
-        if (p.isAI) {
-            const all = [...p.hand, ...p.faceUp];
-            // Score each card for faceUp desirability
-            const scored = all.map(c => {
-                const r = c.slice(0,-1);
-                let s = 0;
-                // faceUp priority: cards that are ALWAYS playable or powerful specials
-                // 2 and 3 are best — playable on anything, never get stuck
-                // 8 great — skip opponent from faceUp
-                // 7 good — force opponent low
-                // 10 is powerful but better played from HAND (context-aware burn)
-                //    so slightly lower priority for faceUp than 2/3/8
-                if (r === '2')  s = 100; // always playable — best faceUp
-                if (r === '3')  s = 95;  // transparent — second best
-                if (r === '8')  s = 75;  // skip — great from faceUp
-                if (r === '7')  s = 65;  // force low — good from faceUp
-                if (r === '10') s = 60;  // burn — good but better from hand
-                if (r === 'A')  s = 45;
-                if (r === 'K')  s = 38;
-                if (r === 'Q')  s = 32;
-                if (r === 'J')  s = 26;
-                if (r === '9')  s = 20;
-                if (r === '6')  s = 12;
-                if (r === '5')  s = 8;
-                if (r === '4')  s = 4;
-                return { c, s };
-            }).sort((a,b) => b.s - a.s);
-            p.faceUp = scored.slice(0,3).map(x=>x.c);
-            p.hand   = scored.slice(3).map(x=>x.c);
-        }
-    });
+        if (!p.isAI) return;
+        const all = [...p.hand, ...p.faceUp];
 
+        // Score for faceDown (best hidden card = highest priority)
+        const fdScore = r => {
+            if (r === '10') return 100;
+            if (r === '2')  return 92;
+            if (r === '3')  return 85;
+            if (r === '8')  return 68;
+            if (r === 'A')  return 52;
+            if (r === 'K')  return 45;
+            if (r === 'Q')  return 38;
+            if (r === '7')  return 32;
+            if (r === 'J')  return 24;
+            if (r === '9')  return 16;
+            if (r === '6')  return 8;
+            if (r === '5')  return 5;
+            if (r === '4')  return 2;
+            return 10;
+        };
+        const byFD = [...all].sort((a,b) => fdScore(b.slice(0,-1)) - fdScore(a.slice(0,-1)));
+        p.faceDown = byFD.slice(0,3);
+        const rest = byFD.slice(3);
+
+        // Score for faceUp (visible — want hard-to-answer cards)
+        const fuScore = r => {
+            if (r === '2')  return 88; // always playable from faceUp
+            if (r === '3')  return 82;
+            if (r === '8')  return 65;
+            if (r === 'A')  return 58;
+            if (r === 'K')  return 52;
+            if (r === 'Q')  return 46;
+            if (r === '7')  return 40;
+            if (r === 'J')  return 28;
+            if (r === '9')  return 20;
+            if (r === '6')  return 10;
+            if (r === '5')  return 6;
+            if (r === '4')  return 2;
+            return 12;
+        };
+        const byFU = [...rest].sort((a,b) => fuScore(b.slice(0,-1)) - fuScore(a.slice(0,-1)));
+        p.faceUp = byFU.slice(0,3);
+        p.hand   = byFU.slice(3); // weakest cards — dump them first in game
+    });
     render();
 }
 
@@ -1531,21 +1546,30 @@ function drawUpToThree(playerIdx) {
 }
 
 // ══════════════════════════════════════════════════════
-//  SMART AI v2
+//  SMART AI v3
+//  Card philosophy:
+//  10  = strongest: burns pile+extra turn. Save until pile is large (7+).
+//  2   = great escape: always playable. Save for when pile threatens you.
+//  3   = strong + transparent: pile top unchanged. Good to play on hard tops.
+//  8   = tactical: skip opponent. Good vs player near finish.
+//  A/K/Q = high cards: hard to beat. Good for pushing pile.
+//  7   = force-low: opponent must play ≤7. Use when opponent is stuck.
+//  9/J = mid: play early, dump when possible.
+//  4/5/6 = weak: dump ASAP.
 // ══════════════════════════════════════════════════════
 
-// Card play-cost: higher = more valuable, save for later
+// How valuable is it to KEEP this card (higher = save longer)
 function aiCardValue(card) {
     const r = card.slice(0,-1);
-    if (r === '2')  return 30;
-    if (r === '3')  return 28;
-    if (r === '10') return 26;
-    if (r === '8')  return 18;
-    if (r === '7')  return 14;
-    if (r === 'A')  return 12;
-    if (r === 'K')  return 10;
-    if (r === 'Q')  return 8;
-    if (r === 'J')  return 6;
+    if (r === '10') return 35; // king — save for big pile burns
+    if (r === '2')  return 28; // escape card — save for emergencies
+    if (r === '3')  return 24; // strong + transparent
+    if (r === '8')  return 16; // skip — tactical save
+    if (r === 'A')  return 13; // high — pile pusher
+    if (r === 'K')  return 11;
+    if (r === 'Q')  return 9;
+    if (r === '7')  return 7;  // weak but tactical
+    if (r === 'J')  return 5;
     if (r === '9')  return 4;
     if (r === '6')  return 3;
     if (r === '5')  return 2;
@@ -1557,7 +1581,7 @@ function aiHandStrength(hand) {
     return hand.reduce((s, c) => s + aiCardValue(c), 0);
 }
 
-// Can cardRank play on a pile topped with topRank?
+// Can cardRank legally play on a pile topped with topRank?
 function aiCardCanPlay(cardRank, topRank) {
     if (!topRank) return true;
     if (['2','3','10'].includes(cardRank)) return true;
@@ -1565,39 +1589,35 @@ function aiCardCanPlay(cardRank, topRank) {
     return ranks.indexOf(cardRank) >= ranks.indexOf(topRank);
 }
 
-// Estimate how many cards ≤ rank opponent likely has in their visible faceUp
-function aiOppCanAnswerRank(rank, opp) {
-    const rankIdx = ranks.indexOf(rank);
-    if (['2','3','10'].includes(rank)) return true; // specials always answerable
-    // check faceUp cards
-    if (rank === '7') {
-        return opp.faceUp.some(c => {
-            if (!c) return false;
-            const r = c.slice(0,-1);
-            return ['2','3','10'].includes(r) || ranks.indexOf(r) <= ranks.indexOf('7');
-        });
-    }
+// Can opponent answer a pile topped with `rank`, looking at their visible cards?
+function aiOppCanAnswer(rank, opp) {
+    if (['2','3','10'].includes(rank)) return true; // resets — anyone can start fresh
     return opp.faceUp.some(c => {
         if (!c) return false;
-        const r = c.slice(0,-1);
-        if (['2','3','10'].includes(r)) return true;
-        return ranks.indexOf(r) >= rankIdx;
+        return aiCardCanPlay(c.slice(0,-1), rank);
     });
 }
 
-// How hard is it for opponents to answer a pile topped with this rank?
-function aiPileDifficulty(rank, opponents) {
-    if (rank === '2' || rank === '3' || rank === '10') return 0; // resets — neutral
-    const cantAnswer = opponents.filter(opp => {
-        if (opp.hand.length > 0) return false; // has hand, can't see cards
-        return !aiOppCanAnswerRank(rank, opp);
-    }).length;
-    return cantAnswer * 20; // each stuck opponent = 20 bonus
+// How many of AI's remaining cards can play on topRank?
+function aiCountPlayable(hand, topRank) {
+    return hand.filter(c => aiCardCanPlay(c.slice(0,-1), topRank)).length;
+}
+
+// Score pile difficulty for opponents currently in faceUp/faceDown phase
+function aiPileDifficultyScore(rank, oppData) {
+    if (['2','3','10'].includes(rank)) return 0;
+    let bonus = 0;
+    oppData.forEach(o => {
+        if (o.hand.length > 0) return; // can't see their hand
+        if (!aiOppCanAnswer(rank, o)) bonus += 25; // they're stuck!
+    });
+    return bonus;
 }
 
 function aiGetBestPlay(validCards, hand) {
     if (!validCards.length) return null;
 
+    // Group valid cards by rank
     const groups = {};
     validCards.forEach(c => {
         const r = c.slice(0,-1);
@@ -1605,164 +1625,168 @@ function aiGetBestPlay(validCards, hand) {
         groups[r].push(c);
     });
 
-    const pileTop = getEffectiveTop();
-    const pileSize = pile.length;
-    const myHand = hand || [];
-    const myTotal = myHand.length + players[currentPlayer].faceUp.filter(Boolean).length + players[currentPlayer].faceDown.filter(Boolean).length;
+    const pileTop   = getEffectiveTop();
+    const topRank   = pileTop ? pileTop.slice(0,-1) : null;
+    const pileSize  = pile.length;
+    const myHand    = hand || [];
+
+    // Opponents still in game
     const opponents = players.filter((_, i) => i !== currentPlayer && !players[i].finished);
     const inLateGame = drawPile.length === 0;
-    const myHandSize = myHand.length;
 
-    // Detailed opponent analysis
+    // Analyse each opponent
     const oppData = opponents.map(p => ({
-        hand: p.hand,
-        handCount: p.hand.length,
-        faceUp: p.faceUp,
-        faceUpCount: p.faceUp.filter(Boolean).length,
-        faceDownCount: p.faceDown.filter(Boolean).length,
-        inFaceUpPhase: p.hand.length === 0 && p.faceUp.some(Boolean),
-        inFaceDownPhase: p.hand.length === 0 && p.faceUp.every(c=>!c) && p.faceDown.some(Boolean),
-        totalCards: p.hand.length + p.faceUp.filter(Boolean).length + p.faceDown.filter(Boolean).length
+        handCount:    p.hand.length,
+        faceUp:       p.faceUp,
+        inFaceUp:     p.hand.length === 0 && p.faceUp.some(Boolean),
+        inFaceDown:   p.hand.length === 0 && !p.faceUp.some(Boolean) && p.faceDown.some(Boolean),
+        totalCards:   p.hand.length + p.faceUp.filter(Boolean).length + p.faceDown.filter(Boolean).length
     }));
-    const anyOppInFaceUpPhase = oppData.some(o => o.inFaceUpPhase);
-    const anyOppInFaceDownPhase = oppData.some(o => o.inFaceDownPhase);
-    const anyOppNearEnd = anyOppInFaceUpPhase || anyOppInFaceDownPhase;
-    const minOppTotal = oppData.length ? Math.min(...oppData.map(o => o.totalCards)) : 99;
-    const maxOppHand = Math.max(0, ...oppData.map(o => o.handCount));
-    // Most dangerous opponent (fewest cards)
-    const mostDangerousOpp = oppData.reduce((a, b) => a.totalCards < b.totalCards ? a : b, oppData[0]);
+
+    const anyNearEnd    = oppData.some(o => o.inFaceUp || o.inFaceDown);
+    const anyFaceDown   = oppData.some(o => o.inFaceDown);
+    const minOppCards   = oppData.length ? Math.min(...oppData.map(o => o.totalCards)) : 99;
+    const maxOppHand    = Math.max(0, ...oppData.map(o => o.handCount));
+
+    // Is pile worth pushing to opponent? Big or dirty pile = yes
+    const pileHasWeak   = pile.filter(pc => ['4','5','6','9','J'].includes(pc.slice(0,-1))).length >= 2;
+    const pileWorth     = pileSize >= 6 || (pileSize >= 4 && pileHasWeak) || anyNearEnd;
 
     const scored = Object.entries(groups).map(([rank, cards]) => {
         let score = 0;
-        const numCards = cards.length;
-        const inPile = pile.filter(c => c.slice(0,-1) === rank).length;
-        const wouldBurn = inPile + numCards >= 4;
+        const n        = cards.length;
+        const inPile   = pile.filter(pc => pc.slice(0,-1) === rank).length;
+        const wouldBurn = inPile + n >= 4;
+        // All copies of this rank in my hand
+        const allCopies = myHand.filter(c => c.slice(0,-1) === rank).length;
 
-        // ── Base: cost of spending this card type ──
+        // ── BURN: always highest priority ──
+        if (wouldBurn) { return { rank, cards, score: -9999 }; }
+
+        // ── BASE: cost of spending this card ──
         score += aiCardValue(cards[0]) * 2;
 
-        // ── Always burn when 4-of-a-kind is achievable ──
-        if (wouldBurn) { score -= 200; }
+        // ── ALWAYS play ALL copies of same rank together ──
+        if (n === allCopies && n > 1) score -= n * 15;
+        else if (n < allCopies) score += 12; // penalise partial play
 
-        // ── Play ALL copies of a rank together (dump multiples aggressively) ──
-        // Playing 2 is strictly better than 1 — removes more cards, closer to burn
-        const allCopies = myHand.filter(c => c.slice(0,-1) === rank).length;
-        if (numCards === allCopies && allCopies > 1) score -= (allCopies - 1) * 18;
-        else if (numCards < allCopies) score += 10; // penalize partial play
+        // ── BUILD TOWARD 4-OF-A-KIND ──
+        if (inPile === 3) score -= 70;
+        else if (inPile === 2) score -= 25;
 
-        // ── Pile difficulty bonus: does this rank leave a hard top for opponents? ──
-        if (!['2','3','10','8'].includes(rank)) {
-            score -= aiPileDifficulty(rank, oppData);
-        }
+        // ══════════════════════════════════════
+        // OPPONENT NEAR END — be aggressive
+        // ══════════════════════════════════════
+        if (anyNearEnd) {
+            const diffBonus = aiPileDifficultyScore(rank, oppData);
 
-        // ── OPPONENT NEAR END: maximize pile size and difficulty ──
-        if (anyOppNearEnd) {
-            const rankIdx = ranks.indexOf(rank);
+            // Q/K/A: high top = opponent likely stuck
+            if (['A','K','Q'].includes(rank)) score -= 20 + diffBonus;
 
-            // High cards (9+) leave tough pile for faceUp/faceDown players
-            if (rankIdx >= ranks.indexOf('9') && !['2','3','10','8'].includes(rank)) {
-                score -= 30;
-            }
-            // 7 = forces them to need ≤7 faceUp card — check if they're stuck
+            // 7: force low — check if opponent has ≤7 in faceUp
             if (rank === '7') {
-                const oppStuck7near = oppData.filter(o =>
-                    (o.inFaceUpPhase || o.inFaceDownPhase) && !aiOppCanAnswerRank('7', o)
-                ).length;
-                score -= oppStuck7near > 0 ? 60 : 38;
-            }
-            // 8 = skip is devastating when opponent is at faceUp/faceDown
-            if (rank === '8') score -= 30;
-            // 10 = burn only if pile is already large (more painful)
-            if (rank === '10') {
-                score += (pileSize >= 6) ? -60 : (pileSize >= 3) ? -20 : 25;
-            }
-            // 2 resets pile — terrible when we want to build pressure
-            if (rank === '2') score += 40;
-            // 3 = transparent — pile top unchanged = ok if pile is already hard
-            if (rank === '3') score += (pileSize >= 3) ? 0 : 15;
-            // Low cards = anyone can answer = bad for us
-            if (['4','5','6'].includes(rank)) score += 35;
-            // Extra aggression when faceDown (opponent fully blind)
-            if (anyOppInFaceDownPhase && !['2','3'].includes(rank)) score -= 10;
-
-        } else {
-            // ── Normal play: smart special usage ──
-
-            // 10: burn when pile is worth burning, save otherwise
-            if (rank === '10') {
-                if (pileSize >= 8) score -= 80;       // big pile = definitely burn
-                else if (pileSize >= 5) score -= 50;
-                else if (pileSize >= 3) score -= 20;
-                else if (inLateGame) score -= 15;
-                else score += 30;                      // small pile = save 10
+                const stuck = oppData.filter(o => (o.inFaceUp||o.inFaceDown) && !aiOppCanAnswer('7', o)).length;
+                score -= stuck > 0 ? 65 : 35;
             }
 
-            // 2: reset pile if pile is getting dangerous for us
-            if (rank === '2') {
-                const pileDanger = pileTop ? ranks.indexOf(pileTop.slice(0,-1)) : 0;
-                if (pileSize >= 6) score -= 35;
-                else if (pileSize >= 4 && pileDanger >= ranks.indexOf('J')) score -= 20;
-                else if (pileSize >= 3) score -= 10;
-                else score += 25;                      // don't waste 2 on empty pile
-            }
+            // 8: skip is powerful near end
+            if (rank === '8') score -= 35;
 
-            // 7: force-low — best when opponent has high hand, bad when they have low cards
-            if (rank === '7') {
-                // Best when opponent faceUp has no card ≤7 (they'll be stuck)
-                const oppStuck7 = oppData.filter(o =>
-                    o.inFaceUpPhase && !aiOppCanAnswerRank('7', o)
-                ).length;
-                if (oppStuck7 > 0)       score -= 50; // will trap them!
-                else if (maxOppHand > 5) score -= 20;
-                else if (maxOppHand > 3) score -= 10;
-                else if (maxOppHand <= 2 && !inLateGame) score += 10;
-            }
-
-            // 8: skip — best when targeting opponent close to winning
-            if (rank === '8') {
-                if (minOppTotal <= 3) score -= 35;     // skip player almost done = critical
-                else if (minOppTotal <= 6) score -= 20;
-                else score -= 8;
-            }
-
-            // 3: save unless it's the only option or late game dump
+            // 3: transparent — pile top unchanged — OK if top is already hard
             if (rank === '3') {
-                if (!inLateGame && myHandSize > 3) score += 20;
-                else if (inLateGame) score += 5;       // late game: less need to save
+                score -= topRank && ranks.indexOf(topRank) >= ranks.indexOf('Q') ? 5 : 0;
+                score += 10; // generally save 3 even near end
             }
 
-            // A/K: strong but not special — use to open pile or dump late
-            if (['A','K'].includes(rank)) {
-                if (pileSize === 0) score -= 5;        // good opener
-                else if (inLateGame) score -= 10;      // dump late
+            // 10: burn only if pile is truly large
+            if (rank === '10') {
+                if      (pileSize >= 8) score -= 85;
+                else if (pileSize >= 5) score -= 30;
+                else                    score += 60; // save!
             }
+
+            // 2: resets pile — BAD when we want to build pressure
+            if (rank === '2') score += 50;
+
+            // Low cards: anyone can answer = bad for pushing
+            if (['4','5','6'].includes(rank)) score += 40;
+
+            // Extra aggression vs blind faceDown player
+            if (anyFaceDown && !['2','3','10'].includes(rank)) score -= 8;
+
+        // ══════════════════════════════════════
+        // NORMAL GAME
+        // ══════════════════════════════════════
+        } else {
+            const diffBonus = aiPileDifficultyScore(rank, oppData);
+
+            // 10: SAVE. Only burn large piles.
+            if (rank === '10') {
+                if      (pileSize >= 10) score -= 95;
+                else if (pileSize >= 7)  score -= 60;
+                else if (pileSize >= 5)  score -= 20;
+                else if (pileSize >= 3 && inLateGame) score -= 10;
+                else                     score += 60; // save hard
+            }
+
+            // 2: escape card. Use when pile is threatening.
+            if (rank === '2') {
+                const topIdx = topRank ? ranks.indexOf(topRank) : 0;
+                const danger = pileSize >= 5 || (pileSize >= 3 && topIdx >= ranks.indexOf('Q'));
+                if (danger)            score -= 32;
+                else if (pileSize >= 2) score -= 8;
+                else                   score += 40; // don't waste on empty pile
+            }
+
+            // 3: transparent — save unless late game or must dump
+            if (rank === '3') {
+                if (!inLateGame && myHand.length > 3) score += 20;
+            }
+
+            // 8: skip — best when opponent close to finishing
+            if (rank === '8') {
+                if      (minOppCards <= 3) score -= 45;
+                else if (minOppCards <= 5) score -= 25;
+                else                       score -= 10;
+            }
+
+            // 7: force low — check if opp faceUp is stuck
+            if (rank === '7') {
+                const stuck = oppData.filter(o => o.inFaceUp && !aiOppCanAnswer('7', o)).length;
+                if (stuck > 0)         score -= 55;
+                else if (maxOppHand>5) score -= 18;
+                else if (maxOppHand>3) score -= 8;
+                else                   score += 5;
+            }
+
+            // Q/K/A: hard for opponents to answer — push pile if it's worth it
+            if (['A','K','Q'].includes(rank)) {
+                if (pileWorth)          score -= 15 + diffBonus;
+                else if (pileSize === 0) score -= 8;
+                else if (inLateGame)     score -= 12;
+            }
+
+            // 9/J: mid cards — dump preferentially
+            if (['9','J'].includes(rank)) {
+                score -= 5;
+                if (inLateGame) score -= 10;
+            }
+
+            // 4/5/6: weak — dump ASAP
+            if (['4','5','6'].includes(rank)) {
+                score -= 8;
+                if (inLateGame) score -= 15;
+            }
+
+            // Don't waste 2 or 10 on tiny piles
+            if (['2','10'].includes(rank) && pileSize <= 1 && !inLateGame) score += 25;
         }
 
-        // ── Late game: urgently dump weak cards ──
-        if (inLateGame && !anyOppNearEnd) {
+        // ── LATE GAME: urgently dump weak cards ──
+        if (inLateGame && !anyNearEnd) {
             const val = aiCardValue(cards[0]);
-            if (val < 10) score -= 15 + (10 - val); // the weaker the card the more we dump it
-            score -= numCards * 6;
-        }
-
-        // ── Build toward 4-of-a-kind ──
-        if (inPile >= 2 && !wouldBurn) score -= 20;
-        if (inPile >= 3) score -= 40; // one away from burn — very high priority
-
-        // ── Prefer leaving a hard pile top (high rank, not easy to cover) ──
-        if (!anyOppNearEnd && !['2','3','7','8','10'].includes(rank)) {
-            const rankIdx = ranks.indexOf(rank);
-            // High cards on top = opponent needs equally high or special
-            if (rankIdx >= ranks.indexOf('9')) score -= 8;
-        }
-
-        // ── Don't play high card on already high pile (wasteful) ──
-        if (pileTop) {
-            const topIdx = ranks.indexOf(pileTop.slice(0,-1));
-            const rankIdx = ranks.indexOf(rank);
-            if (rankIdx >= ranks.indexOf('K') && topIdx >= ranks.indexOf('J') && !inLateGame && !anyOppNearEnd) {
-                score += 5; // slightly prefer not stacking A on K when pile already high
-            }
+            if (val <= 7) score -= 20 + (8 - val) * 2;
+            score -= n * 8;
         }
 
         return { rank, cards, score };
@@ -1771,12 +1795,6 @@ function aiGetBestPlay(validCards, hand) {
     scored.sort((a, b) => a.score - b.score);
     return [scored[0].rank, scored[0].cards];
 }
-
-// Loop detection for AI vs AI
-let aiMoveCount = 0;
-let aiLastPileSize = -1;
-let aiStaleCount = 0;
-
 function aiMove() {
     if (gameOver) return;
     if (animating) { setTimeout(aiMove, fastMode ? 80 : 400); return; }
