@@ -506,7 +506,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.11</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.12</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2108,32 +2108,31 @@ function loadAuth() {
         const cachedLast  = localStorage.getItem('shitheadLastName') || '';
         authUser = { username, token, coins: cachedCoins, firstName: cachedFirst, lastName: cachedLast, displayName: cachedDisplay };
         updateCoinsUI();
+        console.log('[auth] loaded from cache:', username, 'coins:', cachedCoins);
 
-        // Then verify with server and update
+        // Verify with server
         fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, token }) })
             .then(r => r.json()).then(data => {
+                console.log('[auth] verify response:', data);
                 if (data.ok) {
                     authUser = { username: data.username, token, coins: data.coins, firstName: data.firstName||'', lastName: data.lastName||'', displayName: data.displayName||data.username };
                     localStorage.setItem('shithead_coins', data.coins);
-                    if (authUser.firstName) {
-                        localStorage.setItem('shitheadFirstName', authUser.firstName);
-                        localStorage.setItem('shitheadLastName',  authUser.lastName);
-                        localStorage.setItem('shitheadPlayerName', authUser.displayName);
-                    }
+                    localStorage.setItem('shitheadFirstName', authUser.firstName);
+                    localStorage.setItem('shitheadLastName',  authUser.lastName);
+                    localStorage.setItem('shitheadPlayerName', authUser.displayName);
                     updateCoinsUI();
                     checkDailyAvailable();
                 } else {
-                    // Token invalid - clear auth
+                    console.log('[auth] token invalid, clearing');
                     authUser = null;
                     localStorage.removeItem('shithead_auth');
                     localStorage.removeItem('shithead_coins');
                     updateCoinsUI();
                 }
-            }).catch(() => {
-                // Server unreachable - keep cached data, don't log out
-                console.log('[auth] server unreachable, keeping cached session');
+            }).catch(e => {
+                console.log('[auth] server unreachable, keeping cache:', e.message);
             });
-    } catch(e) {}
+    } catch(e) { console.error('[auth] loadAuth error:', e); }
 }
 
 function saveAuthLocal() {
@@ -2295,8 +2294,10 @@ async function claimDaily() {
     const btn = document.getElementById('dailyBtn');
     if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
     try {
+        console.log('[daily] claiming for', authUser.username);
         const r = await fetch('/api/daily', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: authUser.username, token: authUser.token }) });
         const data = await r.json();
+        console.log('[daily] response:', data);
         if (!data.ok) {
             if (data.msLeft > 0) startDailyCountdown(data.msLeft);
             else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -2663,8 +2664,10 @@ function buildDisplayName(first, last) {
 }
 
 function loadProfile() {
+    // If there's a saved auth token, don't show name modal — name comes from server
+    const hasAuth = localStorage.getItem('shithead_auth');
+    if (hasAuth) return;
     const first = localStorage.getItem('shitheadFirstName');
-    const last  = localStorage.getItem('shitheadLastName');
     if (!first) {
         setTimeout(() => showNameModal(true), 300);
     }
@@ -2746,7 +2749,10 @@ function fetchOnlineStats() {
 
 // Fetch stats on page load
 window.addEventListener('load', () => {
-    loadAuth(); loadProfile(); setTimeout(fetchOnlineStats, 500); });
+    loadAuth();
+    loadProfile();
+    setTimeout(fetchOnlineStats, 500);
+});
 
 function setRoomType(type) {
     selectedRoomType = type;
