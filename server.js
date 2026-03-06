@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const crypto = require('crypto');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,6 +12,85 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ══════════════════════════════════════════════
+//  USERS — persistent coin system
+// ══════════════════════════════════════════════
+const USERS_FILE = path.join(__dirname, 'users.json');
+const STARTING_COINS = 1000;
+const DAILY_COINS = 200;
+
+function loadUsers() {
+    try {
+        if (fs.existsSync(USERS_FILE)) return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+    } catch(e) { console.error('loadUsers error:', e.message); }
+    return {};
+}
+
+function saveUsers() {
+    try { fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2)); }
+    catch(e) { console.error('saveUsers error:', e.message); }
+}
+
+function hashPin(pin) {
+    return crypto.createHash('sha256').update('shithead_salt_' + pin).digest('hex');
+}
+
+function makeToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+const users = loadUsers(); // { username: { pinHash, coins, lastDaily, token } }
+
+// HTTP endpoints for auth
+app.use(express.json());
+
+app.post('/api/register', (req, res) => {
+    const { username, pin } = req.body;
+    if (!username || !pin) return res.json({ ok: false, error: 'חסר שם משתמש או PIN' });
+    const name = username.trim().toLowerCase();
+    if (name.length < 2 || name.length > 16) return res.json({ ok: false, error: 'שם משתמש 2-16 תווים' });
+    if (!/^[a-z0-9\u05d0-\u05ea_]+$/i.test(name)) return res.json({ ok: false, error: 'תווים לא חוקיים בשם' });
+    if (pin.length !== 4 || !/^[0-9]{4}$/.test(pin)) return res.json({ ok: false, error: 'PIN חייב להיות 4 ספרות' });
+    if (users[name]) return res.json({ ok: false, error: 'שם משתמש תפוס' });
+    const token = makeToken();
+    users[name] = { pinHash: hashPin(pin), coins: STARTING_COINS, lastDaily: null, token };
+    saveUsers();
+    res.json({ ok: true, username: name, token, coins: STARTING_COINS });
+});
+
+app.post('/api/login', (req, res) => {
+    const { username, pin } = req.body;
+    const name = username?.trim().toLowerCase();
+    if (!name || !users[name]) return res.json({ ok: false, error: 'שם משתמש לא קיים' });
+    if (users[name].pinHash !== hashPin(pin)) return res.json({ ok: false, error: 'PIN שגוי' });
+    const token = makeToken();
+    users[name].token = token;
+    saveUsers();
+    res.json({ ok: true, username: name, token, coins: users[name].coins });
+});
+
+app.post('/api/verify', (req, res) => {
+    const { username, token } = req.body;
+    const name = username?.trim().toLowerCase();
+    if (!name || !users[name] || users[name].token !== token)
+        return res.json({ ok: false });
+    res.json({ ok: true, username: name, coins: users[name].coins });
+});
+
+app.post('/api/daily', (req, res) => {
+    const { username, token } = req.body;
+    const name = username?.trim().toLowerCase();
+    if (!name || !users[name] || users[name].token !== token)
+        return res.json({ ok: false, error: 'לא מחובר' });
+    const today = new Date().toISOString().slice(0, 10);
+    if (users[name].lastDaily === today)
+        return res.json({ ok: false, error: 'כבר קיבלת מטבעות היום', coins: users[name].coins });
+    users[name].coins += DAILY_COINS;
+    users[name].lastDaily = today;
+    saveUsers();
+    res.json({ ok: true, coins: users[name].coins, gained: DAILY_COINS });
+});
 
 // ══════════════════════════════════════════════
 //  STATE
@@ -101,6 +182,7 @@ function startTurnTimer(room) {
                         }
                         room.gameOver = true;
                         clearRoomTimer(room.code);
+                        settleCoins(room);
                         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
                     } else {
                         // Replace with bot
@@ -208,13 +290,14 @@ function restartRoom(room) {
     console.log(`[restartRoom] slots:`, room.slots.map(s=>({name:s.name,socketId:!!s.socketId,connected:s.connected,_swapDone:s._swapDone})));
 }
 
-function createRoom(hostSocketId, hostName, playerCount) {
+function createRoom(hostSocketId, hostName, playerCount, bet=0) {
     const code = makeCode();
     const deck = makeDeck();
     const slots = Array.from({ length: playerCount }, (_, i) => ({
         id: i,
         name: null,
         socketId: null,
+        username: null, // registered username (null = guest)
         hand: deck.splice(0, 3),
         faceUp: deck.splice(0, 3),
         faceDown: deck.splice(0, 3),
@@ -237,10 +320,56 @@ function createRoom(hostSocketId, hostName, playerCount) {
         interruptWindow: false,
         lastPlayedRank: null,
         lastPlayerIdx: null,
-        burnInterrupt: {},  // slotIdx -> count needed to burn
+        burnInterrupt: {},
+        bet: bet || 0,        // coins per player
+        coinsSettled: false,  // prevent double-settle
     };
     return code;
 }
+// ══ COINS: settle bets at end of game ══
+// winnersOrder[0]=1st, [last]=loser
+// 1st takes all coins from last
+// 2nd takes half from 3rd (rounded down)
+function settleCoins(room) {
+    if (room.coinsSettled || room.bet === 0) return;
+    room.coinsSettled = true;
+    const bet = room.bet;
+    const order = room.winnersOrder; // slot indices, best to worst
+    const n = order.length;
+    if (n < 2) return;
+
+    const changes = {}; // slotIdx -> coin delta
+    order.forEach(i => { changes[i] = 0; });
+
+    // 1st takes from last
+    const first = order[0], last = order[n-1];
+    changes[first] += bet;
+    changes[last]  -= bet;
+
+    // 2nd takes half from 3rd (if they exist)
+    if (n >= 4) {
+        const second = order[1], third = order[2];
+        const half = Math.floor(bet / 2);
+        changes[second] += half;
+        changes[third]  -= half;
+    }
+
+    // Apply changes to user accounts
+    const results = [];
+    order.forEach(slotIdx => {
+        const slot = room.slots[slotIdx];
+        const delta = changes[slotIdx] || 0;
+        if (slot.username && users[slot.username]) {
+            users[slot.username].coins = Math.max(0, users[slot.username].coins + delta);
+            saveUsers();
+        }
+        results.push({ name: slot.name, delta, coins: slot.username ? users[slot.username]?.coins : null });
+    });
+
+    broadcast(room, 'coinsResult', results);
+}
+
+
 
 // ── Send state to a specific player (only their cards) ──
 function emitStateToPlayer(room, slotIdx) {
@@ -262,6 +391,7 @@ function emitStateToPlayer(room, slotIdx) {
         allJoined,
         isPublic: room.isPublic || false,
         turnTimer: room.turnTimer || 0,
+        bet: room.bet || 0,
         interruptWindow: room.interruptWindow || false,
         lastPlayedRank: room.lastPlayedRank || null,
         lastPlayerIdx: room.lastPlayerIdx ?? null,
@@ -333,6 +463,7 @@ function checkWin(room, idx) {
             if (last) room.winnersOrder.push(last.id);
             room.gameOver = true;
             clearRoomTimer(room.code);
+            settleCoins(room);
             broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i].name));
         }
     }
@@ -546,6 +677,7 @@ function handlePlayerLeave(socketData) {
         }
         room.gameOver = true;
         clearRoomTimer(room.code);
+        settleCoins(room);
         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
     } else {
         slot.isBot = true;
@@ -563,19 +695,30 @@ function handlePlayerLeave(socketData) {
 io.on('connection', (socket) => {
 
     // ── Create room ──
-    socket.on('createRoom', ({ name, playerCount, turnTimer, isPublic }) => {
-        const code = createRoom(socket.id, name, playerCount);
+    socket.on('createRoom', ({ name, playerCount, turnTimer, isPublic, bet, username, token }) => {
+        const betAmount = parseInt(bet) || 0;
+        // Verify coins if bet > 0
+        if (betAmount > 0) {
+            const uname = username?.trim().toLowerCase();
+            if (!uname || !users[uname] || users[uname].token !== token)
+                return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+            if (users[uname].coins < betAmount)
+                return socket.emit('error', 'אין מספיק מטבעות');
+        }
+        const code = createRoom(socket.id, name, playerCount, betAmount);
         rooms[code].turnTimer = turnTimer || 0;
         rooms[code].isPublic = !!isPublic;
         rooms[code].createdAt = Date.now();
         const room = rooms[code];
+        const uname = username?.trim().toLowerCase();
         room.slots[0].name = name;
         room.slots[0].socketId = socket.id;
         room.slots[0].connected = true;
+        room.slots[0].username = (uname && users[uname]) ? uname : null;
         socket.join(code);
         socket.data.roomCode = code;
         socket.data.slotIdx = 0;
-        socket.emit('roomCreated', { code, slotIdx: 0 });
+        socket.emit('roomCreated', { code, slotIdx: 0, bet: betAmount });
         emitStateToPlayer(room, 0);
     });
 
@@ -610,14 +753,28 @@ io.on('connection', (socket) => {
     });
 
     // ── Join open room ──
-    socket.on('joinRoom', ({ code, name }) => {
+    socket.on('joinRoom', ({ code, name, username, token }) => {
         const room = rooms[code];
         if (!room) { socket.emit('error', 'חדר לא נמצא'); return; }
+
+        // Validate coins for bet rooms
+        const betAmount = room.bet || 0;
+        if (betAmount > 0) {
+            const uname = username?.trim().toLowerCase();
+            if (!uname || !users[uname] || users[uname].token !== token)
+                return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+            if (users[uname].coins < betAmount)
+                return socket.emit('error', `אין מספיק מטבעות (נדרש: ${betAmount})`);
+        }
+        const uname = username?.trim().toLowerCase();
+        const validUser = uname && users[uname] && users[uname].token === token;
+
         if (room.openRoom && !room.gameStarted) {
             if (room.slots.length >= 4) { socket.emit('error', 'החדר מלא (4 שחקנים)'); return; }
             const slotIdx = room.slots.length;
             room.slots.push({
                 id: slotIdx, name, socketId: socket.id, connected: true,
+                username: validUser ? uname : null,
                 hand: [], faceUp: [], faceDown: [], finished: false,
                 consecutiveTimeouts: 0
             });
@@ -632,11 +789,14 @@ io.on('connection', (socket) => {
         // Fixed-size room join
         const slot = room.slots.find(s => !s.connected);
         if (!slot) { socket.emit('error', 'החדר מלא'); return; }
-        slot.name = name; slot.socketId = socket.id; slot.connected = true;
+        slot.name = name;
+        slot.socketId = socket.id;
+        slot.connected = true;
+        slot.username = validUser ? uname : null;
         socket.join(code);
         socket.data.roomCode = code;
         socket.data.slotIdx = slot.id;
-        socket.emit('roomJoined', { code, slotIdx: slot.id });
+        socket.emit('roomJoined', { code, slotIdx: slot.id, bet: room.bet || 0 });
         emitStateToAll(room);
     });
 
@@ -1023,6 +1183,7 @@ io.on('connection', (socket) => {
                 room.gameOver = true;
                 clearRoomTimer(roomCode);
                 broadcast(room, 'toast', `🚪 ${name} יצא — המשחק הסתיים`);
+                settleCoins(room);
                 broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
                 return;
             } else {
