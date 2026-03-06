@@ -2263,7 +2263,10 @@ function showMenu(id) {
     if (id === 'menuJoinPublic') {
         refreshPublicRooms();
     }
-    ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby'].forEach(m => {
+    if (id === 'menuAuth') {
+        updateCoinsUI();
+    }
+    ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuAuth'].forEach(m => {
         const el = document.getElementById(m);
         if (el) el.classList.toggle('hidden', el.id !== id);
     });
