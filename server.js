@@ -397,8 +397,8 @@ function startTurnTimer(room) {
                         }
                         room.gameOver = true;
                         clearRoomTimer(room.code);
-                        settleCoins(room).catch(e => console.error('[coins error]', e.message));
                         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+                        setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
                     } else {
                         // Replace with bot
                         p.isBot = true;
@@ -642,8 +642,8 @@ function checkWin(room, idx) {
             room.gameOver = true;
             clearRoomTimer(room.code);
             console.log(`[gameOver] bet=${room.bet} order=${room.winnersOrder} slots=${JSON.stringify(room.slots.map(s=>({n:s.name,u:s.username})))}`);
-            settleCoins(room).catch(e => console.error('[coins error]', e.message));
             broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i].name));
+            setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
         }
     }
 }
@@ -852,13 +852,17 @@ function handlePlayerLeave(socketData) {
 
     if (active.length <= 1) {
         if (active.length === 1) {
+            // Remove the just-added loser from end, put winner first, then loser at end
+            const loserIdx = room.winnersOrder.pop(); // the one who just left
             active[0].finished = true;
-            room.winnersOrder.unshift(active[0].id);
+            room.winnersOrder.unshift(active[0].id); // winner at front
+            room.winnersOrder.push(loserIdx);         // loser at end
         }
         room.gameOver = true;
         clearRoomTimer(room.code);
-        settleCoins(room).catch(e => console.error('[coins error]', e.message));
+        console.log(`[gameOver by leave] winnersOrder=${room.winnersOrder}`);
         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+        setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
     } else {
         slot.isBot = true;
         slot.finished = false;
@@ -1391,8 +1395,8 @@ io.on('connection', (socket) => {
                 room.gameOver = true;
                 clearRoomTimer(roomCode);
                 broadcast(room, 'toast', `🚪 ${name} יצא — המשחק הסתיים`);
-                settleCoins(room).catch(e => console.error('[coins error]', e.message));
                 broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+                setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
                 return;
             } else {
                 // 2+ active players remain → bot takes over
