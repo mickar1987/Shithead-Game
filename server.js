@@ -867,11 +867,12 @@ function handlePlayerLeave(socketData) {
         const remaining = activeAll.slice().sort((a, b) => (a.isBot ? 1 : -1) - (b.isBot ? 1 : -1));
         remaining.forEach(p => { p.finished = true; });
 
-        // Build final order: [remaining (winners)..., leavers reversed (last leaver = better place)]
-        // leaversOrder[0] = first leaver = last place
-        // leaversOrder[last] = latest leaver = second to last place
+        // Build final order: winner first, then leavers in reverse order (latest leaver = best place among losers)
+        // leaversOrder[0] = first leaver = last place (💩)
+        // leaversOrder[last] = latest leaver = second to last
+        const humanWinners = remaining.filter(p => !p.isBot);
         room.winnersOrder = [
-            ...remaining.map(p => p.id),
+            ...humanWinners.map(p => p.id),
             ...[...room.leaversOrder].reverse()
         ];
 
@@ -882,9 +883,10 @@ function handlePlayerLeave(socketData) {
         setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
     } else {
         // More than 1 human remains — replace leaver with bot
+        // Keep leaversOrder entry — leaver's place is recorded
+        // Bot is just a gameplay placeholder, finished=false so it can play
         slot.isBot = true;
         slot.finished = false;
-        room.leaversOrder.pop(); // undo — bot continues playing
         slot.name = `🤖 ${name}`;
         broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
         emitStateToAll(room);
