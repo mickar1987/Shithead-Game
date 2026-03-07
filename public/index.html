@@ -514,7 +514,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.31</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.33</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2694,12 +2694,14 @@ const overlay = document.getElementById('setupOverlay');
             saveAuthLocal();
             updateCoinsUI();
         }
+        // lb-coins-N = position N in leaderboard (winnersOrder index)
+        // results are also in winnersOrder — so i matches directly
         results.forEach((r, i) => {
             const coinCell = document.getElementById('lb-coins-' + i);
             if (!coinCell) return;
             if (r.delta !== 0) {
                 coinCell.style.color = r.delta > 0 ? '#4ade80' : '#f87171';
-                coinCell.innerHTML = (r.delta > 0 ? '+' : '') + r.delta + '&nbsp;<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>';
+                coinCell.innerHTML = (r.delta > 0 ? '+' : '') + r.delta + ' <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>';
             } else {
                 coinCell.style.color = 'rgba(255,255,255,0.3)';
                 coinCell.textContent = '—';
@@ -2804,13 +2806,18 @@ function buildDisplayName(first, last) {
 }
 
 function loadProfile() {
-    // If there's a saved auth token, don't show name modal — name comes from server
     const hasAuth = localStorage.getItem('shithead_auth');
-    if (hasAuth) return;
+    if (hasAuth) return; // logged in — nothing to do
     const first = localStorage.getItem('shitheadFirstName');
     if (!first) {
-        setTimeout(() => showNameModal(true), 300);
+        // First time — show auth prompt instead of name modal
+        setTimeout(() => showFirstTimeAuthPrompt(), 300);
     }
+}
+
+function showFirstTimeAuthPrompt() {
+    showToast('👋 ברוך הבא! התחבר או הירשם כדי להתחיל', 4000);
+    showMenu('menuAuth');
 }
 
 function updateProfileUI() { /* profileBtn removed */ }
@@ -2967,6 +2974,9 @@ function startTurnTimer(state) {} // handled by server timerTick
 // ── Online render ──
 function renderOnline(state) {
     if (!state || !onlineMode) return;
+    // Always reset playBtn at start — re-applied below if interrupt conditions met
+    const _pb = document.getElementById('playBtn');
+    if (_pb) { _pb.textContent = '▶ שחק'; _pb.style.background = ''; _pb.style.animation = ''; }
     const n = state.players.length;
     const myIdx = mySlotIdx;
     const relMap = {2:{1:'pos-top'},3:{1:'pos-right',2:'pos-left'},4:{1:'pos-right',2:'pos-top',3:'pos-left'}};
