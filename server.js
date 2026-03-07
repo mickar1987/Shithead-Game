@@ -1273,9 +1273,12 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // faceUp phase: must take a faceUp card with pile
+        // faceUp phase: must take a faceUp card with pile — all must be same rank
         if (p.hand.length === 0 && p.faceUp.some(Boolean) && faceUpCards?.length) {
-            faceUpCards.forEach(c => {
+            const firstRank = faceUpCards[0]?.slice(0,-1);
+            const validCards = faceUpCards.filter(c => p.faceUp.includes(c) && c.slice(0,-1) === firstRank);
+            if (!validCards.length) { socket.emit('error', 'קלף לא תקין'); return; }
+            validCards.forEach(c => {
                 const idx = p.faceUp.indexOf(c);
                 if (idx !== -1) { p.hand.push(c); p.faceUp[idx] = null; }
             });
