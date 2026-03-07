@@ -495,6 +495,7 @@ function restartRoom(room) {
     room.currentPlayer = 0;
     room.isSwapPhase = true;
     room.winnersOrder = [];
+    room.leaversOrder = []; // first leaver = last place
     room.gameOver = false;
     room.coinsSettled = false;  // allow new settlement
     room.interruptWindow = false;
@@ -531,6 +532,7 @@ function createRoom(hostSocketId, hostName, playerCount, bet=0) {
         currentPlayer: 0,
         isSwapPhase: true,
         winnersOrder: [],
+        leaversOrder: [],
         gameOver: false,
         started: false,
         hostSocketId,
@@ -847,12 +849,11 @@ function handlePlayerLeave(socketData) {
         return;
     }
 
-    // Mark as loser — first leaver = last place, so insert at beginning of losers
-    // winnersOrder = [winners..., latest_leaver, ..., first_leaver]
+    // Track leavers: first leaver = last place
     slot.finished = true;
     slot.disqualified = true;
-    room.winnersOrder.unshift(slotIdx);
-    console.log(`[leave] ${name} (slot=${slotIdx}, username=${slot.username}) left. winnersOrder=${room.winnersOrder}`);
+    room.leaversOrder.push(slotIdx); // first leaver at index 0
+    console.log(`[leave] ${name} (slot=${slotIdx}) left. leavers=${room.leaversOrder}`);
     broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
 
     // Human players still in game (not finished, not bots)
@@ -862,18 +863,17 @@ function handlePlayerLeave(socketData) {
 
     if (activeHumans.length <= 1) {
         // Only 1 (or 0) human left — end game immediately
-        // Mark all remaining bots as finished in order (they "win" over the leaver)
-        // but human winner comes first
-        const loserIdx = room.winnersOrder.shift(); // the one who just left (was unshifted)
-
-        // Collect remaining non-finished slots: human first, then bots
+        // Remaining non-finished: human first, then bots
         const remaining = activeAll.slice().sort((a, b) => (a.isBot ? 1 : -1) - (b.isBot ? 1 : -1));
-        // Insert them at the FRONT of winnersOrder (best placement first)
-        for (let i = remaining.length - 1; i >= 0; i--) {
-            remaining[i].finished = true;
-            room.winnersOrder.unshift(remaining[i].id);
-        }
-        room.winnersOrder.push(loserIdx); // latest leaver goes last
+        remaining.forEach(p => { p.finished = true; });
+
+        // Build final order: [remaining (winners)..., leavers reversed (last leaver = better place)]
+        // leaversOrder[0] = first leaver = last place
+        // leaversOrder[last] = latest leaver = second to last place
+        room.winnersOrder = [
+            ...remaining.map(p => p.id),
+            ...[...room.leaversOrder].reverse()
+        ];
 
         room.gameOver = true;
         clearRoomTimer(room.code);
@@ -884,7 +884,7 @@ function handlePlayerLeave(socketData) {
         // More than 1 human remains — replace leaver with bot
         slot.isBot = true;
         slot.finished = false;
-        room.winnersOrder.shift(); // undo — bot continues playing
+        room.leaversOrder.pop(); // undo — bot continues playing
         slot.name = `🤖 ${name}`;
         broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
         emitStateToAll(room);
@@ -946,7 +946,8 @@ io.on('connection', (socket) => {
             playerCount: 1, // grows as players join
             drawPile: [], pile: [],
             currentPlayer: 0, isSwapPhase: null, // null = lobby, true/false = in game
-            winnersOrder: [], gameOver: false,
+            winnersOrder: [],
+        leaversOrder: [], gameOver: false,
             interruptWindow: false, lastPlayedRank: null, lastPlayerIdx: null,
             turnTimer: turnTimer || 0,
             bet: betAmount,        // ✅ coins per player
@@ -1053,6 +1054,7 @@ io.on('connection', (socket) => {
         room.currentPlayer = 0;
         room.isSwapPhase = true;
         room.winnersOrder = [];
+    room.leaversOrder = []; // first leaver = last place
         room.gameOver = false;
         broadcast(room, 'toast', '🎮 המארח התחיל את המשחק!');
         emitStateToAll(room);
