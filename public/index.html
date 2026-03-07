@@ -514,7 +514,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.33</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.36</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2687,6 +2687,7 @@ const overlay = document.getElementById('setupOverlay');
     let pendingCoinsResult = null;
 
     function applyCoinsResult(results) {
+        console.log("[coins] apply results=", JSON.stringify(results), "mySlotIdx=", mySlotIdx);
         const myResult = results.find(r => r.slotIdx === mySlotIdx);
         if (authUser && myResult) {
             if (myResult.coins !== null) authUser.coins = myResult.coins;
@@ -2698,6 +2699,7 @@ const overlay = document.getElementById('setupOverlay');
         // results are also in winnersOrder — so i matches directly
         results.forEach((r, i) => {
             const coinCell = document.getElementById('lb-coins-' + i);
+            console.log("[coins] row", i, "delta=", r.delta, "cell=", !!coinCell);
             if (!coinCell) return;
             if (r.delta !== 0) {
                 coinCell.style.color = r.delta > 0 ? '#4ade80' : '#f87171';
@@ -2710,10 +2712,19 @@ const overlay = document.getElementById('setupOverlay');
     }
 
     socket.on('coinsResult', (results) => {
+        console.log('[coinsResult] received, lb-coins-0 exists=', !!document.getElementById('lb-coins-0'), 'results=', results.length);
         if (document.getElementById('lb-coins-0')) {
             applyCoinsResult(results);
         } else {
-            pendingCoinsResult = results; // gameOver not rendered yet — wait
+            pendingCoinsResult = results;
+            // Also retry after short delay in case gameOver is still rendering
+            setTimeout(() => {
+                if (pendingCoinsResult) {
+                    console.log('[coinsResult] retry apply');
+                    applyCoinsResult(pendingCoinsResult);
+                    pendingCoinsResult = null;
+                }
+            }, 500);
         }
     });
 
@@ -3128,7 +3139,17 @@ function renderOnline(state) {
                     if (!allSameRank) return; // can't mix different ranks
                 }
                 const idx2=selectedTableIndices.indexOf(i);
-                if (idx2>-1) selectedTableIndices.splice(idx2,1); else selectedTableIndices.push(i);
+                if (idx2>-1) {
+                    selectedTableIndices.splice(idx2,1);
+                } else {
+                    // Only allow same rank
+                    if (selectedTableIndices.length > 0) {
+                        const existingRank = state.myFaceUp[selectedTableIndices[0]]?.slice(0,-1);
+                        const thisRank = state.myFaceUp[i]?.slice(0,-1);
+                        if (existingRank !== thisRank) selectedTableIndices = [];
+                    }
+                    selectedTableIndices.push(i);
+                }
                 renderOnline(state);
             };
             stack.appendChild(u);
