@@ -773,13 +773,18 @@ function executeMove(room, playerIdx, cards) {
     checkWin(room, playerIdx);
     if (room.slots[playerIdx].finished) { nextTurn(room); return; }
 
-    const skips = r === '8' ? cards.length + 1 : 1;
+    const skips = r === '8' ? cards.length : 1;
 
-    // Open interrupt window — only for normal cards (not 8/10/burn)
-    // Last player can add same rank before next player acts
-    room.interruptWindow = true;
-    room.lastPlayedRank = r;
-    room.lastPlayerIdx = playerIdx;
+    // Open interrupt window — not for 8s or 10s (those have special effects)
+    if (r !== '8' && r !== '10') {
+        room.interruptWindow = true;
+        room.lastPlayedRank = r;
+        room.lastPlayerIdx = playerIdx;
+    } else {
+        room.interruptWindow = false;
+        room.lastPlayedRank = null;
+        room.lastPlayerIdx = null;
+    }
     nextTurn(room, skips);
     // interruptWindow stays open until next player actually plays
 }
@@ -1141,9 +1146,24 @@ io.on('connection', (socket) => {
             } else {
                 drawUpToThree(room, slotIdx);
                 checkWin(room, slotIdx);
-                // After interrupt, same "next player" continues
-                emitStateToAll(room);
-                startTurnTimer(room);
+                if (room.slots[slotIdx].finished) { nextTurn(room); return; }
+                // If interrupt was with 8, add extra skips on top of current position
+                if (topR === '8') {
+                    // Count total 8s in pile streak to determine total skips
+                    let eightCount = 0;
+                    for (let i = room.pile.length - 1; i >= 0; i--) {
+                        if (room.pile[i].slice(0,-1) === '8') eightCount++;
+                        else break;
+                    }
+                    // Already advanced once (to "next player") — skip eightCount-1 more
+                    for (let i = 0; i < eightCount - 1; i++) nextTurn(room, 1);
+                    emitStateToAll(room);
+                    startTurnTimer(room);
+                } else {
+                    // After non-8 interrupt, same next player continues
+                    emitStateToAll(room);
+                    startTurnTimer(room);
+                }
             }
             return;
         }
