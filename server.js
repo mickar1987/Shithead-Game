@@ -20,16 +20,19 @@ async function settleCoins(room) {
     const changes = {};
     order.forEach(i => { changes[i] = 0; });
 
-    // 1st takes from last
+    // 1st takes from last (all player counts)
     changes[order[0]]   += bet;
     changes[order[n-1]] -= bet;
+    // 2nd place: 0 (3-player) — already initialized to 0
 
-    // 2nd takes half from 3rd (4-player)
+    // 4-player: 2nd takes half from 3rd
     if (n >= 4) {
         const half = Math.floor(bet / 2);
         changes[order[1]] += half;
         changes[order[2]] -= half;
     }
+
+    console.log(`[settleCoins] n=${n} changes=${JSON.stringify(changes)}`);
 
     const results = [];
     for (const slotIdx of order) {
