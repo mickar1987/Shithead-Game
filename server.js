@@ -775,8 +775,9 @@ function executeMove(room, playerIdx, cards) {
 
     const skips = r === '8' ? cards.length : 1;
 
-    // Open interrupt window — not for 8s or 10s (those have special effects)
-    if (r !== '8' && r !== '10') {
+    // Open interrupt window for all ranks except 10 (burn)
+    // 8s can be interrupted with more 8s for extra skips
+    if (r !== '10') {
         room.interruptWindow = true;
         room.lastPlayedRank = r;
         room.lastPlayerIdx = playerIdx;
@@ -846,32 +847,43 @@ function handlePlayerLeave(socketData) {
         return;
     }
 
-    // Mark as loser (last place)
+    // Mark as loser (last place among remaining)
     slot.finished = true;
     slot.disqualified = true;
     room.winnersOrder.push(slotIdx);
     console.log(`[leave] ${name} (slot=${slotIdx}, username=${slot.username}) left. winnersOrder=${room.winnersOrder}`);
     broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
 
-    const active = room.slots.filter(s => !s.finished);
+    // Human players still in game (not finished, not bots)
+    const activeHumans = room.slots.filter(s => !s.finished && !s.isBot);
+    // All non-finished players (humans + bots)
+    const activeAll = room.slots.filter(s => !s.finished);
 
-    if (active.length <= 1) {
-        if (active.length === 1) {
-            // Remove the just-added loser from end, put winner first, then loser at end
-            const loserIdx = room.winnersOrder.pop(); // the one who just left
-            active[0].finished = true;
-            room.winnersOrder.unshift(active[0].id); // winner at front
-            room.winnersOrder.push(loserIdx);         // loser at end
+    if (activeHumans.length <= 1) {
+        // Only 1 (or 0) human left — end game immediately
+        // Mark all remaining bots as finished in order (they "win" over the leaver)
+        // but human winner comes first
+        const loserIdx = room.winnersOrder.pop(); // the one who just left
+
+        // Collect remaining non-finished slots: human first, then bots
+        const remaining = activeAll.slice().sort((a, b) => (a.isBot ? 1 : -1) - (b.isBot ? 1 : -1));
+        // Insert them at the FRONT of winnersOrder (best placement first)
+        for (let i = remaining.length - 1; i >= 0; i--) {
+            remaining[i].finished = true;
+            room.winnersOrder.unshift(remaining[i].id);
         }
+        room.winnersOrder.push(loserIdx); // leaver is last
+
         room.gameOver = true;
         clearRoomTimer(room.code);
         console.log(`[gameOver by leave] winnersOrder=${room.winnersOrder}`);
         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
         setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
     } else {
+        // More than 1 human remains — replace leaver with bot
         slot.isBot = true;
         slot.finished = false;
-        room.winnersOrder.pop();
+        room.winnersOrder.pop(); // undo — bot continues playing
         slot.name = `🤖 ${name}`;
         broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
         emitStateToAll(room);
@@ -1147,23 +1159,17 @@ io.on('connection', (socket) => {
                 drawUpToThree(room, slotIdx);
                 checkWin(room, slotIdx);
                 if (room.slots[slotIdx].finished) { nextTurn(room); return; }
-                // If interrupt was with 8, add extra skips on top of current position
+                // If interrupt was with 8, apply the additional skips
                 if (topR === '8') {
-                    // Count total 8s in pile streak to determine total skips
-                    let eightCount = 0;
-                    for (let i = room.pile.length - 1; i >= 0; i--) {
-                        if (room.pile[i].slice(0,-1) === '8') eightCount++;
-                        else break;
-                    }
-                    // Already advanced once (to "next player") — skip eightCount-1 more
-                    for (let i = 0; i < eightCount - 1; i++) nextTurn(room, 1);
-                    emitStateToAll(room);
-                    startTurnTimer(room);
-                } else {
-                    // After non-8 interrupt, same next player continues
-                    emitStateToAll(room);
-                    startTurnTimer(room);
+                    // cards.length = number of 8s added in THIS interrupt
+                    nextTurn(room, cards.length);
                 }
+                // Open interrupt window again so player can keep adding 8s
+                room.interruptWindow = true;
+                room.lastPlayedRank = topR;
+                room.lastPlayerIdx = slotIdx;
+                emitStateToAll(room);
+                startTurnTimer(room);
             }
             return;
         }
