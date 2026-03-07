@@ -1091,14 +1091,16 @@ io.on('connection', (socket) => {
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
         if (!room || room.isSwapPhase || room.gameOver) return;
+        if (room.currentPlayer !== slotIdx) return; // only on your turn
         const p = room.slots[slotIdx];
         // Only in faceDown phase (no hand, no faceUp)
         if (p.hand.length > 0 || p.faceUp.some(Boolean)) return;
         if (!p.faceDown[cardIdx]) return;
+        // Only flip ONE card — if already have a card in hand, must play/take first
+        if (p.hand.length > 0) { socket.emit('error', 'חייב לשחק או לקחת לפני שמהפכים קלף נוסף'); return; }
         // Move to hand
         p.hand.push(p.faceDown[cardIdx]);
         p.faceDown[cardIdx] = null;
-        broadcast(room, 'toast', `${p.name} הפך קלף`);
         emitStateToAll(room);
     });
 
@@ -1214,7 +1216,10 @@ io.on('connection', (socket) => {
                 p.hand.splice(idx, 1);
             }
         } else if (p.faceUp.some(Boolean)) {
-            // Playing from faceUp
+            // Playing from faceUp — all cards must be same rank
+            if (!cards.every(c => c.slice(0,-1) === cards[0].slice(0,-1))) {
+                socket.emit('error', 'כל הקלפים חייבים להיות מאותו ערך'); return;
+            }
             for (const c of cards) {
                 if (!canPlay(c, room.pile)) { socket.emit('error', 'קלף לא חוקי'); return; }
                 const idx = p.faceUp.indexOf(c);
@@ -1273,9 +1278,11 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // faceUp phase: must take a faceUp card with pile
+        // faceUp phase: must take a faceUp card with pile — only same rank
         if (p.hand.length === 0 && p.faceUp.some(Boolean) && faceUpCards?.length) {
-            faceUpCards.forEach(c => {
+            const validCards = faceUpCards.filter(c => p.faceUp.includes(c)
+                && c.slice(0,-1) === faceUpCards[0].slice(0,-1));
+            validCards.forEach(c => {
                 const idx = p.faceUp.indexOf(c);
                 if (idx !== -1) { p.hand.push(c); p.faceUp[idx] = null; }
             });
