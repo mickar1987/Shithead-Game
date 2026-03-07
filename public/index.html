@@ -514,7 +514,7 @@
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.30</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.31</div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
@@ -2677,37 +2677,41 @@ const overlay = document.getElementById('setupOverlay');
         document.getElementById('leaveBtn').style.display = 'block';
         document.getElementById('waitingRestart').style.display = 'none';
         document.getElementById('waitingCount').style.display = 'none';
+        // Apply coins if coinsResult arrived before gameOver
+        if (pendingCoinsResult) {
+            applyCoinsResult(pendingCoinsResult);
+            pendingCoinsResult = null;
+        }
     });
 
-    socket.on('coinsResult', (results) => {
-        // Find MY result by slotIdx
-        const myResult = results.find(r => r.slotIdx === mySlotIdx);
+    let pendingCoinsResult = null;
 
-        // Update my local coins immediately from server's final value
+    function applyCoinsResult(results) {
+        const myResult = results.find(r => r.slotIdx === mySlotIdx);
         if (authUser && myResult) {
-            if (myResult.coins !== null) {
-                // Use server's authoritative value
-                authUser.coins = myResult.coins;
-            } else if (myResult.delta !== 0) {
-                authUser.coins = Math.max(0, authUser.coins + myResult.delta);
-            }
+            if (myResult.coins !== null) authUser.coins = myResult.coins;
+            else if (myResult.delta !== 0) authUser.coins = Math.max(0, authUser.coins + myResult.delta);
             saveAuthLocal();
             updateCoinsUI();
         }
+        results.forEach((r, i) => {
+            const coinCell = document.getElementById('lb-coins-' + i);
+            if (!coinCell) return;
+            if (r.delta !== 0) {
+                coinCell.style.color = r.delta > 0 ? '#4ade80' : '#f87171';
+                coinCell.innerHTML = (r.delta > 0 ? '+' : '') + r.delta + '&nbsp;<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>';
+            } else {
+                coinCell.style.color = 'rgba(255,255,255,0.3)';
+                coinCell.textContent = '—';
+            }
+        });
+    }
 
-        // Show coin changes in leaderboard rows
-        const list = document.getElementById('leaderboardList');
-        if (list && results.length) {
-            // leaderboard rows are in winnersOrder (best→worst), results are too
-            const rows = list.querySelectorAll('.lb-row');
-            results.forEach((r, i) => {
-                if (!rows[i]) return;
-                const coinCell = document.getElementById('lb-coins-' + i);
-                if (coinCell && r.delta !== 0) {
-                    coinCell.style.color = r.delta > 0 ? '#4ade80' : '#f87171';
-                    coinCell.innerHTML = (r.delta > 0 ? '+' : '') + r.delta + '&nbsp;' + `<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>`;
-                }
-            });
+    socket.on('coinsResult', (results) => {
+        if (document.getElementById('lb-coins-0')) {
+            applyCoinsResult(results);
+        } else {
+            pendingCoinsResult = results; // gameOver not rendered yet — wait
         }
     });
 
