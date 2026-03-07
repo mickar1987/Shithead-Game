@@ -847,10 +847,11 @@ function handlePlayerLeave(socketData) {
         return;
     }
 
-    // Mark as loser (last place among remaining)
+    // Mark as loser — first leaver = last place, so insert at beginning of losers
+    // winnersOrder = [winners..., latest_leaver, ..., first_leaver]
     slot.finished = true;
     slot.disqualified = true;
-    room.winnersOrder.push(slotIdx);
+    room.winnersOrder.unshift(slotIdx);
     console.log(`[leave] ${name} (slot=${slotIdx}, username=${slot.username}) left. winnersOrder=${room.winnersOrder}`);
     broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
 
@@ -863,7 +864,7 @@ function handlePlayerLeave(socketData) {
         // Only 1 (or 0) human left — end game immediately
         // Mark all remaining bots as finished in order (they "win" over the leaver)
         // but human winner comes first
-        const loserIdx = room.winnersOrder.pop(); // the one who just left
+        const loserIdx = room.winnersOrder.shift(); // the one who just left (was unshifted)
 
         // Collect remaining non-finished slots: human first, then bots
         const remaining = activeAll.slice().sort((a, b) => (a.isBot ? 1 : -1) - (b.isBot ? 1 : -1));
@@ -872,7 +873,7 @@ function handlePlayerLeave(socketData) {
             remaining[i].finished = true;
             room.winnersOrder.unshift(remaining[i].id);
         }
-        room.winnersOrder.push(loserIdx); // leaver is last
+        room.winnersOrder.push(loserIdx); // latest leaver goes last
 
         room.gameOver = true;
         clearRoomTimer(room.code);
@@ -883,7 +884,7 @@ function handlePlayerLeave(socketData) {
         // More than 1 human remains — replace leaver with bot
         slot.isBot = true;
         slot.finished = false;
-        room.winnersOrder.pop(); // undo — bot continues playing
+        room.winnersOrder.shift(); // undo — bot continues playing
         slot.name = `🤖 ${name}`;
         broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
         emitStateToAll(room);
