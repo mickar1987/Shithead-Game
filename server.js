@@ -822,6 +822,10 @@ function handlePlayerLeave(socketData) {
     if (!room) return;
     const slot = room.slots[slotIdx];
     if (!slot) return;
+    // Guard: if already processed this slot's leave, ignore
+    if (room.leaversOrder.includes(slotIdx) && slot.isBot) return;
+    // Guard: pure bots (never human) don't trigger leave logic
+    if (slot.isBot && !slot.wasHuman) return;
     const name = slot.name;
 
     // Check game state BEFORE marking disconnected
