@@ -15,7 +15,7 @@ async function settleCoins(room) {
     const bet = room.bet;
 
     // Only consider HUMAN players (non-bots) for coin settlement
-    const order = room.winnersOrder.filter(i => !room.slots[i]?.isBot && !room.slots[i]?.disqualifiedBot);
+    const order = room.winnersOrder.filter(i => !room.slots[i]?.isBot || room.slots[i]?.wasHuman);
     const n = order.length;
     if (n < 2) { console.log('[settleCoins] not enough human players'); return; }
 
@@ -43,7 +43,7 @@ async function settleCoins(room) {
         const slot = room.slots[slotIdx];
         const delta = changes[slotIdx] || 0;
         let finalCoins = null;
-        if (slot.username && !slot.isBot) {
+        if (slot.username && (!slot.isBot || slot.wasHuman)) {
             try {
                 const u = await getUser(slot.username);
                 if (u) {
@@ -873,7 +873,7 @@ function handlePlayerLeave(socketData) {
         // - then human leavers in reverse order (latest leaver = best loser place)
         // - leaversOrder contains both humans and bots — filter to humans only
         const humanWinner = remaining.find(p => !p.isBot);
-        const humanLeavers = room.leaversOrder.filter(i => !room.slots[i].isBot);
+        const humanLeavers = room.leaversOrder.filter(i => !room.slots[i].isBot || room.slots[i].wasHuman);
         // humanLeavers[0] = first human to leave = last place
         // humanLeavers[last] = latest human to leave = second to last
         room.winnersOrder = [
@@ -891,6 +891,7 @@ function handlePlayerLeave(socketData) {
         // Keep leaversOrder entry — leaver's place is recorded
         // Bot is just a gameplay placeholder, finished=false so it can play
         slot.isBot = true;
+        slot.wasHuman = true; // was a real player — include in coin settlement
         slot.finished = false;
         slot.name = `🤖 ${name}`;
         broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
