@@ -9,21 +9,24 @@ process.env.NODE_OPTIONS = process.env.NODE_OPTIONS || '';
 
 // ══ COINS: settle bets at end of game ══
 async function settleCoins(room) {
-    console.log(`[settleCoins] called. bet=${room.bet}, settled=${room.coinsSettled}, order=${room.winnersOrder}, slots=${JSON.stringify(room.slots.map(s=>({name:s.name,username:s.username})))}`);
+    console.log(`[settleCoins] called. bet=${room.bet}, settled=${room.coinsSettled}, order=${room.winnersOrder}`);
     if (room.coinsSettled || room.bet === 0) { console.log('[settleCoins] skipped.'); return; }
     room.coinsSettled = true;
     const bet = room.bet;
-    const order = room.winnersOrder;
-    const n = order.length;
-    if (n < 2) { console.log('[settleCoins] not enough players'); return; }
 
+    // Only consider HUMAN players (non-bots) for coin settlement
+    const order = room.winnersOrder.filter(i => !room.slots[i]?.isBot && !room.slots[i]?.disqualifiedBot);
+    const n = order.length;
+    if (n < 2) { console.log('[settleCoins] not enough human players'); return; }
+
+    // Find human winner (1st) and human loser (last)
+    // order[0] = best human, order[n-1] = worst human
     const changes = {};
     order.forEach(i => { changes[i] = 0; });
 
-    // 1st takes from last (all player counts)
+    // 2-player or 3-player: winner takes bet from loser
     changes[order[0]]   += bet;
     changes[order[n-1]] -= bet;
-    // 2nd place: 0 (3-player) — already initialized to 0
 
     // 4-player: 2nd takes half from 3rd
     if (n >= 4) {
@@ -32,14 +35,15 @@ async function settleCoins(room) {
         changes[order[2]] -= half;
     }
 
-    console.log(`[settleCoins] n=${n} changes=${JSON.stringify(changes)}`);
+    console.log(`[settleCoins] human order=${order} n=${n} changes=${JSON.stringify(changes)}`);
 
+    // Build results for ALL slots in winnersOrder (bots get delta=0)
     const results = [];
-    for (const slotIdx of order) {
+    for (const slotIdx of room.winnersOrder) {
         const slot = room.slots[slotIdx];
         const delta = changes[slotIdx] || 0;
         let finalCoins = null;
-        if (slot.username) {
+        if (slot.username && !slot.isBot) {
             try {
                 const u = await getUser(slot.username);
                 if (u) {
@@ -48,12 +52,10 @@ async function settleCoins(room) {
                     console.log(`[coins] ${slot.username}: ${u.coins} ${delta >= 0 ? '+' : ''}${delta} = ${finalCoins}`);
                 }
             } catch(e) { console.error('[coins] error:', e.message); }
-        } else if (delta !== 0) {
-            console.log(`[coins] ${slot.name} (guest): delta=${delta} — not saved`);
         }
         results.push({ name: slot.name, delta, coins: finalCoins, slotIdx });
     }
-    console.log(`[coins] settled. bet=${bet} order=${order.join(',')}`);
+    console.log(`[coins] settled. bet=${bet}`);
     io.to(room.code).emit('coinsResult', results);
 }
 
