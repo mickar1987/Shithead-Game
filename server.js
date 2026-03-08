@@ -865,17 +865,20 @@ function handlePlayerLeave(socketData) {
 
     if (activeHumans.length <= 1) {
         // Only 1 (or 0) human left — end game immediately
-        // Remaining non-finished: human first, then bots
-        const remaining = activeAll.slice().sort((a, b) => (a.isBot ? 1 : -1) - (b.isBot ? 1 : -1));
+        const remaining = activeAll.slice();
         remaining.forEach(p => { p.finished = true; });
 
-        // Build final order: winner first, then leavers in reverse order (latest leaver = best place among losers)
-        // leaversOrder[0] = first leaver = last place (💩)
-        // leaversOrder[last] = latest leaver = second to last
-        const humanWinners = remaining.filter(p => !p.isBot);
+        // Build final order using ONLY humans:
+        // - human winner (last standing human)
+        // - then human leavers in reverse order (latest leaver = best loser place)
+        // - leaversOrder contains both humans and bots — filter to humans only
+        const humanWinner = remaining.find(p => !p.isBot);
+        const humanLeavers = room.leaversOrder.filter(i => !room.slots[i].isBot);
+        // humanLeavers[0] = first human to leave = last place
+        // humanLeavers[last] = latest human to leave = second to last
         room.winnersOrder = [
-            ...humanWinners.map(p => p.id),
-            ...[...room.leaversOrder].reverse()
+            ...(humanWinner ? [humanWinner.id] : []),
+            ...[...humanLeavers].reverse()
         ];
 
         room.gameOver = true;
