@@ -165,10 +165,13 @@ function dealNewHands(room) {
 
 // Play a card from hand. selectedCapture = array of table card indices to capture.
 // Returns { ok, basra, capturedCards, error }
-function playCard(room, slotIdx, cardStr, selectedCapture) {
+function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
     const p = room.slots[slotIdx];
-    const cardIdx = p.hand.indexOf(cardStr);
-    if (cardIdx === -1) return { ok: false, error: 'קלף לא ביד' };
+    if (!alreadyRemoved) {
+        const cardIdx = p.hand.indexOf(cardStr);
+        if (cardIdx === -1) return { ok: false, error: 'קלף לא ביד' };
+        p.hand.splice(cardIdx, 1);
+    }
 
     const rank = cardRank(cardStr);
     const tableCards = room.tableCards;
@@ -216,8 +219,7 @@ function playCard(room, slotIdx, cardStr, selectedCapture) {
         captureGroup = [];
     }
 
-    // Remove card from hand
-    p.hand.splice(cardIdx, 1);
+    // Card already removed from hand (done in commit phase)
 
     let basraScored = false;
     let capturedCards = [];

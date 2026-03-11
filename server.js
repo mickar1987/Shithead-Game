@@ -1557,6 +1557,11 @@ function basraStateForPlayer(room, slotIdx) {
         roundOver: room.roundOver,
         gameOver: room.gameOver,
         lastCapturer: room.lastCapturer,
+        committedCard: room.committedCard || null,
+        committedBy: room.committedBy,
+        turnTimer: room.turnTimer || 0,
+        timerStarted: !!room._timerStarted,
+        timerRemaining: room._timerStarted ? Math.max(0, room.turnTimer - Math.floor((Date.now() - room._timerStarted) / 1000)) : 0,
     };
 }
 
@@ -1578,13 +1583,69 @@ io.on('basraConnection', () => {}); // no-op, handled in main io.on
 // We hook into the existing io.on('connection') — add extra handlers per socket
 // This is called from within the main connection handler below via separate block
 
+function basraClearBasraTimer(room) {
+    if (room._timerTimeout) { clearTimeout(room._timerTimeout); room._timerTimeout = null; }
+}
+
+function basraAdvanceTurn(room) {
+    // Check if all hands empty
+    const allHandsEmpty = room.slots.every(sl => sl.hand.length === 0);
+    if (allHandsEmpty) {
+        if (room.deck.length > 0) {
+            basra.dealNewHands(room);
+            basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
+        } else {
+            if (room.tableCards.length > 0 && room.lastCapturer !== null) {
+                room.slots[room.lastCapturer].captured.push(...room.tableCards);
+                room.tableCards = [];
+            }
+            room.roundOver = true;
+            const roundScores = basra.scoreRound(room);
+            basraBroadcast(room, 'basraRoundOver', {
+                scores: roundScores,
+                totalScores: room.slots.map(s => s.score || 0),
+                pendingMajority: room.pendingMajorityPoints,
+            });
+            const winner = room.slots.find(sl => (sl.score || 0) >= 101);
+            if (winner) {
+                room.gameOver = true;
+                const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                basraBroadcast(room, 'basraGameOver', { names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0) });
+            }
+            basraEmitAll(room);
+            return;
+        }
+    }
+    // Advance turn
+    room.currentPlayer = (room.currentPlayer + 1) % room.slots.length;
+    basraEmitAll(room);
+    // Start turn timer
+    if (room.turnTimer > 0 && !room.gameOver && !room.roundOver) {
+        basraClearBasraTimer(room);
+        room._timerStarted = Date.now();
+        room._timerTimeout = setTimeout(() => {
+            // Auto-play random card without capture
+            const p = room.slots[room.currentPlayer];
+            if (!p || p.hand.length === 0) return;
+            const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+            p.hand.splice(p.hand.indexOf(randomCard), 1);
+            room.tableCards.push(randomCard);
+            room.committedCard = null;
+            room.committedBy = null;
+            basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
+            basraAdvanceTurn(room);
+        }, room.turnTimer * 1000);
+    }
+}
+
+
 function registerBasraHandlers(socket) {
 
     socket.on('basraVerifyAccess', ({ accessCode }) => {
         socket.emit('basraAccessVerified', { ok: accessCode === basra.BASRA_ACCESS_CODE });
     });
 
-    socket.on('basraCreate', ({ name, playerCount, isPublic, bet, accessCode, username, token }) => {
+    socket.on('basraCreate', ({ name, playerCount, isPublic, bet, turnTimer, accessCode, username, token }) => {
         if (accessCode !== basra.BASRA_ACCESS_CODE) {
             socket.emit('basraError', 'קוד גישה שגוי'); return;
         }
@@ -1603,7 +1664,10 @@ function registerBasraHandlers(socket) {
 
         const room = basra.createBasraRoom(code, slots, bet || 0);
         room.isPublic = !!isPublic;
+        room.turnTimer = parseInt(turnTimer) || 0;
         room.gameStarted = false;
+        room.committedCard = null;
+        room.committedBy = null;
         basraRooms[code] = room;
         socket.data.basraRoom = code;
         socket.data.basraSlot = 0;
@@ -1651,77 +1715,62 @@ function registerBasraHandlers(socket) {
             room.gameStarted = true;
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
             basraEmitAll(room);
+            // Start first turn timer
+            if (room.turnTimer > 0) {
+                room._timerStarted = Date.now();
+                room._timerTimeout = setTimeout(() => {
+                    const p = room.slots[room.currentPlayer];
+                    if (!p || p.hand.length === 0) return;
+                    const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+                    p.hand.splice(p.hand.indexOf(randomCard), 1);
+                    room.tableCards.push(randomCard);
+                    basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
+                    basraAdvanceTurn(room);
+                }, room.turnTimer * 1000);
+            }
         }
         console.log(`[basra] ${name} joined room ${code}`);
     });
 
-    socket.on('basraPlay', ({ card, captureIndices }) => {
+    // ── Phase 1: play card to table ──
+    socket.on('basraCommitCard', ({ card }) => {
         const code = socket.data.basraRoom;
         const slotIdx = socket.data.basraSlot;
         const room = basraRooms[code];
         if (!room || room.gameOver || room.roundOver) return;
         if (room.currentPlayer !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
+        const p = room.slots[slotIdx];
+        if (!p.hand.includes(card)) { socket.emit('basraError', 'קלף לא ביד'); return; }
+        // Remove from hand, place on table as "committed"
+        p.hand.splice(p.hand.indexOf(card), 1);
+        room.committedCard = card;
+        room.committedBy = slotIdx;
+        basraClearBasraTimer(room);
+        basraEmitAll(room);
+    });
 
-        const result = basra.playCard(room, slotIdx, card, captureIndices || []);
+    // ── Phase 2: confirm capture ──
+    socket.on('basraPlay', ({ captureIndices }) => {
+        const code = socket.data.basraRoom;
+        const slotIdx = socket.data.basraSlot;
+        const room = basraRooms[code];
+        if (!room || room.gameOver || room.roundOver) return;
+        if (room.committedBy !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
+
+        const card = room.committedCard;
+        room.committedCard = null;
+        room.committedBy = null;
+
+        const result = basra.playCard(room, slotIdx, card, captureIndices || [], true);
         if (!result.ok) { socket.emit('basraError', result.error); return; }
 
         const p = room.slots[slotIdx];
-        let toastMsg = null;
-
         if (result.capturedCards.length > 0) {
-            const captureStr = result.capturedCards.join(' ');
-            toastMsg = `${p.name} תפס ${result.capturedCards.length} קלפים`;
-            if (result.basra) {
-                toastMsg = `⚡ BASRA! ${p.name}`;
-                basraBroadcast(room, 'basraEvent', { type: 'basra', player: slotIdx, name: p.name });
-            }
+            basraBroadcast(room, 'toast', result.basra ? `⚡ BASRA! ${p.name}` : `${p.name} תפס ${result.capturedCards.length} קלפים`);
+            if (result.basra) basraBroadcast(room, 'basraEvent', { type: 'basra', player: slotIdx, name: p.name });
         }
 
-        if (toastMsg) basraBroadcast(room, 'toast', toastMsg);
-
-        // Check if all hands empty
-        const allHandsEmpty = room.slots.every(s => s.hand.length === 0);
-        if (allHandsEmpty) {
-            if (room.deck.length > 0) {
-                // Deal new hands
-                basra.dealNewHands(room);
-                basraBroadcast(room, 'toast', `חולקו קלפים חדשים`);
-            } else {
-                // Round over — give table cards to last capturer
-                if (room.tableCards.length > 0 && room.lastCapturer !== null) {
-                    room.slots[room.lastCapturer].captured.push(...room.tableCards);
-                    room.tableCards = [];
-                }
-                room.roundOver = true;
-
-                const roundScores = basra.scoreRound(room);
-                basraBroadcast(room, 'basraRoundOver', {
-                    scores: roundScores,
-                    totalScores: room.slots.map(s => s.score || 0),
-                    pendingMajority: room.pendingMajorityPoints,
-                });
-
-                // Check game over (101+)
-                const winner = room.slots.find(s => (s.score || 0) >= 101);
-                if (winner) {
-                    room.gameOver = true;
-                    const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
-                    room.winnersOrder = sorted.map(s => s.id);
-                    basraBroadcast(room, 'basraGameOver', {
-                        winnersOrder: room.winnersOrder,
-                        names: sorted.map(s => s.name),
-                        scores: sorted.map(s => s.score || 0),
-                    });
-                }
-                basraEmitAll(room);
-                return;
-            }
-        }
-
-        // Advance turn
-        const n = room.slots.length;
-        room.currentPlayer = (room.currentPlayer + 1) % n;
-        basraEmitAll(room);
+        basraAdvanceTurn(room);
     });
 
     socket.on('basraNextRound', () => {
@@ -1731,6 +1780,19 @@ function registerBasraHandlers(socket) {
         basra.resetRound(room);
         basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
         basraEmitAll(room);
+    });
+
+    socket.on('basraReconnect', ({ code, username }) => {
+        const room = basraRooms[code?.toUpperCase()];
+        if (!room) return;
+        const slot = room.slots.find(s => s.username === username || s.name === username);
+        if (!slot) return;
+        slot.socketId = socket.id;
+        slot.connected = true;
+        socket.data.basraRoom = code.toUpperCase();
+        socket.data.basraSlot = slot.id;
+        socket.join('basra_' + code.toUpperCase());
+        if (room.gameStarted) basraEmitAll(room);
     });
 
     socket.on('basraLeave', () => {
