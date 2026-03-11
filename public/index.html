@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.54</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.56</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -560,6 +560,13 @@
             <button onclick="setBet(500)" id="betBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>500</button>
         </div>
         <div id="betWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
+        <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
+            <button onclick="setBasraTimer(15)" id="basraTimerBtn15" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">15s</button>
+            <button onclick="setBasraTimer(30)" id="basraTimerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">30s</button>
+            <button onclick="setBasraTimer(60)" id="basraTimerBtn60" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">60s</button>
+            <button onclick="setBasraTimer(0)"  id="basraTimerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">♾</button>
+        </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
         <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🎲 קבע המשך</button>
         <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">⚔️ 2 Players</button>
@@ -624,6 +631,13 @@
             <button onclick="setBasraBet(500)" id="basraBetBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>500</button>
         </div>
         <div id="basraBetWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
+        <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
+            <button onclick="setBasraTimer(15)" id="basraTimerBtn15" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">15s</button>
+            <button onclick="setBasraTimer(30)" id="basraTimerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">30s</button>
+            <button onclick="setBasraTimer(60)" id="basraTimerBtn60" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">60s</button>
+            <button onclick="setBasraTimer(0)"  id="basraTimerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">♾</button>
+        </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
         <div style="display:flex;gap:8px;width:100%;max-width:280px;">
             <button onclick="selectBasraCount(2)" id="basraCount2" class="setup-btn" style="flex:1;border-color:var(--gold);">⚔️ 2 Players</button>
@@ -2611,6 +2625,13 @@ function initSocket() {
     if (socket) return;
     socket = io();
 
+    // Reconnect to basra room if was in one
+    socket.on('connect', () => {
+        if (basraRoomCode && basraMySlot !== null) {
+            socket.emit('basraReconnect', { code: basraRoomCode, username: authUser?.username || basraGetMyName() });
+        }
+    });
+
     socket.on('roomCreated', ({ code, slotIdx }) => {
         mySlotIdx = slotIdx;
         document.getElementById('lobbyCode').textContent = code;
@@ -3623,6 +3644,1018 @@ let basraPendingAction = null;
 let selectedBasraCount = 2;
 let selectedBasraRoomType = 'public';
 let selectedBasraBet = 0;
+let selectedBasraTimer = 0;
+
+// Two-phase play state
+let basraPlayPhase = 'select'; // 'select' = picking card, 'capture' = picking what to capture
+let basraCommittedCard = null; // card already played to table, waiting for capture selection
+
+function showBasraCreate() {
+    if (!basraAccessVerified) { basraPendingAction='create'; showMenu('menuBasraAccess'); }
+    else showMenu('menuBasraCreate');
+}
+function showBasraJoin() {
+    if (!basraAccessVerified) { basraPendingAction='join'; showMenu('menuBasraAccess'); }
+    else showMenu('menuBasraJoin');
+}
+function basraVerifyAccess() {
+    const code = document.getElementById('basraAccessCode').value.trim();
+    document.getElementById('basraAccessError').textContent = '';
+    if (!code) { document.getElementById('basraAccessError').textContent = 'הכנס קוד גישה'; return; }
+    if (code === '9218') {
+        basraAccessVerified = true;
+        showMenu(basraPendingAction === 'join' ? 'menuBasraJoin' : 'menuBasraCreate');
+    } else {
+        document.getElementById('basraAccessError').textContent = 'קוד שגוי';
+    }
+}
+function setBasraRoomType(type) {
+    selectedBasraRoomType = type;
+    document.getElementById('basraRoomTypePublic').style.borderColor  = type==='public'  ? 'var(--gold)' : '';
+    document.getElementById('basraRoomTypePrivate').style.borderColor = type==='private' ? 'var(--gold)' : '';
+}
+function setBasraBet(val) {
+    selectedBasraBet = val;
+    [0,50,100,200,500].forEach(v => {
+        const b = document.getElementById('basraBetBtn'+v);
+        if (b) b.style.borderColor = v===val ? 'var(--gold)' : '';
+    });
+    const warn = document.getElementById('basraBetWarning');
+    if (warn && val > 0 && authUser && authUser.coins < val) {
+        warn.textContent = 'אין מספיק מטבעות'; return;
+    }
+    if (warn) warn.textContent = '';
+}
+function setBasraTimer(val) {
+    selectedBasraTimer = val;
+    [15,30,60,0].forEach(v => {
+        const b = document.getElementById('basraTimerBtn'+v);
+        if (b) b.style.borderColor = v===val ? 'var(--gold)' : '';
+    });
+}
+function selectBasraCount(n) {
+    selectedBasraCount = n;
+    document.getElementById('basraCount2').style.borderColor = n===2 ? 'var(--gold)' : '';
+    document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
+}
+function basraGetMyName() {
+    if (authUser) {
+        if (authUser.firstName) return authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '');
+        return authUser.username;
+    }
+    return (typeof localProfile !== 'undefined' && localProfile?.firstName) || 'אורח';
+}
+function basraCreate() {
+    if (!socket) initSocket();
+    const warn = document.getElementById('basraBetWarning');
+    if (selectedBasraBet > 0 && authUser && authUser.coins < selectedBasraBet) {
+        if (warn) warn.textContent = 'אין מספיק מטבעות'; return;
+    }
+    document.getElementById('basraCreateError').textContent = '';
+    socket.emit('basraCreate', {
+        name: basraGetMyName(), playerCount: selectedBasraCount,
+        isPublic: selectedBasraRoomType === 'public', bet: selectedBasraBet,
+        turnTimer: selectedBasraTimer, accessCode: '9218',
+        username: authUser?.username, token: authUser?.token
+    });
+}
+function basraJoin(codeOverride) {
+    if (!socket) initSocket();
+    const code = codeOverride || document.getElementById('basraRoomCode')?.value.trim().toUpperCase();
+    const errEl = document.getElementById('basraJoinError');
+    if (errEl) errEl.textContent = '';
+    if (!code) { if (errEl) errEl.textContent = 'הכנס קוד חדר'; return; }
+    socket.emit('basraJoin', { name: basraGetMyName(), code, accessCode: '9218', username: authUser?.username, token: authUser?.token });
+}
+function refreshBasraPublicRooms() {
+    if (!socket) initSocket();
+    socket.emit('basraGetPublicRooms');
+}
+function basraLeave() {
+    if (socket) socket.emit('basraLeave');
+    document.getElementById('basraGame').style.display = 'none';
+    document.getElementById('basraResultOverlay').style.display = 'none';
+    basraState = null; basraMySlot = null; basraRoomCode = null;
+    basraCommittedCard = null; basraPlayPhase = 'select';
+    basraClearTimer();
+    showMenu('menuMain');
+}
+
+// ── Timer display ──
+let basraTimerInterval = null;
+function basraClearTimer() {
+    if (basraTimerInterval) { clearInterval(basraTimerInterval); basraTimerInterval = null; }
+    const el = document.getElementById('basraTurnTimer');
+    if (el) el.style.display = 'none';
+}
+function basraStartTimer(seconds) {
+    basraClearTimer();
+    if (!seconds) return;
+    let remaining = seconds;
+    const el = document.getElementById('basraTurnTimer');
+    if (!el) return;
+    el.style.display = 'block';
+    el.textContent = remaining;
+    el.style.color = 'var(--gold)';
+    basraTimerInterval = setInterval(() => {
+        remaining--;
+        el.textContent = remaining;
+        if (remaining <= 5) el.style.color = '#ef4444';
+        if (remaining <= 0) basraClearTimer();
+    }, 1000);
+}
+
+// ── Card rendering — uses same .card CSS as Shithead ──
+function basraRenderCard(cardStr, faceUp, selected, clickFn) {
+    const el = document.createElement('div');
+    if (!faceUp) {
+        el.className = 'card back';
+        el.style.cssText = 'width:var(--card-w);height:var(--card-h);cursor:default;';
+        return el;
+    }
+    const rank = cardStr.slice(0,-1), suit = cardStr.slice(-1);
+    const suitMap = {h:'\u2665',d:'\u2666',c:'\u2663',s:'\u2660'};
+    el.className = 'card' + (['h','d'].includes(suit) ? ' red' : '');
+    if (selected) el.classList.add('selected');
+    const inner = document.createElement('div');
+    inner.className = 'card-inner';
+    inner.innerHTML = `<span class="card-rank">${rank}</span><span class="card-suit">${suitMap[suit]||suit}</span>`;
+    el.appendChild(inner);
+    if (clickFn) el.onclick = clickFn;
+    return el;
+}
+
+// ── Two-phase play logic ──
+// Phase 1: player selects card from hand → clicks "שחק" → card goes to table visually
+// Phase 2: player selects which table cards to capture → clicks "אסוף" → server validates + collects
+function basraCommitCard() {
+    // Send card to server — it will add to table and wait for capture decision
+    if (!basraSelectedCard) return;
+    socket.emit('basraCommitCard', { card: basraSelectedCard });
+    basraCommittedCard = basraSelectedCard;
+    basraSelectedCard = null;
+    basraSelectedCaptures = [];
+    basraPlayPhase = 'capture';
+    if (basraState) basraRender(basraState);
+}
+function basraConfirmCapture() {
+    socket.emit('basraPlay', { captureIndices: basraSelectedCaptures.slice() });
+    basraCommittedCard = null;
+    basraPlayPhase = 'select';
+    basraSelectedCaptures = [];
+}
+function basraCancelSelection() {
+    basraSelectedCard = null;
+    basraSelectedCaptures = [];
+    if (basraState) basraRender(basraState);
+}
+
+// ── Main render ──
+function basraRender(state) {
+    if (!state) return;
+    basraState = state;
+    const isMyTurn = state.isMyTurn;
+    const myIdx = state.mySlotIdx;
+    const oppIdx = myIdx === 0 ? 1 : 0;
+
+    // Score bar
+    document.getElementById('basraScoreBar').textContent =
+        state.playerNames.map((n,i) => n.split(' ')[0]+': '+(state.scores[i]||0)).join('  |  ');
+
+    // Opponent name — highlight in gold if their turn
+    const oppNameEl = document.getElementById('basraOpponentName');
+    const isOppTurn = state.currentPlayer === oppIdx;
+    oppNameEl.textContent = state.playerNames[oppIdx] || '';
+    oppNameEl.style.color = isOppTurn ? 'var(--gold)' : 'rgba(255,255,255,0.5)';
+    oppNameEl.style.fontWeight = isOppTurn ? '700' : '400';
+    document.getElementById('basraOpponentInfo').textContent =
+        'תפוסים: '+(state.capturedCounts[oppIdx]||0)+' | בסרות: '+(state.basraCounts[oppIdx]||0);
+
+    // Opponent hand (face-down)
+    const oppHandEl = document.getElementById('basraOpponentHand');
+    oppHandEl.innerHTML = '';
+    ((state.handCounts||[])[oppIdx]||0) && Array.from({length:(state.handCounts||[])[oppIdx]})
+        .forEach(() => oppHandEl.appendChild(basraRenderCard('',false,false,null)));
+
+    // Table cards
+    const tableEl = document.getElementById('basraTableCards');
+    const emptyEl = document.getElementById('basraTableEmpty');
+    tableEl.innerHTML = '';
+    // Sync phase from server state
+    if (isMyTurn && state.committedBy === myIdx && state.committedCard) {
+        basraPlayPhase = 'capture';
+        basraCommittedCard = state.committedCard;
+    } else if (!isMyTurn || !state.committedCard) {
+        if (basraPlayPhase === 'capture' && !state.committedCard) {
+            basraPlayPhase = 'select';
+            basraCommittedCard = null;
+        }
+    }
+    const inCapturePhase = isMyTurn && basraPlayPhase === 'capture';
+    if (state.tableCards.length === 0 && !state.committedCard) {
+        emptyEl.style.display = 'block';
+    } else {
+        emptyEl.style.display = 'none';
+        // Show all table cards
+        state.tableCards.forEach((card, idx) => {
+            const sel = basraSelectedCaptures.includes(idx);
+            tableEl.appendChild(basraRenderCard(card, true, sel, () => {
+                if (!inCapturePhase) return;
+                const pos = basraSelectedCaptures.indexOf(idx);
+                if (pos > -1) basraSelectedCaptures.splice(pos, 1);
+                else basraSelectedCaptures.push(idx);
+                basraRender(state);
+            }));
+        });
+        // Show committed card (already played to table, awaiting capture decision)
+        if (state.committedCard) {
+            const committedEl = basraRenderCard(state.committedCard, true, false, null);
+            committedEl.style.outline = '2px solid #f5a623';
+            committedEl.style.outlineOffset = '2px';
+            tableEl.appendChild(committedEl);
+        }
+    }
+
+    // Deck
+    document.getElementById('basraDeckDisplay').textContent = state.deckCount || 0;
+
+    // My hand
+    const myHandEl = document.getElementById('basraMyHand');
+    myHandEl.innerHTML = '';
+    if (basraPlayPhase === 'select' || !isMyTurn) {
+        (state.myHand||[]).forEach(card => {
+            const sel = basraSelectedCard === card;
+            myHandEl.appendChild(basraRenderCard(card, true, sel, () => {
+                if (!isMyTurn || basraPlayPhase !== 'select') return;
+                basraSelectedCard = basraSelectedCard === card ? null : card;
+                basraSelectedCaptures = [];
+                basraRender(state);
+            }));
+        });
+    }
+
+    // My info
+    const myNameEl = document.getElementById('basraMyInfo');
+    myNameEl.textContent = 'תפוסים: '+(state.capturedCounts[myIdx]||0)+' | בסרות: '+(state.basraCounts[myIdx]||0);
+
+    // Buttons
+    const playBtn    = document.getElementById('basraPlayBtn');
+    const confirmBtn = document.getElementById('basraConfirmBtn');
+    const cancelBtn  = document.getElementById('basraCancelBtn');
+
+    if (isMyTurn && basraPlayPhase === 'select') {
+        playBtn.style.display    = basraSelectedCard ? 'block' : 'none';
+        confirmBtn.style.display = 'none';
+        cancelBtn.style.display  = basraSelectedCard ? 'block' : 'none';
+    } else if (isMyTurn && basraPlayPhase === 'capture') {
+        playBtn.style.display    = 'none';
+        confirmBtn.style.display = 'block';
+        cancelBtn.style.display  = 'none';
+    } else {
+        playBtn.style.display = confirmBtn.style.display = cancelBtn.style.display = 'none';
+    }
+
+    // Status message
+    const statusEl = document.getElementById('basraStatusMsg');
+    if (!isMyTurn) {
+        statusEl.textContent = 'תור של ' + state.playerNames[state.currentPlayer];
+    } else if (basraPlayPhase === 'select') {
+        statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק כדי להניח את הקלף' : 'בחר קלף מהיד';
+    } else {
+        statusEl.textContent = basraSelectedCaptures.length > 0
+            ? 'לחץ ✅ אסוף (' + basraSelectedCaptures.length + ' קלפים)'
+            : 'בחר קלפים לאיסוף (או אסוף ריק)';
+    }
+
+    // Timer
+    if (state.timerStarted && isMyTurn && state.turnTimer > 0) {
+        basraStartTimer(state.timerRemaining || state.turnTimer);
+    } else if (!isMyTurn) {
+        basraClearTimer();
+    }
+}
+
+function basraNextRound() {
+    document.getElementById('basraResultOverlay').style.display = 'none';
+    socket.emit('basraNextRound');
+}
+
+function updateLobby(state) {
+    const c = document.getElementById('lobbyPlayers');
+    if (!c) return;
+    c.innerHTML = state.players.map((p,i) =>
+        `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px;">
+            ${i===0?'👑 ':'👤 '}<span style="color:${i===mySlotIdx?'var(--gold)':'#fff'}">${p.name||'?'}</span>
+         </div>`
+    ).join('');
+    const s = document.getElementById('lobbyStatus');
+    const startBtn = document.getElementById('startOpenBtn');
+    const waitMore = document.getElementById('waitingMore');
+    if (state.openRoom) {
+        // Open room — host controls start
+        const count = state.players.length;
+        if (s) s.textContent = `${count} שחקנים מחוברים (עד 4)`;
+        if (mySlotIdx === 0) {
+            // I am host
+            if (count >= 2) {
+                if (startBtn) startBtn.classList.remove('hidden');
+                if (waitMore) waitMore.style.display = 'none';
+            } else {
+                if (startBtn) startBtn.classList.add('hidden');
+                if (waitMore) waitMore.style.display = 'block';
+            }
+        } else {
+            if (startBtn) startBtn.classList.add('hidden');
+            if (waitMore) waitMore.style.display = 'none';
+            if (s) s.textContent = `${count} שחקנים | ממתין למארח...`;
+        }
+    } else {
+        if (startBtn) startBtn.classList.add('hidden');
+        if (waitMore) waitMore.style.display = 'none';
+        const joined = state.players.filter(p => p.connected).length;
+        const total = state.players.length;
+        if (s) s.textContent = `${joined}/${total} שחקנים מחוברים`;
+    }
+}
+
+
+function showHowToPlay() {
+    document.getElementById('howToPlayModal').style.display = 'block';
+}
+
+// ── Profile management ──
+// Build display name: "מיקה.ר." from first="מיקה" last="רובינשטיין"
+function buildDisplayName(first, last) {
+    first = (first || '').trim();
+    last  = (last  || '').trim();
+    if (!first) return last || '';
+    if (!last)  return first;
+    const initial = [...last][0].toUpperCase();
+    return `${first}.${initial}.`;
+}
+
+function loadProfile() {
+    const hasAuth = localStorage.getItem('shithead_auth');
+    if (hasAuth) return; // logged in — nothing to do
+    const first = localStorage.getItem('shitheadFirstName');
+    if (!first) {
+        // First time — show auth prompt instead of name modal
+        setTimeout(() => showFirstTimeAuthPrompt(), 300);
+    }
+}
+
+function showFirstTimeAuthPrompt() {
+    showToast('👋 ברוך הבא! התחבר או הירשם כדי להתחיל', 4000);
+    showMenu('menuAuth');
+}
+
+function updateProfileUI() { /* profileBtn removed */ }
+
+function showNameModal(firstTime = false) {
+    const modal = document.getElementById('nameModal');
+    const sub   = document.getElementById('nameModalSubtitle');
+    const inpF  = document.getElementById('nameModalFirst');
+    const inpL  = document.getElementById('nameModalLast');
+    if (firstTime) {
+        sub.textContent = 'ברוך הבא! הכנס את שמך לפני שמתחילים 👋';
+        if (inpF) inpF.value = '';
+        if (inpL) inpL.value = '';
+    } else {
+        sub.textContent = 'עדכן את שמך';
+        if (inpF) inpF.value = localStorage.getItem('shitheadFirstName') || '';
+        if (inpL) inpL.value = localStorage.getItem('shitheadLastName')  || '';
+    }
+    updateNamePreview();
+    modal.style.display = 'flex';
+    setTimeout(() => inpF && inpF.focus(), 100);
+}
+
+function updateNamePreview() {
+    const first = (document.getElementById('nameModalFirst')?.value || '').trim();
+    const last  = (document.getElementById('nameModalLast')?.value  || '').trim();
+    const prev  = document.getElementById('namePreview');
+    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
+}
+
+function saveProfileName() {
+    const inpF = document.getElementById('nameModalFirst');
+    const inpL = document.getElementById('nameModalLast');
+    const first = (inpF?.value || '').trim();
+    const last  = (inpL?.value || '').trim();
+    if (!first) {
+        if (inpF) { inpF.style.borderColor = '#ef4444'; setTimeout(() => inpF.style.borderColor = 'rgba(255,255,255,0.2)', 1500); }
+        return;
+    }
+    localStorage.setItem('shitheadFirstName', first);
+    localStorage.setItem('shitheadLastName',  last);
+    // Keep legacy key for backward compat
+    localStorage.setItem('shitheadPlayerName', buildDisplayName(first, last));
+    document.getElementById('nameModal').style.display = 'none';
+}
+
+function editProfile() {
+    showNameModal(false);
+}
+
+function getMyName() {
+    // If logged in, always use server display name
+    if (authUser && authUser.displayName) return authUser.displayName;
+    // Guest: use localStorage
+    const first = localStorage.getItem('shitheadFirstName');
+    const last  = localStorage.getItem('shitheadLastName');
+    if (!first) { showNameModal(true); return null; }
+    return buildDisplayName(first, last);
+}
+
+function fetchOnlineStats() {
+    if (socket) {
+        socket.emit('getOnlineStats');
+        return;
+    }
+    // Lightweight temp connection just for stats
+    const tmpSocket = io({ autoConnect: true, reconnection: false });
+    tmpSocket.once('connect', () => tmpSocket.emit('getOnlineStats'));
+    tmpSocket.once('onlineStats', ({ online, inGame }) => {
+        const el = document.getElementById('onlineStats');
+        if (el) el.textContent = `${online} משתמשים מחוברים • ${inGame} במשחק`;
+        tmpSocket.disconnect();
+    });
+    setTimeout(() => { if (tmpSocket.connected) tmpSocket.disconnect(); }, 5000);
+}
+
+// Fetch stats on page load
+window.addEventListener('load', () => {
+    loadAuth();
+    loadProfile();
+    setTimeout(fetchOnlineStats, 500);
+});
+
+function setRoomType(type) {
+    selectedRoomType = type;
+    const pub = document.getElementById('roomTypePublic');
+    const prv = document.getElementById('roomTypePrivate');
+    if (pub) pub.style.borderColor = type === 'public' ? 'var(--gold)' : '';
+    if (prv) prv.style.borderColor = type === 'private' ? 'var(--gold)' : '';
+}
+
+function refreshPublicRooms() {
+    if (!socket) initSocket();
+    socket.emit('getPublicRooms');
+}
+
+function setTimer(secs) {
+    selectedTimer = secs;
+    timerSelected = true;
+    ['0','10','20','40'].forEach(v => {
+        const b = document.getElementById('timerBtn'+v);
+        if (b) b.style.borderColor = (parseInt(v)===secs) ? 'var(--gold)' : '';
+    });
+    // Enable player count buttons
+    ['2','3','4','Open'].forEach(v => {
+        const b = document.getElementById('playerBtn'+v);
+        if (b) { b.disabled = false; b.style.opacity = '1'; b.style.cursor = 'pointer'; }
+    });
+}
+
+function createOnlineRoom(count) {
+    const name = getMyName(); if (!name) return;
+    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(`אין מספיק מטבעות`); return; }
+    initSocket();
+    socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
+}
+
+function createOpenRoom() {
+    const name = getMyName(); if (!name) return;
+    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast('אין מספיק מטבעות'); return; }
+    initSocket();
+    socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
+}
+
+function hostStartGame() {
+    if (socket) socket.emit('hostStart');
+}
+
+function joinPublicRoom(code) {
+    const name = getMyName(); if (!name) return;
+    if (!socket) initSocket();
+    socket.emit('joinRoom', { code, name, username: authUser?.username, token: authUser?.token });
+}
+
+function joinOnlineRoom() {
+    const name = getMyName(); if (!name) return;
+    const code = (document.getElementById('roomCodeInput')?.value||'').trim().toUpperCase();
+    if (code.length !== 4) { showToast('קוד חדר חייב להיות 4 תווים'); return; }
+    initSocket();
+    socket.emit('joinRoom', { code, name, username: authUser?.username, token: authUser?.token });
+}
+
+function joinPublicRoomWithAuth(code) {
+    const name = getMyName(); if (!name) return;
+    if (!socket) initSocket();
+    socket.emit('joinRoom', { code, name, username: authUser?.username, token: authUser?.token });
+}
+
+// ── Turn timer ──
+function startTurnTimer(state) {} // handled by server timerTick
+
+// ── Online render ──
+function renderOnline(state) {
+    if (!state || !onlineMode) return;
+    // Always reset playBtn at start — re-applied below if interrupt conditions met
+    const _pb = document.getElementById('playBtn');
+    if (_pb) { _pb.textContent = '▶ שחק'; _pb.style.background = ''; _pb.style.animation = ''; }
+    const n = state.players.length;
+    const myIdx = mySlotIdx;
+    const relMap = {2:{1:'pos-top'},3:{1:'pos-right',2:'pos-left'},4:{1:'pos-right',2:'pos-top',3:'pos-left'}};
+
+    // Clear slots
+    ['pos-top','pos-left','pos-right'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.innerHTML=''; el.classList.remove('active-turn-player'); }
+    });
+
+    // Render other players in slots
+    for (let off = 1; off < n; off++) {
+        const theirIdx = (myIdx + off) % n;
+        const p = state.players[theirIdx];
+        const slotId = relMap[n]?.[off];
+        if (!slotId) continue;
+        const slot = document.getElementById(slotId);
+        if (!slot) continue;
+        const wrap = document.createElement('div'); wrap.className = 'ai-player-wrap';
+        const badge = document.createElement('div'); badge.className = 'ai-name-badge';
+        badge.textContent = `${p.name||'?'} (${p.handCount})`;
+        if (!p.connected) badge.style.opacity = '0.4';
+        const tableRow = document.createElement('div'); tableRow.style.cssText='display:flex;gap:6px;';
+        for (let i=0;i<3;i++) {
+            const st = document.createElement('div'); st.className='ai-table-stack';
+            if (p.faceDownCount>i) st.appendChild(renderCard(null,true,true));
+            if (p.faceUp[i]) { const u=renderCard(p.faceUp[i],false,true); u.classList.add('face-up'); st.appendChild(u); }
+            tableRow.appendChild(st);
+        }
+        const handRow = document.createElement('div'); handRow.className='ai-hand-container';
+        const W=36,ov=18, tw=p.handCount>0?(p.handCount-1)*ov+W:0;
+        handRow.style.width=tw+'px';
+        for (let i=0;i<p.handCount;i++) {
+            const c=renderCard(null,true,true); c.style.cssText=`position:absolute;left:${i*ov}px;z-index:${i}`; handRow.appendChild(c);
+        }
+        wrap.appendChild(badge); wrap.appendChild(tableRow); wrap.appendChild(handRow);
+        slot.appendChild(wrap);
+        if (state.currentPlayer===theirIdx && !state.isSwapPhase) slot.classList.add('active-turn-player');
+    }
+
+    const isMyTurn = state.currentPlayer === myIdx && !state.isSwapPhase;
+    // Type 1: same-player add-on interrupt
+    const canAddInterrupt = !!(state.interruptWindow
+        && state.lastPlayerIdx === myIdx
+        && state.currentPlayer !== myIdx
+        && state.myHand.some(c => c.slice(0,-1) === state.lastPlayedRank));
+    // Type 2: burn interrupt — any player completing 4-of-a-kind
+    const burnNeeded = state.burnInterruptCount || 0;
+    const canBurnInterrupt = !!(burnNeeded > 0
+        && state.currentPlayer !== myIdx
+        && !state.isSwapPhase
+        && state.pileTopRank
+        && state.myHand.filter(c => c.slice(0,-1) === state.pileTopRank).length >= burnNeeded);
+    const canInterrupt = canAddInterrupt || canBurnInterrupt;
+    const me = state.players[myIdx];
+
+    // My area highlight
+    const pArea = document.getElementById('playerArea');
+    pArea.classList.toggle('active-turn-player', isMyTurn || canInterrupt);
+
+    // My hand
+    const handDiv = document.getElementById('playerHand');
+    handDiv.innerHTML='';
+    const handSize = getHandCardSize(state.myHand.length);
+    const sorted = state.myHand.map((c,i)=>({c,i}))
+        .sort((a,b)=>customSort.indexOf(a.c.slice(0,-1))-customSort.indexOf(b.c.slice(0,-1)));
+    sorted.forEach(({c,i:orig})=>{
+        const el=renderCard(c,false,false);
+        el.style.width = handSize.w;
+        el.style.height = handSize.h;
+        if (handSize.w !== '52px') el.style.fontSize = handSize.w === '36px' ? '0.65rem' : '0.75rem';
+        else el.style.fontSize = '';
+        if (selectedHandIndices.includes(orig)) el.classList.add('selected');
+        if (isMyTurn && canPlay(c,state.pile)) el.classList.add('playable-hint');
+        else if (isMyTurn) el.classList.add('not-playable');
+        else if (canAddInterrupt && c.slice(0,-1) === state.lastPlayedRank) el.classList.add('playable-hint');
+        else if (canBurnInterrupt && c.slice(0,-1) === state.pileTopRank) el.classList.add('playable-hint');
+        else if (canInterrupt) el.classList.add('not-playable');
+        el.onclick=()=>{
+            if (onlineState && onlineState.isSwapPhase) {
+                selectedHandIndices=[orig];
+                if (selectedTableIndices.length===1) { onlineSwap(); } else { renderOnline(onlineState); }
+                return;
+            }
+            if (!isMyTurn && !canInterrupt) return;
+            const cardRank = state.myHand[orig]?.slice(0,-1);
+            if (canAddInterrupt && !isMyTurn && cardRank !== state.lastPlayedRank) return;
+            if (canBurnInterrupt && !isMyTurn && cardRank !== state.pileTopRank) return;
+            const rank=state.myHand[orig]?.slice(0,-1);
+            if (selectedHandIndices.includes(orig)) { selectedHandIndices=selectedHandIndices.filter(x=>x!==orig); }
+            else {
+                if (selectedHandIndices.length>0 && state.myHand[selectedHandIndices[0]]?.slice(0,-1)!==rank) selectedHandIndices=[];
+                selectedHandIndices.push(orig);
+            }
+            renderOnline(state);
+        };
+        handDiv.appendChild(el);
+    });
+
+    // Player name label below hand
+    const existingNameLbl = document.getElementById('onlinePlayerName');
+    if (existingNameLbl) existingNameLbl.remove();
+    const nameLbl = document.createElement('div');
+    nameLbl.id = 'onlinePlayerName';
+    nameLbl.style.cssText = 'font-family:"Bebas Neue",sans-serif;font-size:1.1rem;letter-spacing:3px;color:var(--gold);text-align:center;width:100%;margin-top:4px;';
+    nameLbl.textContent = me?.name || '';
+    handDiv.after(nameLbl);
+
+    // My table
+    const tableDiv=document.getElementById('playerTable');
+    tableDiv.innerHTML='';
+    tableDiv.style.cssText='display:flex;gap:16px;margin-bottom:10px;align-items:flex-end;justify-content:center;';
+    for (let i=0;i<3;i++) {
+        const stack=document.createElement('div'); stack.className='table-stack';
+        if (state.myFaceDown[i]) {
+            const isRev=(revealedFaceDownIndex===i);
+            const b=renderCard(isRev?state.myFaceDown[i]:null,!isRev,false);
+            if (isRev) b.classList.add('revealed');
+            b.onclick=()=>{
+                if (state.myHand.length>0||state.myFaceUp.some(Boolean)) return;
+                // Flip faceDown to hand anytime (any turn)
+                if (!isRev){
+                    socket.emit('flipFaceDown',{cardIdx:i});
+                }
+            };
+            stack.appendChild(b);
+        }
+        if (state.myFaceUp[i]) {
+            const u=renderCard(state.myFaceUp[i],false,false); u.classList.add('face-up');
+            if (selectedTableIndices.includes(i)) u.classList.add('selected');
+            const fuRank2 = state.myFaceUp[i]?.slice(0,-1);
+            const handAllSame = state.myHand.length > 0 && state.drawPileCount === 0 && state.myHand.every(c => c.slice(0,-1) === fuRank2);
+            if (isMyTurn && (state.myHand.length===0 || handAllSame)) {
+                if (canPlay(state.myFaceUp[i],state.pile)) u.classList.add('playable-hint');
+                else if (state.myHand.length===0) u.classList.add('not-playable');
+            }
+            u.onclick=()=>{
+                if (onlineState && onlineState.isSwapPhase){
+                    selectedTableIndices=[i];
+                    if (selectedHandIndices.length===1) { onlineSwap(); } else { renderOnline(onlineState); }
+                    return;
+                }
+                if (!isMyTurn||revealedFaceDownIndex!==null) return;
+                // Allow selecting faceUp together with hand cards if all hand cards are same rank as this faceUp
+                if (state.myHand.length > 0) {
+                    if (state.drawPileCount > 0) return; // can't touch faceUp while draw pile has cards
+                    const fuRank = state.myFaceUp[i]?.slice(0,-1);
+                    const allSameRank = state.myHand.every(c => c.slice(0,-1) === fuRank);
+                    if (!allSameRank) return; // can't mix different ranks
+                }
+                const idx2 = selectedTableIndices.indexOf(i);
+                if (idx2 > -1) {
+                    // Deselect
+                    selectedTableIndices.splice(idx2, 1);
+                } else {
+                    // In faceUp phase (no hand): only allow same rank
+                    if (state.myHand.length === 0) {
+                        const thisRank = state.myFaceUp[i]?.slice(0,-1);
+                        if (selectedTableIndices.length > 0) {
+                            const existingRank = state.myFaceUp[selectedTableIndices[0]]?.slice(0,-1);
+                            if (thisRank !== existingRank) {
+                                // Different rank — replace selection with this card only
+                                selectedTableIndices = [i];
+                                renderOnline(state);
+                                return;
+                            }
+                        }
+                    }
+                    selectedTableIndices.push(i);
+                }
+                renderOnline(state);
+            };
+            stack.appendChild(u);
+        }
+        tableDiv.appendChild(stack);
+    }
+
+    // Pile
+    const pDiv=document.getElementById('pile'); pDiv.innerHTML='';
+    if (state.pile.length) {
+        let di=state.pile.length-1;
+        if (isPeeking) while(di>=0&&state.pile[di].slice(0,-1)==='3') di--;
+        if (di>=0) {
+            const ce=renderCard(state.pile[di],false,false);
+            if (isPeeking&&di<state.pile.length-1) ce.classList.add('peek-transparent');
+            pDiv.appendChild(ce);
+        }
+        if (state.pile.length>1) {
+            const b=document.createElement('div'); b.className='pile-count-badge'; b.textContent=state.pile.length; pDiv.appendChild(b);
+        }
+        const streak2=getPileStreak(state.pile);
+        if (streak2>=2) {
+            const sb=document.createElement('div'); sb.className='pile-streak-badge'; sb.textContent='x'+streak2; pDiv.appendChild(sb);
+        }
+    }
+
+    // Peek
+    const peekBtn=document.getElementById('peekBtn');
+    const pTop=state.pile.length>0?state.pile[state.pile.length-1]:null;
+    peekBtn.classList.toggle('hidden',!(isMyTurn&&pTop?.slice(0,-1)==='3'));
+
+    document.getElementById('drawCountDisplay').textContent=state.drawPileCount;
+    document.getElementById('pileStatus').textContent=state.pile.length
+        ?`עליון: ${(()=>{for(let i=state.pile.length-1;i>=0;i--) if(state.pile[i].slice(0,-1)!=='3') return state.pile[i].slice(0,-1); return '3';})()}`:'ריק';
+
+    // Buttons
+    const swapBtn=document.getElementById('swapDoneBtn');
+    swapBtn.style.display=state.isSwapPhase?'block':'none';
+    if (state.isSwapPhase && !mySwapDone) {
+        swapBtn.textContent='✅ סיום החלפה';
+        swapBtn.disabled=false; swapBtn.style.opacity='1';
+    } else if (state.isSwapPhase && mySwapDone) {
+        swapBtn.textContent='⏳ ממתין לשאר...';
+        swapBtn.disabled=true; swapBtn.style.opacity='0.4';
+    }
+    document.getElementById('playBtn').style.display=(state.isSwapPhase)?'none':'block';
+    const inFaceDownPhase = !state.isSwapPhase && state.myHand.length === 0 && state.myFaceUp.every(c=>!c) && state.myFaceDown.some(Boolean);
+    const canTake = !state.isSwapPhase && (state.pile.length > 0 || (inFaceDownPhase && revealedFaceDownIndex !== null));
+    document.getElementById('takeBtn').style.display=(canTake&&state.currentPlayer===mySlotIdx)?'block':'none';
+
+    // Flash playBtn for interrupts
+    const playBtn = document.getElementById('playBtn');
+    if (canBurnInterrupt) {
+        playBtn.textContent = '🔥 שרוף!';
+        playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
+        playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
+    } else if (canAddInterrupt) {
+        playBtn.textContent = '⚡ התפרץ!';
+        playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
+        playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
+    } else {
+        playBtn.textContent = '▶ שחק';
+        playBtn.style.background = '';
+        playBtn.style.animation = '';
+    }
+    document.getElementById('interruptBtn').classList.add('hidden');
+}
+
+function onlineSwap() {
+    if (selectedHandIndices.length===1&&selectedTableIndices.length===1) {
+        socket.emit('swap',{handIdx:selectedHandIndices[0],tableIdx:selectedTableIndices[0]});
+        selectedHandIndices=[]; selectedTableIndices=[];
+    }
+}
+
+// ── Route action buttons ──
+function endSwapPhase() {
+    if (onlineMode) {
+        if (mySwapDone) return; // already sent
+        mySwapDone = true;
+        const btn = document.getElementById('swapDoneBtn');
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = '⏳ ממתין לשאר...'; }
+        socket.emit('endSwap');
+        return;
+    }
+    _endSwapAI();
+}
+
+function humanPlay() {
+    if (!onlineMode) { _humanPlayAI(); return; }
+    const s = onlineState;
+    if (!s) return;
+
+    // Burn interrupt — any player completing 4-of-a-kind
+    const myBurnInterrupt = !!(s.burnInterruptCount > 0 && s.currentPlayer !== mySlotIdx && !s.isSwapPhase && s.pileTopRank
+        && s.myHand.filter(c=>c.slice(0,-1)===s.pileTopRank).length >= s.burnInterruptCount);
+    if (myBurnInterrupt) {
+        if (!selectedHandIndices.length) { showToast(`בחר ${s.burnInterruptCount} קלפי ${s.pileTopRank} לשריפה`); return; }
+        const cards = selectedHandIndices.map(i => s.myHand[i]);
+        if (cards.length !== s.burnInterruptCount || !cards.every(c=>c.slice(0,-1)===s.pileTopRank)) {
+            showToast(`צריך בדיוק ${s.burnInterruptCount} קלפי ${s.pileTopRank}`); return;
+        }
+        selectedHandIndices = [];
+        playSound('play');
+        socket.emit('playCards', { cards }); // server detects non-current player + valid burn
+        return;
+    }
+
+    // Add-on interrupt (same player who just played)
+    const myCanInterrupt = s.interruptWindow && s.lastPlayerIdx === mySlotIdx && s.currentPlayer !== mySlotIdx;
+    if (myCanInterrupt) {
+        if (!selectedHandIndices.length) { showToast('בחר קלף זהה להתפרצות'); return; }
+        const cards = selectedHandIndices.map(i => s.myHand[i]);
+        if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast('רק קלף ' + s.lastPlayedRank + ' להתפרצות'); return; }
+        selectedHandIndices = [];
+        playSound('play');
+        socket.emit('playCards', { cards, isInterrupt: true });
+        return;
+    }
+
+    if (s.currentPlayer !== mySlotIdx) return;
+
+    if (revealedFaceDownIndex !== null) {
+        const idx = revealedFaceDownIndex;
+        revealedFaceDownIndex = null;
+        socket.emit('playCards', { cards: [s.myFaceDown[idx]], faceDownIdx: idx });
+        return;
+    }
+    let cards = [];
+    if (s.myHand.length > 0) {
+        if (!selectedHandIndices.length) { showToast('בחר קלף תחילה'); return; }
+        cards = selectedHandIndices.map(i => s.myHand[i]);
+        // Also include selected faceUp cards if same rank
+        if (selectedTableIndices.length > 0) {
+            const rank = cards[0].slice(0,-1);
+            const fuCards = selectedTableIndices.map(i => s.myFaceUp[i]).filter(c => c && c.slice(0,-1) === rank);
+            cards = [...cards, ...fuCards];
+        }
+    } else {
+        if (!selectedTableIndices.length) { showToast('בחר קלף תחילה'); return; }
+        cards = selectedTableIndices.map(i => s.myFaceUp[i]);
+    }
+    selectedHandIndices = []; selectedTableIndices = [];
+    playSound('play');
+    socket.emit('playCards', { cards });
+}
+
+function humanTake() {
+    if (!onlineMode) { _humanTakeAI(); return; }
+    if (!onlineState || onlineState.currentPlayer !== mySlotIdx) return;
+    const s = onlineState;
+
+    if (revealedFaceDownIndex !== null) {
+        const fdCard = s.myFaceDown[revealedFaceDownIndex];
+        const idx = revealedFaceDownIndex;
+        revealedFaceDownIndex = null;
+        playSound('take');
+        socket.emit('takePile', { faceUpCards: [], faceDownCard: fdCard, faceDownIdx: idx });
+        return;
+    }
+    if (s.myHand.length === 0 && s.myFaceUp.some(Boolean)) {
+        if (!selectedTableIndices.length) { showToast('בחר קלף מהשולחן לקחת עם הערימה'); return; }
+        const faceUpCards = selectedTableIndices.map(i => s.myFaceUp[i]).filter(Boolean);
+        // Validate: all selected cards must be same rank
+        if (faceUpCards.length > 1) {
+            const rank = faceUpCards[0].slice(0,-1);
+            if (!faceUpCards.every(c => c.slice(0,-1) === rank)) {
+                showToast('ניתן לקחת רק קלפים מאותו ערך');
+                return;
+            }
+        }
+        selectedTableIndices = [];
+        playSound('take');
+        socket.emit('takePile', { faceUpCards });
+        return;
+    }
+    playSound('take');
+    socket.emit('takePile', { faceUpCards: [] });
+    selectedHandIndices = []; selectedTableIndices = [];
+}
+
+function humanInterrupt() {
+    if (!onlineState) return;
+    const s = onlineState;
+    if (!s.interruptWindow || s.lastPlayerIdx !== mySlotIdx) return;
+    // Find matching cards in hand
+    const matchCards = s.myHand.filter(c => c.slice(0,-1) === s.lastPlayedRank);
+    if (!matchCards.length) { showToast('אין קלף זהה להתפרצות'); return; }
+    // Use selected cards if they match, otherwise use first match
+    let cards;
+    if (selectedHandIndices.length > 0) {
+        const sel = selectedHandIndices.map(i => s.myHand[i]);
+        if (sel.every(c => c.slice(0,-1) === s.lastPlayedRank)) {
+            cards = sel;
+        } else {
+            cards = [matchCards[0]];
+        }
+    } else {
+        cards = [matchCards[0]];
+    }
+    selectedHandIndices = [];
+    playSound('play');
+    socket.emit('playCards', { cards, isInterrupt: true });
+}
+
+function requestNewGame() {
+    if (!onlineMode || !socket) {
+        // AI mode — restart with same player count
+        document.getElementById('resultOverlay').style.display = 'none';
+        startGame(lastAIPlayerCount);
+        return;
+    }
+    socket.emit('voteRestart');
+    document.getElementById('newGameBtn').style.display = 'none';
+    document.getElementById('leaveBtn').style.display = 'none';
+    document.getElementById('waitingRestart').style.display = 'block';
+}
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+}
+
+function leaveLobby() {
+    // If still in lobby (not yet in game) — tell server to close room
+    if (socket && !onlineMode) {
+        socket.emit('playerLeaving');
+        setTimeout(() => {
+            if (socket) { socket.disconnect(); socket = null; }
+        }, 400);
+    }
+    showMenu('menuOnline');
+}
+
+function leaveToMenu() {
+    document.getElementById('resultOverlay').style.display = 'none';
+    document.getElementById('gameTopBar').style.display = 'none';
+    document.getElementById('setupOverlay').style.display = 'flex';
+    showMenu('menuMain');
+    if (socket) {
+        socket.emit('playerLeaving'); // dedicated event — server handles before disconnect
+        setTimeout(() => {
+            if (socket) { socket.disconnect(); socket = null; }
+            onlineMode = false;
+        }, 400); // wait 400ms for server to receive
+    } else {
+        onlineMode = false;
+    }
+}
+
+function confirmLeave() {
+    if (confirm('לצאת למסך הראשי?')) leaveToMenu();
+}
+
+function toggleEmojiPicker() {
+    const p = document.getElementById('emojiPicker');
+    p.style.display = p.style.display === 'none' || !p.style.display ? 'block' : 'none';
+}
+
+function sendReaction(emoji) {
+    if (reactionCooldown) { showToast('המתן 10 שניות בין תגובות'); return; }
+    reactionCooldown = true;
+    // Start cooldown visual on emoji button
+    const btn = document.getElementById('emojiToggleBtn');
+    if (btn) { btn.style.opacity = '0.4'; btn.title = 'המתן...'; }
+    setTimeout(() => {
+        reactionCooldown = false;
+        if (btn) { btn.style.opacity = '1'; btn.title = ''; }
+    }, 10000);
+    if (onlineMode && socket) {
+        // Server broadcasts to ALL players including sender
+        socket.emit('reaction', { emoji });
+    } else {
+        // AI mode — show locally
+        showReactionLocal(emoji, 'אתה');
+    }
+    const picker = document.getElementById('emojiPicker');
+    if (picker) picker.style.display = 'none';
+}
+
+function showReactionLocal(emoji, name) {
+    const picker = document.getElementById('emojiPicker');
+    if (picker) picker.style.display = 'none';
+    const el = document.getElementById('reactionDisplay');
+    const emojiEl = document.getElementById('reactionEmoji');
+    const nameEl = document.getElementById('reactionName');
+    if (emojiEl) emojiEl.textContent = emoji;
+    if (nameEl) nameEl.textContent = name;
+    // Position over the draw pile dynamically
+    // Position over the קופה (draw deck)
+    const drawEl = document.getElementById('drawCountDisplay') || document.querySelector('.draw-deck');
+    if (drawEl) {
+        const rect = drawEl.getBoundingClientRect();
+        el.style.top = (rect.top + rect.height/2) + 'px';
+        el.style.left = (rect.left + rect.width/2) + 'px';
+        el.style.transform = 'translate(-50%,-50%)';
+        el.style.position = 'fixed';
+    }
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+// ══════════════════════════════════════════════
+//  BASRA CLIENT
+// ══════════════════════════════════════════════
+
+
+function selectBasraCount(n) {
+    selectedBasraCount = n;
+    document.getElementById('basraCount2').style.borderColor = n===2 ? 'var(--gold)' : '';
+    document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
+}
+
+
+
+
+
+
 
 function showBasraCreate() {
     if (!basraAccessVerified) { basraPendingAction='create'; showMenu('menuBasraAccess'); }
@@ -3809,15 +4842,16 @@ function basraCancelSelection() {
 </script>
 
 <!-- BASRA GAME -->
-<div id="basraGame" style="display:none;position:fixed;inset:0;background:#0a1a0a;z-index:500;overflow:hidden;">
+<div id="basraGame" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:500;overflow:hidden;">
     <!-- Top bar -->
-    <div style="position:fixed;top:calc(env(safe-area-inset-top)+6px);left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 10px;z-index:502;">
-        <div id="basraScoreBar" style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;color:rgba(255,255,255,0.5);letter-spacing:1px;"></div>
+    <div style="position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 44px);background:var(--bg);z-index:503;"></div>
+    <div style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 12px;z-index:504;">
+        <div id="basraScoreBar" style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.6);letter-spacing:1.5px;"></div>
         <button onclick="basraLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;">EXIT</button>
     </div>
 
     <!-- Opponent area (top) -->
-    <div id="basraOpponentArea" style="position:fixed;top:calc(env(safe-area-inset-top)+36px);left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:4px;z-index:501;">
+    <div id="basraOpponentArea" style="position:fixed;top:calc(env(safe-area-inset-top) + 52px);left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:4px;z-index:501;">
         <div id="basraOpponentName" style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:1px;"></div>
         <div id="basraOpponentHand" style="display:flex;gap:-8px;justify-content:center;flex-wrap:wrap;"></div>
         <div id="basraOpponentInfo" style="font-size:11px;color:rgba(255,200,50,0.6);"></div>
@@ -3831,16 +4865,18 @@ function basraCancelSelection() {
                 <div style="font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:1px;">קופה</div>
             </div>
         </div>
+        <div id="basraTurnTimer" style="display:none;font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:var(--gold);letter-spacing:3px;text-align:center;min-width:60px;transition:color 0.3s;text-shadow:0 0 12px rgba(240,192,64,0.5);"></div>
         <div id="basraTableCards" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:72px;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(255,255,255,0.08);min-width:200px;"></div>
         <div id="basraTableEmpty" style="font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:1px;display:none;">שולחן ריק</div>
     </div>
 
     <!-- Player area (bottom) -->
-    <div id="basraPlayerArea" style="position:fixed;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:calc(env(safe-area-inset-bottom)+12px);z-index:501;">
+    <div id="basraPlayerArea" style="position:fixed;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px);padding-top:8px;background:linear-gradient(transparent, rgba(0,0,0,0.6) 30%);z-index:501;">
         <div id="basraMyInfo" style="font-size:11px;color:rgba(255,200,50,0.6);"></div>
         <div id="basraMyHand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;"></div>
         <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
-            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;">▶ שחק</button>
+            <button id="basraPlayBtn" onclick="basraCommitCard()" class="action-btn" style="display:none;">▶ שחק</button>
+            <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);">✅ אסוף</button>
             <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
