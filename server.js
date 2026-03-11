@@ -4,6 +4,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
+const basra = require('./basra-server');
+const basraRooms = {}; // separate room store for basra
 // Fix TLS for Node.js v22
 process.env.NODE_OPTIONS = process.env.NODE_OPTIONS || '';
 
@@ -1359,6 +1361,8 @@ io.on('connection', (socket) => {
     // ── Player voluntarily leaves ──
     socket.on('playerLeaving', () => handlePlayerLeave(socket.data));
 
+    registerBasraHandlers(socket);
+
     socket.on('disconnect', () => {
         // Also handle unexpected disconnect same way
         if (socket.data?.roomCode) handlePlayerLeave(socket.data);
@@ -1522,6 +1526,210 @@ emitStateToAll(room);
         }, 12000);
     });
 });
+
+// ══════════════════════════════════════════════
+//  BASRA SOCKET EVENTS
+// ══════════════════════════════════════════════
+
+function basraBroadcast(room, event, data) {
+    room.slots.forEach(s => {
+        if (s.socketId) io.to(s.socketId).emit(event, data);
+    });
+}
+
+function basraStateForPlayer(room, slotIdx) {
+    const p = room.slots[slotIdx];
+    const isMyTurn = room.currentPlayer === slotIdx;
+    return {
+        gameType: 'basra',
+        roomCode: room.code,
+        mySlotIdx: slotIdx,
+        myHand: p.hand,
+        tableCards: room.tableCards,
+        deckCount: room.deck.length,
+        currentPlayer: room.currentPlayer,
+        isMyTurn,
+        playerNames: room.slots.map(s => s.name),
+        capturedCounts: room.slots.map(s => s.captured.length),
+        handCounts: room.slots.map(s => s.hand.length),
+        scores: room.slots.map(s => s.score || 0),
+        basraCounts: room.slots.map(s => s.basras || 0),
+        roundOver: room.roundOver,
+        gameOver: room.gameOver,
+        lastCapturer: room.lastCapturer,
+    };
+}
+
+function basraEmitAll(room) {
+    room.slots.forEach((s, i) => {
+        if (s.socketId) io.to(s.socketId).emit('basraState', basraStateForPlayer(room, i));
+    });
+}
+
+function basraMakeCode() {
+    let code;
+    do { code = Math.random().toString(36).substring(2,6).toUpperCase(); }
+    while (basraRooms[code]);
+    return code;
+}
+
+io.on('basraConnection', () => {}); // no-op, handled in main io.on
+
+// We hook into the existing io.on('connection') — add extra handlers per socket
+// This is called from within the main connection handler below via separate block
+
+function registerBasraHandlers(socket) {
+
+    socket.on('basraCreate', ({ name, playerCount, accessCode, username, token }) => {
+        if (accessCode !== basra.BASRA_ACCESS_CODE) {
+            socket.emit('basraError', 'קוד גישה שגוי'); return;
+        }
+        const count = parseInt(playerCount) || 2;
+        if (![2, 4].includes(count)) { socket.emit('basraError', 'שחקנים: 2 או 4'); return; }
+
+        const code = basraMakeCode();
+        const slots = Array.from({ length: count }, (_, i) => ({
+            id: i, name: i === 0 ? name : `שחקן ${i+1}`,
+            hand: [], captured: [], basras: 0, score: 0,
+            socketId: i === 0 ? socket.id : null,
+            connected: i === 0,
+            username: i === 0 ? username : null,
+            isBot: false,
+        }));
+
+        const room = basra.createBasraRoom(code, slots, 0);
+        basraRooms[code] = room;
+        socket.data.basraRoom = code;
+        socket.data.basraSlot = 0;
+        socket.join('basra_' + code);
+
+        socket.emit('basraJoined', { code, slotIdx: 0 });
+        basraEmitAll(room);
+        console.log(`[basra] Room ${code} created by ${name}`);
+    });
+
+    socket.on('basraJoin', ({ code, name, accessCode, username, token }) => {
+        if (accessCode !== basra.BASRA_ACCESS_CODE) {
+            socket.emit('basraError', 'קוד גישה שגוי'); return;
+        }
+        const room = basraRooms[code?.toUpperCase()];
+        if (!room) { socket.emit('basraError', 'חדר לא נמצא'); return; }
+        if (room.gameStarted) { socket.emit('basraError', 'המשחק כבר התחיל'); return; }
+
+        const freeSlot = room.slots.find(s => !s.connected);
+        if (!freeSlot) { socket.emit('basraError', 'החדר מלא'); return; }
+
+        freeSlot.name = name;
+        freeSlot.socketId = socket.id;
+        freeSlot.connected = true;
+        freeSlot.username = username || null;
+
+        socket.data.basraRoom = code.toUpperCase();
+        socket.data.basraSlot = freeSlot.id;
+        socket.join('basra_' + code.toUpperCase());
+
+        const allConnected = room.slots.every(s => s.connected);
+        if (allConnected) {
+            room.gameStarted = true;
+            basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
+        }
+        basraEmitAll(room);
+        socket.emit('basraJoined', { code: code.toUpperCase(), slotIdx: freeSlot.id });
+        console.log(`[basra] ${name} joined room ${code}`);
+    });
+
+    socket.on('basraPlay', ({ card, captureIndices }) => {
+        const code = socket.data.basraRoom;
+        const slotIdx = socket.data.basraSlot;
+        const room = basraRooms[code];
+        if (!room || room.gameOver || room.roundOver) return;
+        if (room.currentPlayer !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
+
+        const result = basra.playCard(room, slotIdx, card, captureIndices || []);
+        if (!result.ok) { socket.emit('basraError', result.error); return; }
+
+        const p = room.slots[slotIdx];
+        let toastMsg = null;
+
+        if (result.capturedCards.length > 0) {
+            const captureStr = result.capturedCards.join(' ');
+            toastMsg = `${p.name} תפס ${result.capturedCards.length} קלפים`;
+            if (result.basra) {
+                toastMsg = `⚡ BASRA! ${p.name}`;
+                basraBroadcast(room, 'basraEvent', { type: 'basra', player: slotIdx, name: p.name });
+            }
+        }
+
+        if (toastMsg) basraBroadcast(room, 'toast', toastMsg);
+
+        // Check if all hands empty
+        const allHandsEmpty = room.slots.every(s => s.hand.length === 0);
+        if (allHandsEmpty) {
+            if (room.deck.length > 0) {
+                // Deal new hands
+                basra.dealNewHands(room);
+                basraBroadcast(room, 'toast', `חולקו קלפים חדשים`);
+            } else {
+                // Round over — give table cards to last capturer
+                if (room.tableCards.length > 0 && room.lastCapturer !== null) {
+                    room.slots[room.lastCapturer].captured.push(...room.tableCards);
+                    room.tableCards = [];
+                }
+                room.roundOver = true;
+
+                const roundScores = basra.scoreRound(room);
+                basraBroadcast(room, 'basraRoundOver', {
+                    scores: roundScores,
+                    totalScores: room.slots.map(s => s.score || 0),
+                    pendingMajority: room.pendingMajorityPoints,
+                });
+
+                // Check game over (101+)
+                const winner = room.slots.find(s => (s.score || 0) >= 101);
+                if (winner) {
+                    room.gameOver = true;
+                    const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                    room.winnersOrder = sorted.map(s => s.id);
+                    basraBroadcast(room, 'basraGameOver', {
+                        winnersOrder: room.winnersOrder,
+                        names: sorted.map(s => s.name),
+                        scores: sorted.map(s => s.score || 0),
+                    });
+                }
+                basraEmitAll(room);
+                return;
+            }
+        }
+
+        // Advance turn
+        const n = room.slots.length;
+        room.currentPlayer = (room.currentPlayer + 1) % n;
+        basraEmitAll(room);
+    });
+
+    socket.on('basraNextRound', () => {
+        const code = socket.data.basraRoom;
+        const room = basraRooms[code];
+        if (!room || !room.roundOver || room.gameOver) return;
+        basra.resetRound(room);
+        basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
+        basraEmitAll(room);
+    });
+
+    socket.on('basraLeave', () => {
+        const code = socket.data.basraRoom;
+        if (code && basraRooms[code]) {
+            const room = basraRooms[code];
+            const slotIdx = socket.data.basraSlot;
+            const slot = room.slots[slotIdx];
+            if (slot) { slot.connected = false; slot.socketId = null; }
+            basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב`);
+        }
+        socket.data.basraRoom = null;
+        socket.data.basraSlot = null;
+    });
+}
+
 
 const PORT = process.env.PORT || 3000;
 // Start server only after MongoDB is ready

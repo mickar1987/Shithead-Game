@@ -1,0 +1,346 @@
+'use strict';
+// ══════════════════════════════════════════════
+//  BASRA GAME LOGIC (server-side module)
+// ══════════════════════════════════════════════
+
+const BASRA_ACCESS_CODE = '9218';
+
+function makeDeck() {
+    const suits = ['h','d','c','s'];
+    const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+    const deck = [];
+    for (const s of suits) for (const r of ranks) deck.push(r + s);
+    return deck;
+}
+
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function cardRank(card) {
+    return card.slice(0, -1);
+}
+
+function rankValue(rank) {
+    if (rank === 'A') return 1;
+    if (rank === 'J' || rank === 'Q' || rank === 'K') return null; // face cards: no numeric value
+    return parseInt(rank);
+}
+
+function is7D(card) { return card === '7d'; }
+function isJack(card) { return cardRank(card) === 'J'; }
+
+// Find all subsets of tableCards that sum to targetVal
+// Returns array of valid capture groups (each group is array of card strings)
+function findCaptures(playedCard, tableCards) {
+    const rank = cardRank(playedCard);
+
+    // Jack: captures everything
+    if (rank === 'J') {
+        return tableCards.length > 0 ? [tableCards.slice()] : [];
+    }
+
+    // 7♦: captures everything
+    if (is7D(playedCard)) {
+        return tableCards.length > 0 ? [tableCards.slice()] : [];
+    }
+
+    // Q can only capture Q, K can only capture K
+    if (rank === 'Q' || rank === 'K') {
+        const matches = tableCards.filter(c => cardRank(c) === rank);
+        return matches.length > 0 ? [matches] : [];
+    }
+
+    const val = rankValue(rank);
+    if (val === null) return [];
+
+    // Find all subsets summing to val
+    const result = [];
+    const n = tableCards.length;
+
+    for (let mask = 1; mask < (1 << n); mask++) {
+        let sum = 0;
+        const group = [];
+        let valid = true;
+        for (let i = 0; i < n; i++) {
+            if (mask & (1 << i)) {
+                const v = rankValue(cardRank(tableCards[i]));
+                if (v === null) { valid = false; break; } // face card in group — can't sum
+                sum += v;
+                group.push(tableCards[i]);
+            }
+        }
+        if (valid && sum === val) result.push(group);
+    }
+
+    // Also add pairs (same rank) that may have been covered by sum already
+    // (they're already found as single-element groups summing to val, or multi-element)
+    return result;
+}
+
+// Determine if a capture results in a Basra
+function isBasra(playedCard, capturedCards, tableCards) {
+    // Must clear entire table
+    if (capturedCards.length !== tableCards.length) return false;
+    if (tableCards.length === 0) return false;
+
+    const rank = cardRank(playedCard);
+
+    // Jack: never basra
+    if (rank === 'J') return false;
+
+    // 7♦: basra only if table total ≤ 10 and no face cards
+    if (is7D(playedCard)) {
+        const hasFace = tableCards.some(c => ['J','Q','K'].includes(cardRank(c)));
+        if (hasFace) return false;
+        const total = tableCards.reduce((s, c) => s + (rankValue(cardRank(c)) || 0), 0);
+        return total <= 10;
+    }
+
+    // Numeric card: basra if it clears the table
+    return true;
+}
+
+function createBasraRoom(code, slots, bet = 0) {
+    const deck = shuffle(makeDeck());
+
+    // Deal 4 to table, replace any J or 7♦
+    let tableCards = [];
+    while (tableCards.length < 4) {
+        const card = deck.shift();
+        const rank = cardRank(card);
+        if (rank === 'J' || is7D(card)) {
+            deck.push(card); // put back
+            shuffle(deck);
+        } else {
+            tableCards.push(card);
+        }
+    }
+
+    // Deal 4 to each player
+    slots.forEach(s => {
+        s.hand = [];
+        s.captured = [];
+        s.basras = 0;
+        s.score = 0; // cumulative game score
+    });
+
+    for (let i = 0; i < 4; i++) {
+        slots.forEach(s => s.hand.push(deck.shift()));
+    }
+
+    return {
+        code,
+        gameType: 'basra',
+        slots,
+        deck,
+        tableCards,
+        currentPlayer: 0,
+        lastCapturer: null,
+        roundOver: false,
+        gameOver: false,
+        bet,
+        coinsSettled: false,
+        leaversOrder: [],
+        winnersOrder: [],
+        pendingMajorityPoints: 0, // carried over on tie
+        roundNum: 0,
+    };
+}
+
+function dealNewHands(room) {
+    if (room.deck.length === 0) return false;
+    room.slots.forEach(s => {
+        const count = Math.min(4, room.deck.length);
+        for (let i = 0; i < count; i++) {
+            if (room.deck.length > 0) s.hand.push(room.deck.shift());
+        }
+    });
+    return true;
+}
+
+// Play a card from hand. selectedCapture = array of table card indices to capture.
+// Returns { ok, basra, capturedCards, error }
+function playCard(room, slotIdx, cardStr, selectedCapture) {
+    const p = room.slots[slotIdx];
+    const cardIdx = p.hand.indexOf(cardStr);
+    if (cardIdx === -1) return { ok: false, error: 'קלף לא ביד' };
+
+    const rank = cardRank(cardStr);
+    const tableCards = room.tableCards;
+
+    // Validate capture selection
+    let captureGroup = null;
+    if (selectedCapture && selectedCapture.length > 0) {
+        // Verify these cards are on table
+        captureGroup = selectedCapture.map(idx => tableCards[idx]).filter(Boolean);
+        if (captureGroup.length !== selectedCapture.length) return { ok: false, error: 'קלף לא על השולחן' };
+
+        // Validate the capture is legal
+        const valid = findCaptures(cardStr, tableCards);
+        // Check if captureGroup matches one of the valid capture possibilities
+        const captureSet = new Set(captureGroup);
+
+        // For Jack and 7♦, capture all
+        if (isJack(cardStr) || is7D(cardStr)) {
+            captureGroup = tableCards.slice();
+        } else if (rank === 'Q' || rank === 'K') {
+            captureGroup = tableCards.filter(c => cardRank(c) === rank);
+            if (captureGroup.length === 0) return { ok: false, error: 'אין קלף תואם לתפוס' };
+        } else {
+            // Verify sum
+            let sum = 0;
+            let hasFace = false;
+            for (const c of captureGroup) {
+                const v = rankValue(cardRank(c));
+                if (v === null) { hasFace = true; break; }
+                sum += v;
+            }
+            const cardVal = rankValue(rank);
+            if (hasFace || sum !== cardVal) return { ok: false, error: 'תפיסה לא חוקית' };
+        }
+    } else if (isJack(cardStr) || is7D(cardStr)) {
+        // Auto-capture all for Jack and 7♦
+        captureGroup = tableCards.slice();
+    } else if (rank === 'Q' || rank === 'K') {
+        captureGroup = tableCards.filter(c => cardRank(c) === rank);
+    } else {
+        // No capture selected — card goes to table (only if no valid capture exists... or player chooses)
+        // Actually player can always choose NOT to capture in basra (strategic)
+        // BUT: if they CAN capture, they must? Actually no — optional in most versions
+        // We'll allow player to choose. If captureGroup is empty, card goes to table.
+        captureGroup = [];
+    }
+
+    // Remove card from hand
+    p.hand.splice(cardIdx, 1);
+
+    let basraScored = false;
+    let capturedCards = [];
+
+    if (captureGroup && captureGroup.length > 0) {
+        // Remove captured cards from table
+        capturedCards = captureGroup.slice();
+        room.tableCards = tableCards.filter(c => !captureGroup.includes(c));
+
+        // Add played card + captured to player's capture pile
+        p.captured.push(cardStr, ...capturedCards);
+        room.lastCapturer = slotIdx;
+
+        // Check basra
+        if (room.tableCards.length === 0) {
+            basraScored = isBasra(cardStr, capturedCards, tableCards);
+            if (basraScored) {
+                p.basras++;
+                // Mark basra in capture pile (conceptually — we track count)
+            }
+        }
+    } else {
+        // Card goes to table
+        room.tableCards.push(cardStr);
+    }
+
+    return { ok: true, basra: basraScored, capturedCards };
+}
+
+// Score a round
+function scoreRound(room) {
+    const scores = room.slots.map((s, i) => ({
+        slotIdx: i,
+        name: s.name,
+        cards: s.captured.length,
+        basras: s.basras,
+        points: 0,
+    }));
+
+    const totalCards = scores.reduce((s, p) => s + p.cards, 0);
+    const maxCards = Math.max(...scores.map(p => p.cards));
+    const leaders = scores.filter(p => p.cards === maxCards);
+
+    // Majority cards: 30 pts (or pending)
+    if (leaders.length === 1) {
+        const pts = 30 + room.pendingMajorityPoints;
+        leaders[0].points += pts;
+        room.pendingMajorityPoints = 0;
+    } else {
+        room.pendingMajorityPoints += 30;
+    }
+
+    // Card bonuses
+    for (const s of room.slots) {
+        const idx = s.captured ? room.slots.indexOf(s) : -1;
+        if (idx === -1) continue;
+        const sc = scores[idx];
+        for (const card of (s.captured || [])) {
+            const r = cardRank(card);
+            if (r === 'A' || r === 'J') sc.points += 1;
+            if (card === '2c') sc.points += 2;
+            if (card === '10d') sc.points += 3;
+        }
+        // Basra bonus
+        sc.points += s.basras * 10;
+    }
+
+    // Apply to cumulative scores
+    scores.forEach((sc, i) => {
+        room.slots[i].score = (room.slots[i].score || 0) + sc.points;
+    });
+
+    return scores;
+}
+
+function resetRound(room) {
+    const deck = shuffle(makeDeck());
+
+    // New table (recheck for J/7♦)
+    let tableCards = [];
+    while (tableCards.length < 4) {
+        const card = deck.shift();
+        const rank = cardRank(card);
+        if (rank === 'J' || is7D(card)) {
+            deck.push(card);
+            shuffle(deck);
+        } else {
+            tableCards.push(card);
+        }
+    }
+
+    room.deck = deck;
+    room.tableCards = tableCards;
+    room.lastCapturer = null;
+    room.roundOver = false;
+    room.roundNum++;
+
+    // Rotate dealer → rotate who goes first
+    const n = room.slots.length;
+    room.currentPlayer = (room.currentPlayer + 1) % n;
+
+    room.slots.forEach(s => {
+        s.hand = [];
+        s.captured = [];
+        s.basras = 0;
+    });
+
+    for (let i = 0; i < 4; i++) {
+        room.slots.forEach(s => s.hand.push(deck.shift()));
+    }
+}
+
+module.exports = {
+    BASRA_ACCESS_CODE,
+    createBasraRoom,
+    dealNewHands,
+    playCard,
+    findCaptures,
+    isBasra,
+    scoreRound,
+    resetRound,
+    cardRank,
+    rankValue,
+    is7D,
+    isJack,
+};
