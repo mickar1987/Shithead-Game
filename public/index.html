@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.49</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.50</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -597,39 +597,41 @@
     <div id="menuBasra" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;">🀄 BASRA</div>
-        <button onclick="showMenu('menuBasraCreate')" class="setup-btn">➕ צור חדר</button>
-        <button onclick="showMenu('menuBasraJoin')" class="setup-btn">🔑 הצטרף לחדר</button>
+        <button onclick="showBasraCreate()" class="setup-btn">➕ צור חדר</button>
+        <button onclick="showBasraJoin()" class="setup-btn">🔗 הצטרף לחדר</button>
+    </div>
+    <div id="menuBasraAccess" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">קוד גישה לבסרה</div>
+        <input id="basraAccessCode" type="password" placeholder="קוד גישה" maxlength="6" class="setup-input" inputmode="numeric"
+            onkeydown="if(event.key==='Enter') basraVerifyAccess()"/>
+        <div id="basraAccessError" style="font-size:11px;color:#f87171;min-height:14px;"></div>
+        <button onclick="basraVerifyAccess()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">✅ אמת</button>
     </div>
     <div id="menuBasraCreate" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">קוד גישה</div>
-        <input id="basraAccessCreate" type="password" placeholder="קוד גישה" maxlength="6" class="setup-input" inputmode="numeric"/>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">שמך</div>
-        <input id="basraNameCreate" type="text" placeholder="שם" maxlength="16" class="setup-input"/>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">שחקנים</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
         <div style="display:flex;gap:8px;width:100%;max-width:280px;">
-            <button onclick="selectBasraCount(2)" id="basraCount2" class="setup-btn" style="flex:1;border-color:var(--gold);">⚔️ 2</button>
-            <button onclick="selectBasraCount(4)" id="basraCount4" class="setup-btn" style="flex:1;">🏆 4</button>
+            <button onclick="selectBasraCount(2)" id="basraCount2" class="setup-btn" style="flex:1;border-color:var(--gold);">⚔️ 2 Players</button>
+            <button onclick="selectBasraCount(4)" id="basraCount4" class="setup-btn" style="flex:1;">🏆 4 Players</button>
         </div>
         <div id="basraCreateError" style="font-size:11px;color:#f87171;min-height:14px;"></div>
         <button onclick="basraCreate()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">▶ צור חדר</button>
     </div>
     <div id="menuBasraJoin" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">קוד גישה</div>
-        <input id="basraAccessJoin" type="password" placeholder="קוד גישה" maxlength="6" class="setup-input" inputmode="numeric"/>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">שמך</div>
-        <input id="basraNameJoin" type="text" placeholder="שם" maxlength="16" class="setup-input"/>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">קוד חדר</div>
-        <input id="basraRoomCode" type="text" placeholder="קוד חדר" maxlength="4" class="setup-input" style="font-size:1.6rem;letter-spacing:8px;text-transform:uppercase;"/>
+        <input id="basraRoomCode" type="text" placeholder="קוד חדר" maxlength="4" class="setup-input"
+            style="font-size:1.6rem;letter-spacing:8px;text-transform:uppercase;"
+            onkeydown="if(event.key==='Enter') basraJoin()"/>
         <div id="basraJoinError" style="font-size:11px;color:#f87171;min-height:14px;"></div>
-        <button onclick="basraJoin()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">▶ הצטרף</button>
+        <button onclick="basraJoin()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">הצטרף ▶</button>
     </div>
     <div id="menuBasraLobby" class="setup-grid hidden">
+        <div class="setup-back" onclick="basraLeave()">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:2px;">קוד החדר</div>
         <div id="basraLobbyCode" style="font-family:'Bebas Neue',sans-serif;font-size:4rem;color:var(--gold);letter-spacing:8px;"></div>
-        <div id="basraLobbyStatus" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;"></div>
-        <button onclick="basraLeave()" class="setup-btn" style="background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);font-size:0.8rem;margin-top:8px;">יציאה</button>
+        <div id="basraLobbyStatus" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-bottom:8px;"></div>
+        <div id="basraLobbyPlayers" style="width:100%;max-width:280px;"></div>
     </div>
 
 </div>
@@ -2571,7 +2573,7 @@ function showMenu(id) {
     if (id === 'menuAuth') {
         updateCoinsUI();
     }
-    ['menuMain','menuShithead','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuAuth','menuBasra','menuBasraCreate','menuBasraJoin','menuBasraLobby'].forEach(m => {
+    ['menuMain','menuShithead','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuAuth','menuBasra','menuBasraAccess','menuBasraCreate','menuBasraJoin','menuBasraLobby'].forEach(m => {
         const el = document.getElementById(m);
         if (el) el.classList.toggle('hidden', el.id !== id);
     });
@@ -3516,22 +3518,47 @@ function selectBasraCount(n) {
     document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
 }
 
+let basraAccessVerified = false;
+let basraPendingAction = null; // 'create' or 'join'
+
+function showBasraCreate() {
+    if (!basraAccessVerified) {
+        basraPendingAction = 'create';
+        showMenu('menuBasraAccess');
+    } else {
+        showMenu('menuBasraCreate');
+    }
+}
+
+function showBasraJoin() {
+    if (!basraAccessVerified) {
+        basraPendingAction = 'join';
+        showMenu('menuBasraAccess');
+    } else {
+        showMenu('menuBasraJoin');
+    }
+}
+
+function basraVerifyAccess() {
+    const code = document.getElementById('basraAccessCode').value.trim();
+    document.getElementById('basraAccessError').textContent = '';
+    if (!code) { document.getElementById('basraAccessError').textContent = 'הכנס קוד גישה'; return; }
+    // Verify against server
+    socket.emit('basraVerifyAccess', { accessCode: code });
+}
+
 function basraCreate() {
-    const access = document.getElementById('basraAccessCreate').value.trim();
-    const name = document.getElementById('basraNameCreate').value.trim() || 'אורח';
+    const name = authUser ? (authUser.firstName ? authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '') : authUser.username) : (localProfile?.firstName || 'אורח');
     document.getElementById('basraCreateError').textContent = '';
-    if (!access) { document.getElementById('basraCreateError').textContent = 'הכנס קוד גישה'; return; }
-    socket.emit('basraCreate', { name, playerCount: selectedBasraCount, accessCode: access, username: authUser?.username, token: authUser?.token });
+    socket.emit('basraCreate', { name, playerCount: selectedBasraCount, accessCode: '9218', username: authUser?.username, token: authUser?.token });
 }
 
 function basraJoin() {
-    const access = document.getElementById('basraAccessJoin').value.trim();
-    const name = document.getElementById('basraNameJoin').value.trim() || 'אורח';
+    const name = authUser ? (authUser.firstName ? authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '') : authUser.username) : (localProfile?.firstName || 'אורח');
     const code = document.getElementById('basraRoomCode').value.trim().toUpperCase();
     document.getElementById('basraJoinError').textContent = '';
-    if (!access) { document.getElementById('basraJoinError').textContent = 'הכנס קוד גישה'; return; }
     if (!code) { document.getElementById('basraJoinError').textContent = 'הכנס קוד חדר'; return; }
-    socket.emit('basraJoin', { name, code, accessCode: access, username: authUser?.username, token: authUser?.token });
+    socket.emit('basraJoin', { name, code, accessCode: '9218', username: authUser?.username, token: authUser?.token });
 }
 
 function basraLeave() {
@@ -3657,17 +3684,34 @@ function basraCancelSelection() {
     if (basraState) basraRender(basraState);
 }
 
+socket.on('basraAccessVerified', ({ ok }) => {
+    if (ok) {
+        basraAccessVerified = true;
+        showMenu(basraPendingAction === 'join' ? 'menuBasraJoin' : 'menuBasraCreate');
+    } else {
+        document.getElementById('basraAccessError').textContent = 'קוד שגוי';
+    }
+});
+
 socket.on('basraError', msg => {
     showToast(msg);
     const el1=document.getElementById('basraCreateError'); if(el1) el1.textContent=msg;
     const el2=document.getElementById('basraJoinError'); if(el2) el2.textContent=msg;
 });
 
-socket.on('basraJoined', ({code, slotIdx}) => {
+socket.on('basraJoined', ({code, slotIdx, playerCount}) => {
     basraRoomCode=code; basraMySlot=slotIdx;
     const lc=document.getElementById('basraLobbyCode'); if(lc) lc.textContent=code;
-    const ls=document.getElementById('basraLobbyStatus'); if(ls) ls.textContent='ממתין לשחקנים...';
+    const ls=document.getElementById('basraLobbyStatus'); if(ls) ls.textContent='ממתין לשחקנים... ('+playerCount+' נדרשים)';
     showMenu('menuBasraLobby');
+});
+
+socket.on('basraLobbyUpdate', ({players}) => {
+    const el=document.getElementById('basraLobbyPlayers'); if(!el) return;
+    el.innerHTML=players.map(p=>`<div style="padding:6px 0;font-size:13px;color:${p.connected?'#fff':'rgba(255,255,255,0.3)'};letter-spacing:1px;">${p.connected?'✅':'⏳'} ${p.name}</div>`).join('');
+    const ls=document.getElementById('basraLobbyStatus');
+    const connected=players.filter(p=>p.connected).length;
+    if(ls) ls.textContent=connected+'/'+players.length+' שחקנים';
 });
 
 socket.on('basraStart', ({playerNames}) => {
