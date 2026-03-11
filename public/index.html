@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.50</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.51</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3543,17 +3543,25 @@ function basraVerifyAccess() {
     const code = document.getElementById('basraAccessCode').value.trim();
     document.getElementById('basraAccessError').textContent = '';
     if (!code) { document.getElementById('basraAccessError').textContent = 'הכנס קוד גישה'; return; }
-    // Verify against server
-    socket.emit('basraVerifyAccess', { accessCode: code });
+    if (!socket) initSocket();
+    // Check locally (no need for round-trip)
+    if (code === '9218') {
+        basraAccessVerified = true;
+        showMenu(basraPendingAction === 'join' ? 'menuBasraJoin' : 'menuBasraCreate');
+    } else {
+        document.getElementById('basraAccessError').textContent = 'קוד שגוי';
+    }
 }
 
 function basraCreate() {
+    if (!socket) initSocket();
     const name = authUser ? (authUser.firstName ? authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '') : authUser.username) : (localProfile?.firstName || 'אורח');
     document.getElementById('basraCreateError').textContent = '';
     socket.emit('basraCreate', { name, playerCount: selectedBasraCount, accessCode: '9218', username: authUser?.username, token: authUser?.token });
 }
 
 function basraJoin() {
+    if (!socket) initSocket();
     const name = authUser ? (authUser.firstName ? authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '') : authUser.username) : (localProfile?.firstName || 'אורח');
     const code = document.getElementById('basraRoomCode').value.trim().toUpperCase();
     document.getElementById('basraJoinError').textContent = '';
