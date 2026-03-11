@@ -1580,6 +1580,10 @@ io.on('basraConnection', () => {}); // no-op, handled in main io.on
 
 function registerBasraHandlers(socket) {
 
+    socket.on('basraVerifyAccess', ({ accessCode }) => {
+        socket.emit('basraAccessVerified', { ok: accessCode === basra.BASRA_ACCESS_CODE });
+    });
+
     socket.on('basraCreate', ({ name, playerCount, accessCode, username, token }) => {
         if (accessCode !== basra.BASRA_ACCESS_CODE) {
             socket.emit('basraError', 'קוד גישה שגוי'); return;
@@ -1603,7 +1607,8 @@ function registerBasraHandlers(socket) {
         socket.data.basraSlot = 0;
         socket.join('basra_' + code);
 
-        socket.emit('basraJoined', { code, slotIdx: 0 });
+        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: slots.length });
+        io.to('basra_' + code).emit('basraLobbyUpdate', { players: room.slots.map(s=>({name:s.name,connected:s.connected})) });
         basraEmitAll(room);
         console.log(`[basra] Room ${code} created by ${name}`);
     });
@@ -1634,7 +1639,8 @@ function registerBasraHandlers(socket) {
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
         }
         basraEmitAll(room);
-        socket.emit('basraJoined', { code: code.toUpperCase(), slotIdx: freeSlot.id });
+        socket.emit('basraJoined', { code: code.toUpperCase(), slotIdx: freeSlot.id, playerCount: room.slots.length });
+        io.to('basra_' + code.toUpperCase()).emit('basraLobbyUpdate', { players: room.slots.map(s=>({name:s.name,connected:s.connected})) });
         console.log(`[basra] ${name} joined room ${code}`);
     });
 
