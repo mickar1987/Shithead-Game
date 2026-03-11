@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.57</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.58</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3784,6 +3784,21 @@ function basraCancelSelection() {
     if (basraState) basraRender(basraState);
 }
 
+
+
+
+function basraPlaySelected() {
+    if (!basraSelectedCard) return;
+    socket.emit('basraPlay', { card: basraSelectedCard, captureIndices: basraSelectedCaptures.slice() });
+    basraSelectedCard=null; basraSelectedCaptures=[];
+}
+function basraCancelSelection() {
+    basraSelectedCard=null; basraSelectedCaptures=[];
+    if (basraState) basraRender(basraState);
+}
+
+}
+
 // ── Card rendering — identical to shithead cards ──
 function basraRenderCard(cardStr, faceUp, selected, clickFn) {
     const el = document.createElement('div');
@@ -3930,19 +3945,6 @@ function basraRender(state) {
     } else if (!isMyTurn) {
         basraClearTimer();
     }
-}
-
-
-function basraPlaySelected() {
-    if (!basraSelectedCard) return;
-    socket.emit('basraPlay', { card: basraSelectedCard, captureIndices: basraSelectedCaptures.slice() });
-    basraSelectedCard=null; basraSelectedCaptures=[];
-}
-function basraCancelSelection() {
-    basraSelectedCard=null; basraSelectedCaptures=[];
-    if (basraState) basraRender(basraState);
-}
-
 } // end initSocket
 
 </script>
