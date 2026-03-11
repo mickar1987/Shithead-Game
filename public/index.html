@@ -500,7 +500,7 @@
 
     <div id="menuMain" class="setup-grid">
         <!-- Profile + Coins bar -->
-        <div id="authDebug" style="font-size:11px;color:rgba(255,200,50,0.8);text-align:center;padding:4px;min-height:16px;"></div>
+        <div id="authDebug" style="font-size:10px;color:yellow;background:rgba(0,0,0,0.7);padding:4px;border-radius:4px;min-height:16px;">טוען...</div>
         <div id="mainCoinsBar" style="display:none;flex-direction:column;align-items:center;gap:4px;width:100%;max-width:280px;margin-bottom:4px;">
             <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.07);border-radius:20px;padding:6px 18px;width:100%;box-sizing:border-box;justify-content:center;">
                 <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:2px solid #f5c842;box-shadow:0 2px 6px rgba(245,168,35,0.5),inset 0 1px 2px rgba(255,255,255,0.4);font-size:11px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;">C</span>
@@ -517,7 +517,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.73</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.74</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2224,16 +2224,13 @@ let onlineState = null;
 //  AUTH & COINS
 // ══════════════════════════════════════════════
 function loadAuth() {
-    // DEBUG
-    setTimeout(() => {
-        const lsAuth = localStorage.getItem('shithead_auth');
-        const cookies = document.cookie;
-        const dbg = document.getElementById('authDebug');
-        if (dbg) {
-            dbg.style.cssText = 'font-size:10px;color:yellow;background:rgba(0,0,0,0.8);padding:6px;border-radius:6px;width:100%;word-break:break-all;';
-            dbg.textContent = 'LS:' + (lsAuth ? lsAuth.slice(0,40) : 'ריק') + ' | CK:' + (cookies ? cookies.slice(0,40) : 'ריק');
-        }
-    }, 800);
+    // DEBUG - runs immediately
+    const lsAuth = localStorage.getItem('shithead_auth');
+    const cookies = document.cookie;
+    const dbg = document.getElementById('authDebug');
+    if (dbg) {
+        dbg.textContent = 'LS:' + (lsAuth ? lsAuth.slice(0,40) : 'ריק') + ' | CK:' + (cookies.slice(0,60) || 'ריק');
+    }
     // Original logic below
     // Step 1: show cached data immediately (instant UI)
     try {
