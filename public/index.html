@@ -2573,7 +2573,7 @@ function showMenu(id) {
     if (id === 'menuAuth') {
         updateCoinsUI();
     }
-    ['menuMain','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuAuth'].forEach(m => {
+    ['menuMain','menuShithead','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuAuth','menuBasra','menuBasraCreate','menuBasraJoin','menuBasraLobby'].forEach(m => {
         const el = document.getElementById(m);
         if (el) el.classList.toggle('hidden', el.id !== id);
     });
