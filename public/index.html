@@ -499,30 +499,41 @@
     </div>
 
     <div id="menuMain" class="setup-grid">
-        <!-- Coins bar — shown only when logged in -->
-        <div id="mainCoinsBar" style="display:none;flex-direction:column;align-items:center;gap:4px;width:100%;max-width:280px;margin-bottom:2px;">
+        <!-- Profile + Coins bar -->
+        <div id="mainCoinsBar" style="display:none;flex-direction:column;align-items:center;gap:4px;width:100%;max-width:280px;margin-bottom:4px;">
             <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.07);border-radius:20px;padding:6px 18px;width:100%;box-sizing:border-box;justify-content:center;">
                 <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:2px solid #f5c842;box-shadow:0 2px 6px rgba(245,168,35,0.5),inset 0 1px 2px rgba(255,255,255,0.4);font-size:11px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;">C</span>
                 <span id="mainCoinsAmount" style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:2px;"></span>
                 <span id="mainUsername" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"></span>
             </div>
-            <button onclick="claimDaily()" id="mainDailyBtn" class="setup-btn" style="font-size:0.8rem;padding:6px 12px;background:linear-gradient(135deg,#b45309,#78350f);width:100%;margin-top:8px;">🎁 קבל 200 מטבעות יומיים</button>
+            <button onclick="claimDaily()" id="mainDailyBtn" class="setup-btn" style="font-size:0.8rem;padding:6px 12px;background:linear-gradient(135deg,#b45309,#78350f);width:100%;margin-top:4px;">🎁 קבל 200 מטבעות יומיים</button>
             <div id="mainDailyCountdown" style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;min-height:14px;text-align:center;"></div>
         </div>
-        <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 מול מחשב</button>
-        <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 אונליין</button>
-        <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;">👤 חשבון / התחבר</button>
-        <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
+        <!-- Game selection -->
+        <div style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-bottom:2px;">בחר משחק</div>
+        <button onclick="showMenu('menuShithead')" class="setup-btn" style="font-size:1.1rem;padding:14px;">🃏 Shithead</button>
+        <button class="setup-btn" style="font-size:1.1rem;padding:14px;opacity:0.45;cursor:not-allowed;" disabled>🀄 Basra <span style="font-size:10px;color:rgba(255,255,255,0.4);">Coming Soon</span></button>
+        <!-- Account button -->
+        <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
     <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.47</div>
 
-    <div id="menuVsAI" class="setup-grid hidden">
+    <!-- Shithead sub-menu -->
+    <div id="menuShithead" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
-        <button onclick="startGame(2)" class="setup-btn">⚔️ 2 שחקנים</button>
-        <button onclick="startGame(4)" class="setup-btn">🏆 4 שחקנים</button>
+        <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 vs Computer</button>
+        <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 Online</button>
+        <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
+    </div>
+
+    <div id="menuVsAI" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuShithead')">← חזור</div>
+        <button onclick="startGame(2)" class="setup-btn">⚔️ 2 Players</button>
+        <button onclick="startGame(3)" class="setup-btn">🃏 3 Players</button>
+        <button onclick="startGame(4)" class="setup-btn">🏆 4 Players</button>
     </div>
     <div id="menuOnline" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuShithead')">← חזור</div>
         <button onclick="showMenu('menuCreate')" class="setup-btn">➕ צור חדר</button>
         <button onclick="showMenu('menuJoin')" class="setup-btn">🔗 הצטרף לחדר</button>
     </div>
@@ -551,8 +562,9 @@
         <div id="betWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
         <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🎲 קבע המשך</button>
-        <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">⚔️ 2 שחקנים</button>
-        <button onclick="createOnlineRoom(4)" id="playerBtn4" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🏆 4 שחקנים</button>
+        <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">⚔️ 2 Players</button>
+        <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🃏 3 Players</button>
+        <button onclick="createOnlineRoom(4)" id="playerBtn4" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🏆 4 Players</button>
     </div>
     <div id="menuJoin" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
