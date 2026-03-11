@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.51</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.52</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -610,16 +610,41 @@
     </div>
     <div id="menuBasraCreate" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
+        <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
+            <button onclick="setBasraRoomType('public')" id="basraRoomTypePublic" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">🌐 ציבורי</button>
+            <button onclick="setBasraRoomType('private')" id="basraRoomTypePrivate" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;">🔒 פרטי</button>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">הימור למשחק</div>
+        <div style="display:flex;gap:6px;justify-content:center;width:100%;max-width:280px;flex-wrap:wrap;">
+            <button onclick="setBasraBet(0)"   id="basraBetBtn0"   class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);">ללא</button>
+            <button onclick="setBasraBet(50)"  id="basraBetBtn50"  class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>50</button>
+            <button onclick="setBasraBet(100)" id="basraBetBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>100</button>
+            <button onclick="setBasraBet(200)" id="basraBetBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>200</button>
+            <button onclick="setBasraBet(500)" id="basraBetBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>500</button>
+        </div>
+        <div id="basraBetWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
         <div style="display:flex;gap:8px;width:100%;max-width:280px;">
             <button onclick="selectBasraCount(2)" id="basraCount2" class="setup-btn" style="flex:1;border-color:var(--gold);">⚔️ 2 Players</button>
             <button onclick="selectBasraCount(4)" id="basraCount4" class="setup-btn" style="flex:1;">🏆 4 Players</button>
         </div>
         <div id="basraCreateError" style="font-size:11px;color:#f87171;min-height:14px;"></div>
-        <button onclick="basraCreate()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">▶ צור חדר</button>
+        <button onclick="basraCreate()" id="basraCreateBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">▶ צור חדר</button>
     </div>
     <div id="menuBasraJoin" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
+        <button onclick="showMenu('menuBasraJoinPublic')" class="setup-btn">🌐 הצטרף לחדר ציבורי</button>
+        <button onclick="showMenu('menuBasraJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
+    </div>
+    <div id="menuBasraJoinPublic" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuBasraJoin')">← חזור</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-bottom:4px;">חדרים ציבוריים פתוחים</div>
+        <div id="basraPublicRoomsList" style="width:100%;max-width:280px;"></div>
+        <button onclick="refreshBasraPublicRooms()" class="setup-btn" style="font-size:0.8rem;margin-top:4px;">🔄 רענן</button>
+    </div>
+    <div id="menuBasraJoinPrivate" class="setup-grid hidden">
+        <div class="setup-back" onclick="showMenu('menuBasraJoin')">← חזור</div>
         <input id="basraRoomCode" type="text" placeholder="קוד חדר" maxlength="4" class="setup-input"
             style="font-size:1.6rem;letter-spacing:8px;text-transform:uppercase;"
             onkeydown="if(event.key==='Enter') basraJoin()"/>
@@ -630,6 +655,7 @@
         <div class="setup-back" onclick="basraLeave()">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:2px;">קוד החדר</div>
         <div id="basraLobbyCode" style="font-family:'Bebas Neue',sans-serif;font-size:4rem;color:var(--gold);letter-spacing:8px;"></div>
+        <div id="basraLobbyBetInfo" style="font-size:12px;color:rgba(255,200,50,0.8);letter-spacing:1px;min-height:16px;"></div>
         <div id="basraLobbyStatus" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-bottom:8px;"></div>
         <div id="basraLobbyPlayers" style="width:100%;max-width:280px;"></div>
     </div>
@@ -2573,7 +2599,7 @@ function showMenu(id) {
     if (id === 'menuAuth') {
         updateCoinsUI();
     }
-    ['menuMain','menuShithead','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuAuth','menuBasra','menuBasraAccess','menuBasraCreate','menuBasraJoin','menuBasraLobby'].forEach(m => {
+    ['menuMain','menuShithead','menuVsAI','menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuAuth','menuBasra','menuBasraAccess','menuBasraCreate','menuBasraJoin','menuBasraJoinPublic','menuBasraJoinPrivate','menuBasraLobby'].forEach(m => {
         const el = document.getElementById(m);
         if (el) el.classList.toggle('hidden', el.id !== id);
     });
@@ -3510,7 +3536,6 @@ let basraMySlot = null;
 let basraRoomCode = null;
 let basraSelectedCard = null;
 let basraSelectedCaptures = [];
-let selectedBasraCount = 2;
 
 function selectBasraCount(n) {
     selectedBasraCount = n;
@@ -3519,32 +3544,23 @@ function selectBasraCount(n) {
 }
 
 let basraAccessVerified = false;
-let basraPendingAction = null; // 'create' or 'join'
+let basraPendingAction = null;
+let selectedBasraCount = 2;
+let selectedBasraRoomType = 'public';
+let selectedBasraBet = 0;
 
 function showBasraCreate() {
-    if (!basraAccessVerified) {
-        basraPendingAction = 'create';
-        showMenu('menuBasraAccess');
-    } else {
-        showMenu('menuBasraCreate');
-    }
+    if (!basraAccessVerified) { basraPendingAction='create'; showMenu('menuBasraAccess'); }
+    else showMenu('menuBasraCreate');
 }
-
 function showBasraJoin() {
-    if (!basraAccessVerified) {
-        basraPendingAction = 'join';
-        showMenu('menuBasraAccess');
-    } else {
-        showMenu('menuBasraJoin');
-    }
+    if (!basraAccessVerified) { basraPendingAction='join'; showMenu('menuBasraAccess'); }
+    else showMenu('menuBasraJoin');
 }
-
 function basraVerifyAccess() {
     const code = document.getElementById('basraAccessCode').value.trim();
     document.getElementById('basraAccessError').textContent = '';
     if (!code) { document.getElementById('basraAccessError').textContent = 'הכנס קוד גישה'; return; }
-    if (!socket) initSocket();
-    // Check locally (no need for round-trip)
     if (code === '9218') {
         basraAccessVerified = true;
         showMenu(basraPendingAction === 'join' ? 'menuBasraJoin' : 'menuBasraCreate');
@@ -3552,23 +3568,66 @@ function basraVerifyAccess() {
         document.getElementById('basraAccessError').textContent = 'קוד שגוי';
     }
 }
+function setBasraRoomType(type) {
+    selectedBasraRoomType = type;
+    document.getElementById('basraRoomTypePublic').style.borderColor  = type==='public'  ? 'var(--gold)' : '';
+    document.getElementById('basraRoomTypePrivate').style.borderColor = type==='private' ? 'var(--gold)' : '';
+}
+function setBasraBet(val) {
+    selectedBasraBet = val;
+    [0,50,100,200,500].forEach(v => {
+        const b = document.getElementById('basraBetBtn'+v);
+        if (b) b.style.borderColor = v===val ? 'var(--gold)' : '';
+    });
+    const warn = document.getElementById('basraBetWarning');
+    if (warn && val > 0 && authUser && authUser.coins < val) {
+        warn.textContent = 'אין מספיק מטבעות'; return;
+    }
+    if (warn) warn.textContent = '';
+}
+function selectBasraCount(n) {
+    selectedBasraCount = n;
+    document.getElementById('basraCount2').style.borderColor = n===2 ? 'var(--gold)' : '';
+    document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
+}
+
+function basraGetMyName() {
+    if (authUser) {
+        if (authUser.firstName) return authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '');
+        return authUser.username;
+    }
+    return localProfile?.firstName || 'אורח';
+}
 
 function basraCreate() {
     if (!socket) initSocket();
-    const name = authUser ? (authUser.firstName ? authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '') : authUser.username) : (localProfile?.firstName || 'אורח');
+    const warn = document.getElementById('basraBetWarning');
+    if (selectedBasraBet > 0 && authUser && authUser.coins < selectedBasraBet) {
+        if (warn) warn.textContent = 'אין מספיק מטבעות'; return;
+    }
     document.getElementById('basraCreateError').textContent = '';
-    socket.emit('basraCreate', { name, playerCount: selectedBasraCount, accessCode: '9218', username: authUser?.username, token: authUser?.token });
+    socket.emit('basraCreate', {
+        name: basraGetMyName(),
+        playerCount: selectedBasraCount,
+        isPublic: selectedBasraRoomType === 'public',
+        bet: selectedBasraBet,
+        accessCode: '9218',
+        username: authUser?.username,
+        token: authUser?.token
+    });
 }
-
-function basraJoin() {
+function basraJoin(codeOverride) {
     if (!socket) initSocket();
-    const name = authUser ? (authUser.firstName ? authUser.firstName + (authUser.lastName ? ' ' + authUser.lastName.charAt(0) + '.' : '') : authUser.username) : (localProfile?.firstName || 'אורח');
-    const code = document.getElementById('basraRoomCode').value.trim().toUpperCase();
-    document.getElementById('basraJoinError').textContent = '';
-    if (!code) { document.getElementById('basraJoinError').textContent = 'הכנס קוד חדר'; return; }
-    socket.emit('basraJoin', { name, code, accessCode: '9218', username: authUser?.username, token: authUser?.token });
+    const code = codeOverride || document.getElementById('basraRoomCode')?.value.trim().toUpperCase();
+    const errEl = document.getElementById('basraJoinError');
+    if (errEl) errEl.textContent = '';
+    if (!code) { if (errEl) errEl.textContent = 'הכנס קוד חדר'; return; }
+    socket.emit('basraJoin', { name: basraGetMyName(), code, accessCode: '9218', username: authUser?.username, token: authUser?.token });
 }
-
+function refreshBasraPublicRooms() {
+    if (!socket) initSocket();
+    socket.emit('basraGetPublicRooms');
+}
 function basraLeave() {
     socket.emit('basraLeave');
     document.getElementById('basraGame').style.display = 'none';
@@ -3577,6 +3636,7 @@ function basraLeave() {
     showMenu('menuMain');
 }
 
+// ── Card rendering ──
 function basraRenderCard(cardStr, faceUp, selected, clickFn) {
     const el = document.createElement('div');
     if (!faceUp) {
@@ -3615,29 +3675,16 @@ function basraRender(state) {
     basraState = state;
     const isMyTurn = state.isMyTurn;
     const myIdx = state.mySlotIdx;
-
-    // Score bar
+    const oppIdx = myIdx===0?1:0;
     document.getElementById('basraScoreBar').textContent =
         state.playerNames.map((n,i)=>n.split(' ')[0]+': '+(state.scores[i]||0)).join('  |  ');
-
-    // Opponents (support 2 and 4 players)
-    const oppIdx = myIdx===0?1:0;
-    const oppName = state.playerNames[oppIdx]||'';
-    document.getElementById('basraOpponentName').textContent =
-        (state.currentPlayer===oppIdx?'▶ ':'')+oppName;
-    document.getElementById('basraOpponentInfo').textContent =
-        'תפוסים: '+(state.capturedCounts[oppIdx]||0)+' | בסרות: '+(state.basraCounts[oppIdx]||0);
-
-    const oppHandEl = document.getElementById('basraOpponentHand');
-    oppHandEl.innerHTML='';
-    const oppCount = (state.handCounts||[])[oppIdx]||0;
-    for (let i=0;i<oppCount;i++) oppHandEl.appendChild(basraRenderCard('',false,false,null));
-
-    // Table
-    const tableEl = document.getElementById('basraTableCards');
-    const emptyEl = document.getElementById('basraTableEmpty');
+    document.getElementById('basraOpponentName').textContent = (state.currentPlayer===oppIdx?'▶ ':'')+state.playerNames[oppIdx];
+    document.getElementById('basraOpponentInfo').textContent = 'תפוסים: '+(state.capturedCounts[oppIdx]||0)+' | בסרות: '+(state.basraCounts[oppIdx]||0);
+    const oppHandEl=document.getElementById('basraOpponentHand'); oppHandEl.innerHTML='';
+    ((state.handCounts||[])[oppIdx]||0) && Array.from({length:(state.handCounts||[])[oppIdx]}).forEach(()=>oppHandEl.appendChild(basraRenderCard('',false,false,null)));
+    const tableEl=document.getElementById('basraTableCards'); const emptyEl=document.getElementById('basraTableEmpty');
     tableEl.innerHTML='';
-    if (state.tableCards.length===0) { emptyEl.style.display='block'; }
+    if (state.tableCards.length===0) emptyEl.style.display='block';
     else {
         emptyEl.style.display='none';
         state.tableCards.forEach((card,idx)=>{
@@ -3650,12 +3697,8 @@ function basraRender(state) {
             }));
         });
     }
-
     document.getElementById('basraDeckDisplay').textContent = state.deckCount||0;
-
-    // My hand
-    const myHandEl = document.getElementById('basraMyHand');
-    myHandEl.innerHTML='';
+    const myHandEl=document.getElementById('basraMyHand'); myHandEl.innerHTML='';
     (state.myHand||[]).forEach(card=>{
         const sel=basraSelectedCard===card;
         myHandEl.appendChild(basraRenderCard(card,true,sel,()=>{
@@ -3665,15 +3708,10 @@ function basraRender(state) {
             basraRender(state);
         }));
     });
-
-    document.getElementById('basraMyInfo').textContent =
-        'תפוסים: '+(state.capturedCounts[myIdx]||0)+' | בסרות: '+(state.basraCounts[myIdx]||0);
-
-    const playBtn=document.getElementById('basraPlayBtn');
-    const cancelBtn=document.getElementById('basraCancelBtn');
-    playBtn.style.display = (isMyTurn&&basraSelectedCard)?'block':'none';
-    cancelBtn.style.display = (isMyTurn&&basraSelectedCard)?'block':'none';
-
+    document.getElementById('basraMyInfo').textContent = 'תפוסים: '+(state.capturedCounts[myIdx]||0)+' | בסרות: '+(state.basraCounts[myIdx]||0);
+    const playBtn=document.getElementById('basraPlayBtn'); const cancelBtn=document.getElementById('basraCancelBtn');
+    playBtn.style.display=(isMyTurn&&basraSelectedCard)?'block':'none';
+    cancelBtn.style.display=(isMyTurn&&basraSelectedCard)?'block':'none';
     const statusEl=document.getElementById('basraStatusMsg');
     if (!isMyTurn) statusEl.textContent='תור של '+state.playerNames[state.currentPlayer];
     else if (!basraSelectedCard) statusEl.textContent='בחר קלף מהיד';
@@ -3686,34 +3724,27 @@ function basraPlaySelected() {
     socket.emit('basraPlay', { card: basraSelectedCard, captureIndices: basraSelectedCaptures.slice() });
     basraSelectedCard=null; basraSelectedCaptures=[];
 }
-
 function basraCancelSelection() {
     basraSelectedCard=null; basraSelectedCaptures=[];
     if (basraState) basraRender(basraState);
 }
 
+// ── Socket listeners ──
 socket.on('basraAccessVerified', ({ ok }) => {
-    if (ok) {
-        basraAccessVerified = true;
-        showMenu(basraPendingAction === 'join' ? 'menuBasraJoin' : 'menuBasraCreate');
-    } else {
-        document.getElementById('basraAccessError').textContent = 'קוד שגוי';
-    }
+    if (ok) { basraAccessVerified=true; showMenu(basraPendingAction==='join'?'menuBasraJoin':'menuBasraCreate'); }
+    else document.getElementById('basraAccessError').textContent = 'קוד שגוי';
 });
-
 socket.on('basraError', msg => {
     showToast(msg);
-    const el1=document.getElementById('basraCreateError'); if(el1) el1.textContent=msg;
-    const el2=document.getElementById('basraJoinError'); if(el2) el2.textContent=msg;
+    ['basraCreateError','basraJoinError'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=msg; });
 });
-
-socket.on('basraJoined', ({code, slotIdx, playerCount}) => {
+socket.on('basraJoined', ({code, slotIdx, playerCount, bet}) => {
     basraRoomCode=code; basraMySlot=slotIdx;
     const lc=document.getElementById('basraLobbyCode'); if(lc) lc.textContent=code;
-    const ls=document.getElementById('basraLobbyStatus'); if(ls) ls.textContent='ממתין לשחקנים... ('+playerCount+' נדרשים)';
+    const lb=document.getElementById('basraLobbyBetInfo');
+    if(lb) lb.textContent = bet>0 ? '💰 הימור: '+bet+' מטבעות' : '';
     showMenu('menuBasraLobby');
 });
-
 socket.on('basraLobbyUpdate', ({players}) => {
     const el=document.getElementById('basraLobbyPlayers'); if(!el) return;
     el.innerHTML=players.map(p=>`<div style="padding:6px 0;font-size:13px;color:${p.connected?'#fff':'rgba(255,255,255,0.3)'};letter-spacing:1px;">${p.connected?'✅':'⏳'} ${p.name}</div>`).join('');
@@ -3721,55 +3752,52 @@ socket.on('basraLobbyUpdate', ({players}) => {
     const connected=players.filter(p=>p.connected).length;
     if(ls) ls.textContent=connected+'/'+players.length+' שחקנים';
 });
-
-socket.on('basraStart', ({playerNames}) => {
+socket.on('basraPublicRooms', (rooms) => {
+    const el=document.getElementById('basraPublicRoomsList'); if(!el) return;
+    if (!rooms.length) { el.innerHTML='<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px;">אין חדרים פתוחים</div>'; return; }
+    el.innerHTML=rooms.map(r=>`<div onclick="basraJoin('${r.code}')" style="cursor:pointer;padding:10px;margin-bottom:6px;border:1px solid rgba(255,255,255,0.15);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:#fff;letter-spacing:1px;">${r.code}</span>
+        <span style="font-size:11px;color:rgba(255,200,50,0.7);">${r.players}/${r.total} שחקנים${r.bet>0?' · '+r.bet+'💰':''}</span>
+    </div>`).join('');
+});
+socket.on('basraStart', () => {
     document.getElementById('basraGame').style.display='block';
     const so=document.querySelector('.setup-overlay'); if(so) so.style.display='none';
     showToast('המשחק התחיל!');
 });
-
 socket.on('basraState', state => {
-    basraMySlot = state.mySlotIdx;
+    basraMySlot=state.mySlotIdx;
     document.getElementById('basraGame').style.display='block';
     const so=document.querySelector('.setup-overlay'); if(so) so.style.display='none';
     basraRender(state);
 });
-
 socket.on('basraEvent', ({type, name}) => {
     if (type==='basra') showToast('\u26A1 BASRA! '+name);
 });
-
 socket.on('basraRoundOver', ({scores, totalScores, pendingMajority}) => {
     const overlay=document.getElementById('basraResultOverlay');
     const scoresEl=document.getElementById('basraRoundScores');
     const btnsEl=document.getElementById('basraRoundBtns');
     let html='<div style="display:flex;flex-direction:column;gap:10px;">';
     scores.forEach(sc=>{
-        html+=`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${sc.name}</span><span style="color:var(--gold);">+${sc.points} (\u05e1\u05d4"\u05db: ${totalScores[sc.slotIdx]})</span></div>`;
+        html+=`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${sc.name}</span><span style="color:var(--gold);">+${sc.points} (סה"כ: ${totalScores[sc.slotIdx]})</span></div>`;
     });
-    if (pendingMajority>0) html+=`<div style="font-size:11px;color:rgba(255,200,50,0.5);margin-top:4px;">${pendingMajority} \u05e0\u05e7' \u05e8\u05d5\u05d1 \u05d4\u05d5\u05e2\u05d1\u05e8\u05d5 \u05dc\u05e1\u05d9\u05d1\u05d5\u05d1 \u05d4\u05d1\u05d0</div>`;
+    if (pendingMajority>0) html+=`<div style="font-size:11px;color:rgba(255,200,50,0.5);margin-top:4px;">${pendingMajority} נק' רוב הועברו לסיבוב הבא</div>`;
     html+='</div>';
     scoresEl.innerHTML=html;
-    btnsEl.innerHTML='<button onclick="basraNextRound()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);width:220px;">\u25B6 \u05e1\u05d9\u05d1\u05d5\u05d1 \u05d4\u05d1\u05d0</button>';
+    btnsEl.innerHTML='<button onclick="basraNextRound()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);width:220px;">▶ סיבוב הבא</button>';
     overlay.style.display='flex';
 });
-
-socket.on('basraGameOver', ({winnersOrder, names, scores}) => {
+socket.on('basraGameOver', ({names, scores}) => {
     const overlay=document.getElementById('basraResultOverlay');
-    const scoresEl=document.getElementById('basraRoundScores');
-    const btnsEl=document.getElementById('basraRoundBtns');
-    const medals=['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
-    let html='<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">\uD83C\uDFC6 \u05DE\u05E9\u05D7\u05E7 \u05D4\u05E1\u05EA\u05D9\u05D9\u05DD!</div>';
-    html+='<div style="display:flex;flex-direction:column;gap:8px;">';
-    names.forEach((name,i)=>{
-        html+=`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${medals[i]||''} ${name}</span><span style="color:var(--gold);">${scores[i]} \u05E0\u05E7'</span></div>`;
-    });
-    html+='</div>';
-    scoresEl.innerHTML=html;
-    btnsEl.innerHTML='<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">\uD83D\uDEAA \u05E6\u05D0 \u05DC\u05EA\u05E4\u05E8\u05D9\u05D8</button>';
+    document.getElementById('basraRoundScores').innerHTML=
+        '<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🏆 משחק הסתיים!</div>'+
+        '<div style="display:flex;flex-direction:column;gap:8px;">'+
+        names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('')+
+        '</div>';
+    document.getElementById('basraRoundBtns').innerHTML='<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 צא לתפריט</button>';
     overlay.style.display='flex';
 });
-
 function basraNextRound() {
     document.getElementById('basraResultOverlay').style.display='none';
     socket.emit('basraNextRound');
