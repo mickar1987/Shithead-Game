@@ -1584,7 +1584,7 @@ function registerBasraHandlers(socket) {
         socket.emit('basraAccessVerified', { ok: accessCode === basra.BASRA_ACCESS_CODE });
     });
 
-    socket.on('basraCreate', ({ name, playerCount, accessCode, username, token }) => {
+    socket.on('basraCreate', ({ name, playerCount, isPublic, bet, accessCode, username, token }) => {
         if (accessCode !== basra.BASRA_ACCESS_CODE) {
             socket.emit('basraError', 'קוד גישה שגוי'); return;
         }
@@ -1601,16 +1601,27 @@ function registerBasraHandlers(socket) {
             isBot: false,
         }));
 
-        const room = basra.createBasraRoom(code, slots, 0);
+        const room = basra.createBasraRoom(code, slots, bet || 0);
+        room.isPublic = !!isPublic;
+        room.gameStarted = false;
         basraRooms[code] = room;
         socket.data.basraRoom = code;
         socket.data.basraSlot = 0;
         socket.join('basra_' + code);
 
-        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: slots.length });
+        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: slots.length, bet: room.bet });
         io.to('basra_' + code).emit('basraLobbyUpdate', { players: room.slots.map(s=>({name:s.name,connected:s.connected})) });
-        basraEmitAll(room);
-        console.log(`[basra] Room ${code} created by ${name}`);
+        console.log(`[basra] Room ${code} created by ${name} (public:${isPublic}, bet:${bet})`);
+    });
+
+    socket.on('basraGetPublicRooms', () => {
+        const open = Object.values(basraRooms).filter(r => r.isPublic && !r.gameStarted && !r.gameOver);
+        socket.emit('basraPublicRooms', open.map(r => ({
+            code: r.code,
+            players: r.slots.filter(s=>s.connected).length,
+            total: r.slots.length,
+            bet: r.bet || 0,
+        })));
     });
 
     socket.on('basraJoin', ({ code, name, accessCode, username, token }) => {
@@ -1633,14 +1644,14 @@ function registerBasraHandlers(socket) {
         socket.data.basraSlot = freeSlot.id;
         socket.join('basra_' + code.toUpperCase());
 
+        socket.emit('basraJoined', { code: code.toUpperCase(), slotIdx: freeSlot.id, playerCount: room.slots.length, bet: room.bet || 0 });
+        io.to('basra_' + code.toUpperCase()).emit('basraLobbyUpdate', { players: room.slots.map(s=>({name:s.name,connected:s.connected})) });
         const allConnected = room.slots.every(s => s.connected);
         if (allConnected) {
             room.gameStarted = true;
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
+            basraEmitAll(room);
         }
-        basraEmitAll(room);
-        socket.emit('basraJoined', { code: code.toUpperCase(), slotIdx: freeSlot.id, playerCount: room.slots.length });
-        io.to('basra_' + code.toUpperCase()).emit('basraLobbyUpdate', { players: room.slots.map(s=>({name:s.name,connected:s.connected})) });
         console.log(`[basra] ${name} joined room ${code}`);
     });
 
