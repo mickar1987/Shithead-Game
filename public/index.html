@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.66</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.67</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2224,7 +2224,19 @@ let onlineState = null;
 // ══════════════════════════════════════════════
 function loadAuth() {
     try {
-        const saved = localStorage.getItem('shithead_auth');
+        let saved = localStorage.getItem('shithead_auth');
+        // Fallback: restore from cookie if localStorage is empty
+        if (!saved) {
+            const cookieMatch = document.cookie.match(/shithead_auth=([^;]+)/);
+            if (cookieMatch) {
+                try {
+                    saved = decodeURIComponent(cookieMatch[1]);
+                    // Restore to localStorage from cookie
+                    localStorage.setItem('shithead_auth', saved);
+                    console.log('[auth] restored from cookie');
+                } catch(e) {}
+            }
+        }
         if (!saved) return;
         const { username, token } = JSON.parse(saved);
         if (!username || !token) return;
@@ -2264,14 +2276,21 @@ function loadAuth() {
 
 function saveAuthLocal() {
     if (authUser) {
-        localStorage.setItem('shithead_auth', JSON.stringify({ username: authUser.username, token: authUser.token }));
+        const authData = JSON.stringify({ username: authUser.username, token: authUser.token });
+        localStorage.setItem('shithead_auth', authData);
         localStorage.setItem('shithead_coins', authUser.coins || 0);
         if (authUser.displayName) localStorage.setItem('shitheadPlayerName', authUser.displayName);
         if (authUser.firstName)   localStorage.setItem('shitheadFirstName',  authUser.firstName);
         if (authUser.lastName != null) localStorage.setItem('shitheadLastName', authUser.lastName);
+        // Also save to cookie as backup (365 days)
+        const expires = new Date(Date.now() + 365*24*60*60*1000).toUTCString();
+        document.cookie = `shithead_auth=${encodeURIComponent(authData)};expires=${expires};path=/;SameSite=Lax`;
+        document.cookie = `shithead_user=${encodeURIComponent(authUser.username)};expires=${expires};path=/;SameSite=Lax`;
     } else {
         localStorage.removeItem('shithead_auth');
         localStorage.removeItem('shithead_coins');
+        document.cookie = 'shithead_auth=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/';
+        document.cookie = 'shithead_user=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/';
     }
 }
 
