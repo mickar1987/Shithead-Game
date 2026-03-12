@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.77</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.79</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4719,12 +4719,30 @@ function refreshBasraPublicRooms() {
     if (!socket) initSocket();
     socket.emit('basraGetPublicRooms');
 }
+function basraConfirmExit() {
+    if (!basraState || !basraState.gameStarted === false) {
+        // Not in active game — just leave
+        basraLeave(); return;
+    }
+    const overlay = document.getElementById('basraExitConfirm');
+    if (overlay) overlay.style.display = 'flex';
+}
 function basraLeave() {
     socket.emit('basraLeave');
     document.getElementById('basraGame').style.display = 'none';
     document.getElementById('basraResultOverlay').style.display = 'none';
+    const exitOverlay = document.getElementById('basraExitConfirm');
+    if (exitOverlay) exitOverlay.style.display = 'none';
     basraState = null; basraMySlot = null; basraRoomCode = null;
+    basraPlayPhase = 'select'; basraSelectedCard = null; basraSelectedCaptures = [];
+    const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display = '';
+    const pa = document.getElementById('playerArea'); if (pa) pa.style.display = '';
+    document.querySelectorAll('.log-btn').forEach(el => el.style.display = '');
     showMenu('menuMain');
+}
+function basraForfeit() {
+    socket.emit('basraForfeit');
+    basraLeave();
 }
 
 // ── Card rendering ──
@@ -4935,33 +4953,56 @@ function basraPlaySelected() {
     basraSelectedCaptures = [];
     basraPlayPhase = 'capture';
 
-    if (basraIsAutoCapture(card) && tableCards.length > 0) {
-        // Show committed card for 2 seconds, highlight all table cards, then auto-capture
+    if (basraIsAutoCapture(card)) {
         if (basraState) basraRender(basraState);
-        setTimeout(() => {
-            // Highlight all table cards in gold
-            const tableEl = document.getElementById('basraTableCards');
-            if (tableEl) {
-                tableEl.querySelectorAll('.card').forEach(el => {
-                    el.style.outline = '3px solid var(--gold)';
-                    el.style.outlineOffset = '3px';
-                    el.style.transition = 'outline 0.2s';
-                });
-            }
-            const committedEl = document.querySelector('#basraCommittedCard .card');
-            if (committedEl) {
-                committedEl.style.outline = '3px solid var(--gold)';
-                committedEl.style.outlineOffset = '3px';
-            }
-            // After 1 more second, capture all
+
+        // Grey out buttons immediately so player knows not to touch them
+        ['basraConfirmBtn','basraThrowBtn','basraCancelBtn','basraPlayBtn'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) { btn.disabled = true; btn.style.opacity = '0.3'; btn.style.cursor = 'not-allowed'; }
+        });
+
+        if (tableCards.length === 0) {
+            // Empty table — just throw after 1 second
             setTimeout(() => {
-                const allIndices = tableCards.map((_, i) => i);
-                socket.emit('basraPlay', { captureIndices: allIndices });
+                socket.emit('basraPlay', { captureIndices: [] });
                 basraCommittedCard = null;
                 basraPlayPhase = 'select';
                 basraSelectedCaptures = [];
-            }, 900);
-        }, 1200);
+                ['basraConfirmBtn','basraThrowBtn','basraCancelBtn','basraPlayBtn'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+                });
+            }, 1000);
+        } else {
+            // Highlight all table cards, then capture
+            setTimeout(() => {
+                const tableEl = document.getElementById('basraTableCards');
+                if (tableEl) {
+                    tableEl.querySelectorAll('.card').forEach(el => {
+                        el.style.outline = '3px solid var(--gold)';
+                        el.style.outlineOffset = '3px';
+                        el.style.transition = 'outline 0.2s';
+                    });
+                }
+                const committedEl = document.querySelector('#basraCommittedCard .card');
+                if (committedEl) {
+                    committedEl.style.outline = '3px solid var(--gold)';
+                    committedEl.style.outlineOffset = '3px';
+                }
+                setTimeout(() => {
+                    const allIndices = tableCards.map((_, i) => i);
+                    socket.emit('basraPlay', { captureIndices: allIndices });
+                    basraCommittedCard = null;
+                    basraPlayPhase = 'select';
+                    basraSelectedCaptures = [];
+                    ['basraConfirmBtn','basraThrowBtn','basraCancelBtn','basraPlayBtn'].forEach(id => {
+                        const btn = document.getElementById(id);
+                        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+                    });
+                }, 900);
+            }, 1200);
+        }
     } else {
         if (basraState) basraRender(basraState);
     }
@@ -4983,7 +5024,7 @@ function basraCancelSelection() {
         <div id="basraScoreBar" style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.6);letter-spacing:1.5px;"></div>
         <div style="display:flex;gap:6px;align-items:center;">
             <button onclick="toggleLog()" style="background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:9px;padding:4px 8px;border-radius:4px;cursor:pointer;">📜 LOG</button>
-            <button onclick="basraLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;">EXIT</button>
+            <button onclick="basraConfirmExit()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;">EXIT</button>
         </div>
     </div>
 
@@ -5023,6 +5064,16 @@ function basraCancelSelection() {
             <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
+    </div>
+</div>
+
+<!-- BASRA EXIT CONFIRM -->
+<div id="basraExitConfirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:700;align-items:center;justify-content:center;flex-direction:column;gap:20px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:#fff;letter-spacing:2px;">לצאת מהמשחק?</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;">היציאה תיחשב כהפסד</div>
+    <div style="display:flex;gap:12px;">
+        <button onclick="basraForfeit()" style="background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">כן, צא</button>
+        <button onclick="document.getElementById('basraExitConfirm').style.display='none'" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">המשך משחק</button>
     </div>
 </div>
 
