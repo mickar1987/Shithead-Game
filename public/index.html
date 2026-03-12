@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.79</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.80</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2223,8 +2223,10 @@ let onlineState = null;
 //  AUTH & COINS
 // ══════════════════════════════════════════════
 function loadAuth() {
+    console.log('[loadAuth] START');
     try {
         let saved = localStorage.getItem('shithead_auth');
+        console.log('[loadAuth] saved:', saved ? 'found' : 'empty');
         // Fallback: restore from cookie if localStorage is empty
         if (!saved) {
             const cookieMatch = document.cookie.match(/shithead_auth=([^;]+)/);
@@ -2246,7 +2248,9 @@ function loadAuth() {
         const cachedFirst = localStorage.getItem('shitheadFirstName') || '';
         const cachedLast  = localStorage.getItem('shitheadLastName') || '';
         authUser = { username, token, coins: cachedCoins, firstName: cachedFirst, lastName: cachedLast, displayName: cachedDisplay };
+        console.log('[loadAuth] authUser SET:', username);
         updateCoinsUI();
+        console.log('[loadAuth] updateCoinsUI done, authUser still:', authUser ? authUser.username : 'NULL');
         console.log('[auth] loaded from cache:', username, 'coins:', cachedCoins);
 
         // Verify with server
