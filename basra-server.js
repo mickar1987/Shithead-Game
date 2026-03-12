@@ -223,13 +223,8 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
     } else if (isJack(cardStr) || is7D(cardStr)) {
         // Auto-capture all for Jack and 7♦
         captureGroup = tableCards.slice();
-    } else if (rank === 'Q' || rank === 'K') {
-        captureGroup = tableCards.filter(c => cardRank(c) === rank);
     } else {
-        // No capture selected — card goes to table (only if no valid capture exists... or player chooses)
-        // Actually player can always choose NOT to capture in basra (strategic)
-        // BUT: if they CAN capture, they must? Actually no — optional in most versions
-        // We'll allow player to choose. If captureGroup is empty, card goes to table.
+        // selectedCapture was empty [] — player chose to throw (no capture)
         captureGroup = [];
     }
 
