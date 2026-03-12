@@ -1,5 +1,5 @@
-const CACHE = 'shithead-v7';
-const ASSETS = ['/', '/index.html', '/manifest.json', '/socket.io/socket.io.js'];
+const CACHE = 'shithead-v4';
+const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -15,9 +15,9 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const url = e.request.url;
-    // Never intercept API calls
-    if (url.includes('/api/')) return;
-    // Network first for everything — fallback to cache when server is sleeping
+    // Never intercept API calls or socket.io
+    if (url.includes('/api/') || url.includes('socket.io')) return;
+    // Network first for everything else
     e.respondWith(
         fetch(e.request).catch(() => caches.match(e.request))
     );
