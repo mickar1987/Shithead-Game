@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.75</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.76</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3829,10 +3829,80 @@ function basraRenderCard(cardStr, faceUp, selected, clickFn) {
 // basraCommitCard merged into basraPlaySelected
 function basraConfirmCapture() {
     if (basraSelectedCaptures.length === 0) { showToast('בחר קלפים לאיסוף'); return; }
-    socket.emit('basraPlay', { captureIndices: basraSelectedCaptures.slice() });
-    basraCommittedCard = null;
-    basraPlayPhase = 'select';
-    basraSelectedCaptures = [];
+    const captureIndices = basraSelectedCaptures.slice();
+    const tableCards = basraState ? basraState.tableCards : [];
+    const committedCard = basraCommittedCard;
+
+    // Split selected indices into capture groups for animation
+    const groups = basraFindValidCaptures(committedCard, tableCards);
+    const selectedSet = [...captureIndices];
+    const assignedGroups = [];
+
+    // Greedily assign selected indices to groups
+    const remaining = [...selectedSet];
+    for (const group of groups) {
+        if (remaining.length === 0) break;
+        const canUse = group.every(i => remaining.includes(i));
+        if (canUse) {
+            assignedGroups.push(group.slice());
+            group.forEach(i => { const p = remaining.indexOf(i); if(p>-1) remaining.splice(p,1); });
+        }
+    }
+    // If single group (e.g. pair), still animate it
+    if (assignedGroups.length === 0) assignedGroups.push(captureIndices);
+
+    const groupColors = ['#3b82f6','#eab308','#ef4444','#a855f7','#22c55e'];
+
+    // Disable buttons during animation
+    const confirmBtn = document.getElementById('basraConfirmBtn');
+    const throwBtn = document.getElementById('basraThrowBtn');
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (throwBtn) throwBtn.disabled = true;
+
+    // Animation: highlight each group one by one, then emit
+    let step = 0;
+    function animateStep() {
+        if (step >= assignedGroups.length) {
+            // Done — emit
+            if (confirmBtn) confirmBtn.disabled = false;
+            if (throwBtn) throwBtn.disabled = false;
+            socket.emit('basraPlay', { captureIndices });
+            basraCommittedCard = null;
+            basraPlayPhase = 'select';
+            basraSelectedCaptures = [];
+            return;
+        }
+        const group = assignedGroups[step];
+        const color = groupColors[step % groupColors.length];
+
+        // Clear table card highlights
+        const tableEl = document.getElementById('basraTableCards');
+        if (tableEl) {
+            tableEl.querySelectorAll('.card').forEach(el => {
+                el.style.outline = ''; el.style.outlineOffset = '';
+            });
+            const cards = tableEl.querySelectorAll('.card');
+            group.forEach(idx => {
+                if (cards[idx]) {
+                    cards[idx].style.outline = `3px solid ${color}`;
+                    cards[idx].style.outlineOffset = '3px';
+                    cards[idx].style.transition = 'outline 0.15s';
+                }
+            });
+        }
+
+        // Also pulse the committed card with same color
+        const committedEl = document.querySelector('#basraCommittedCard .card');
+        if (committedEl) {
+            committedEl.style.outline = `3px solid ${color}`;
+            committedEl.style.outlineOffset = '3px';
+            committedEl.style.transition = 'outline 0.15s';
+        }
+
+        step++;
+        setTimeout(animateStep, 900);
+    }
+    animateStep();
 }
 function basraThrowCard() {
     // Throw committed card to table (no capture)
