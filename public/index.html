@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.76</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.77</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4918,14 +4918,53 @@ function basraRender(state) {
     }
 }
 
+function basraIsAutoCapture(card) {
+    if (!card) return false;
+    const rank = card.slice(0, -1);
+    return rank === 'J' || card === '7d';
+}
+
 function basraPlaySelected() {
     if (!basraSelectedCard) { showToast('בחר קלף מהיד'); return; }
-    socket.emit('basraCommitCard', { card: basraSelectedCard });
-    basraCommittedCard = basraSelectedCard;
+    const card = basraSelectedCard;
+    const tableCards = basraState ? basraState.tableCards : [];
+
+    socket.emit('basraCommitCard', { card });
+    basraCommittedCard = card;
     basraSelectedCard = null;
     basraSelectedCaptures = [];
     basraPlayPhase = 'capture';
-    if (basraState) basraRender(basraState);
+
+    if (basraIsAutoCapture(card) && tableCards.length > 0) {
+        // Show committed card for 2 seconds, highlight all table cards, then auto-capture
+        if (basraState) basraRender(basraState);
+        setTimeout(() => {
+            // Highlight all table cards in gold
+            const tableEl = document.getElementById('basraTableCards');
+            if (tableEl) {
+                tableEl.querySelectorAll('.card').forEach(el => {
+                    el.style.outline = '3px solid var(--gold)';
+                    el.style.outlineOffset = '3px';
+                    el.style.transition = 'outline 0.2s';
+                });
+            }
+            const committedEl = document.querySelector('#basraCommittedCard .card');
+            if (committedEl) {
+                committedEl.style.outline = '3px solid var(--gold)';
+                committedEl.style.outlineOffset = '3px';
+            }
+            // After 1 more second, capture all
+            setTimeout(() => {
+                const allIndices = tableCards.map((_, i) => i);
+                socket.emit('basraPlay', { captureIndices: allIndices });
+                basraCommittedCard = null;
+                basraPlayPhase = 'select';
+                basraSelectedCaptures = [];
+            }, 900);
+        }, 1200);
+    } else {
+        if (basraState) basraRender(basraState);
+    }
 }
 function basraCancelSelection() {
     basraSelectedCard=null; basraSelectedCaptures=[];
