@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.87</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.88</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3838,18 +3838,28 @@ function basraStartTimer(seconds) {
 // ── Card rendering — uses same .card CSS as Shithead ──
 function basraRenderCard(cardStr, faceUp, selected, clickFn) {
     const el = document.createElement('div');
+    const CARD_S = 'width:34px;height:48px;border-radius:5px;flex-shrink:0;';
     if (!faceUp) {
         el.className = 'card back';
-        el.style.cssText = 'width:38px;height:54px;border-radius:5px;cursor:default;';
+        el.style.cssText = CARD_S + 'cursor:default;';
         return el;
     }
     const rank = cardStr.slice(0,-1), suit = cardStr.slice(-1);
     const suitMap = {h:'\u2665',d:'\u2666',c:'\u2663',s:'\u2660'};
     el.className = 'card' + (['h','d'].includes(suit) ? ' red' : '');
+    el.style.cssText = CARD_S;
     if (selected) el.classList.add('selected');
     const inner = document.createElement('div');
     inner.className = 'card-inner';
-    inner.innerHTML = `<span class="card-rank">${rank}</span><span class="card-suit">${suitMap[suit]||suit}</span>`;
+    inner.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;gap:1px;line-height:1;';
+    const rankEl = document.createElement('span');
+    rankEl.style.cssText = 'font-size:0.9rem;font-weight:600;line-height:1;';
+    rankEl.textContent = rank;
+    const suitEl = document.createElement('span');
+    suitEl.style.cssText = 'font-size:0.8rem;font-weight:400;line-height:1;';
+    suitEl.textContent = suitMap[suit]||suit;
+    inner.appendChild(rankEl);
+    inner.appendChild(suitEl);
     el.appendChild(inner);
     if (clickFn) el.onclick = clickFn;
     return el;
