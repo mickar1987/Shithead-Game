@@ -167,8 +167,6 @@ app.post('/api/register', async (req, res) => {
         const last = (lastName || '').trim();
         await saveUser(name, { username: name, pinHash: hashPin(pin), coins: STARTING_COINS, lastDailyTs: null, token, firstName: first, lastName: last });
         const displayName = buildDisplayName(first, last);
-        const sessionVal = JSON.stringify({ username: name, token });
-        res.cookie('shithead_session', sessionVal, { maxAge: 365*24*60*60*1000, httpOnly: false, sameSite: 'lax', path: '/' });
         res.json({ ok: true, username: name, token, coins: STARTING_COINS, firstName: first, lastName: last, displayName });
     } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
 });
@@ -185,8 +183,6 @@ app.post('/api/login', async (req, res) => {
         if (!u.token) await saveUser(name, { token });
         console.log(`[login] ${name} token=${u.token ? 'existing' : 'new'}`);
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
-        const sessionVal = JSON.stringify({ username: name, token });
-        res.cookie('shithead_session', sessionVal, { maxAge: 365*24*60*60*1000, httpOnly: false, sameSite: 'lax', path: '/' });
         res.json({ ok: true, username: name, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
     } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
 });
@@ -201,31 +197,6 @@ app.post('/api/verify', async (req, res) => {
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
         res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
     } catch(e) { console.error('[verify error]', e); res.json({ ok: false }); }
-});
-
-// Auto-login from cookie
-app.get('/api/me', async (req, res) => {
-    try {
-        const raw = req.cookies?.shithead_session || 
-                    (req.headers.cookie||'').match(/shithead_session=([^;]+)/)?.[1];
-        if (!raw) return res.json({ ok: false });
-        const { username, token } = JSON.parse(decodeURIComponent(raw));
-        if (!username || !token) return res.json({ ok: false });
-        const u = await db.collection('users').findOne({ username });
-        if (!u || u.token !== token) return res.json({ ok: false });
-        const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
-        res.json({ ok: true, username, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
-    } catch(e) { res.json({ ok: false }); }
-});
-
-app.post('/api/coins', async (req, res) => {
-    const { username, token } = req.body || {};
-    if (!username || !token) return res.json({ ok: false });
-    try {
-        const user = await db.collection('users').findOne({ username });
-        if (!user || user.token !== token) return res.json({ ok: false });
-        res.json({ ok: true, coins: user.coins || 0 });
-    } catch(e) { res.json({ ok: false }); }
 });
 
 app.post('/api/daily', async (req, res) => {
