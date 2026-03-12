@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.82</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.83</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2314,7 +2314,7 @@ async function refreshCoins() {
 }
 
 function updateCoinsUI() {
-    console.log('[updateCoinsUI] authUser=', authUser ? authUser.username : 'NULL', new Error().stack.split('\n')[2]);
+    console.log('[updateCoinsUI] authUser=', authUser ? authUser.username : 'NULL', '\n' + new Error().stack.split('\n').slice(1,5).join('\n'));
     const bar = document.getElementById('mainCoinsBar');
     const amt = document.getElementById('mainCoinsAmount');
     const uname = document.getElementById('mainUsername');
