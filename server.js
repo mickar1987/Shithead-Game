@@ -1625,8 +1625,10 @@ function basraAdvanceTurn(room) {
         basraClearBasraTimer(room);
         room._timerStarted = Date.now();
         room._timerRemaining = room.turnTimer;
+        console.log(`[basra] starting timer interval, turnTimer=${room.turnTimer}`);
         room._timerInterval = setInterval(() => {
             room._timerRemaining--;
+            console.log(`[basra] timerTick remaining=${room._timerRemaining}`);
             basraBroadcast(room, 'basraTimerTick', { remaining: room._timerRemaining, currentPlayer: room.currentPlayer });
             if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
         }, 1000);
@@ -1672,6 +1674,7 @@ function registerBasraHandlers(socket) {
         const room = basra.createBasraRoom(code, slots, bet || 0);
         room.isPublic = !!isPublic;
         room.turnTimer = parseInt(turnTimer) || 0;
+        console.log(`[basra] room created, turnTimer=${room.turnTimer}, raw=${turnTimer}`);
         room.gameStarted = false;
         room.committedCard = null;
         room.committedBy = null;
