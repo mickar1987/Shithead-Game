@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.68</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.69</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4664,19 +4664,26 @@ function basraAutoSelectCaptures(card, tableCards) {
 function basraRender(state) {
     if (!state) return;
     basraState = state;
-    const isMyTurn = state.isMyTurn;
     const myIdx = state.mySlotIdx;
     const oppIdx = myIdx===0?1:0;
 
-    // Sync phase from server state
+    // Determine phase purely from server state
+    // committedBy === myIdx → I played a card, now picking captures
+    // committedBy !== myIdx (or null) and isMyTurn → I need to pick a card
     const inCommitPhase = !!(state.committedCard && state.committedBy === myIdx);
+    const oppCommitted  = !!(state.committedCard && state.committedBy !== myIdx);
+    const isMyTurn = state.isMyTurn && !inCommitPhase ? true : inCommitPhase;
+    // Actually: it's my turn to act if server says isMyTurn OR I committed and waiting for capture
+    const canAct = state.isMyTurn || inCommitPhase;
+
     if (inCommitPhase) {
         basraPlayPhase = 'capture';
         basraCommittedCard = state.committedCard;
     } else if (!state.committedCard) {
         basraPlayPhase = 'select';
         basraCommittedCard = null;
-        if (!isMyTurn) { basraSelectedCard = null; basraSelectedCaptures = []; }
+        basraSelectedCaptures = [];
+        if (!state.isMyTurn) basraSelectedCard = null;
     }
 
     // Score bar
@@ -4686,11 +4693,12 @@ function basraRender(state) {
     // Gold border around active player area
     const myArea = document.getElementById('basraPlayerArea');
     const oppArea = document.getElementById('basraOpponentArea');
-    if (myArea) { myArea.style.outline = isMyTurn ? '2px solid var(--gold)' : 'none'; myArea.style.borderRadius='12px'; }
-    if (oppArea) { oppArea.style.outline = !isMyTurn ? '2px solid var(--gold)' : 'none'; oppArea.style.borderRadius='12px'; }
+    const showMyTurn = state.isMyTurn || inCommitPhase;
+    if (myArea) { myArea.style.outline = showMyTurn ? '2px solid var(--gold)' : 'none'; myArea.style.borderRadius='12px'; }
+    if (oppArea) { oppArea.style.outline = !showMyTurn ? '2px solid var(--gold)' : 'none'; oppArea.style.borderRadius='12px'; }
 
     // Opponent
-    document.getElementById('basraOpponentName').textContent = (state.currentPlayer===oppIdx?'▶ ':'')+state.playerNames[oppIdx];
+    document.getElementById('basraOpponentName').textContent = (!state.isMyTurn && !inCommitPhase ?'▶ ':'')+state.playerNames[oppIdx];
     document.getElementById('basraOpponentInfo').textContent = 'תפוסים: '+(state.capturedCounts[oppIdx]||0)+' | בסרות: '+(state.basraCounts[oppIdx]||0);
     const oppHandEl=document.getElementById('basraOpponentHand'); oppHandEl.innerHTML='';
     ((state.handCounts||[])[oppIdx]||0) && Array.from({length:(state.handCounts||[])[oppIdx]}).forEach(()=>oppHandEl.appendChild(basraRenderCard('',false,false,null)));
@@ -4699,12 +4707,12 @@ function basraRender(state) {
     const tableEl=document.getElementById('basraTableCards');
     const emptyEl=document.getElementById('basraTableEmpty');
     tableEl.innerHTML='';
-    const hasTableContent = state.tableCards.length > 0 || state.committedCard;
+    const hasTableContent = state.tableCards.length > 0;
     emptyEl.style.display = hasTableContent ? 'none' : 'block';
     // Regular table cards — selectable in capture phase
     state.tableCards.forEach((card,idx)=>{
         const sel = basraSelectedCaptures.includes(idx);
-        const canSelect = isMyTurn && basraPlayPhase === 'capture';
+        const canSelect = inCommitPhase;
         tableEl.appendChild(basraRenderCard(card,true,sel,()=>{
             if (!canSelect) return;
             const pos=basraSelectedCaptures.indexOf(idx);
@@ -4712,32 +4720,37 @@ function basraRender(state) {
             basraRender(state);
         }));
     });
-    // Committed card — shown with gold outline, not selectable
-    if (state.committedCard) {
-        const committedEl = basraRenderCard(state.committedCard, true, false, null);
-        committedEl.style.outline = '3px solid var(--gold)';
-        committedEl.style.outlineOffset = '2px';
-        committedEl.style.cursor = 'default';
-        tableEl.appendChild(committedEl);
+    // Committed card — shown in dedicated area below table
+    const committedArea = document.getElementById('basraCommittedArea');
+    const committedCardEl = document.getElementById('basraCommittedCard');
+    if (state.committedCard && committedArea && committedCardEl) {
+        committedArea.style.display = 'flex';
+        committedCardEl.innerHTML = '';
+        const cEl = basraRenderCard(state.committedCard, true, false, null);
+        cEl.style.outline = '3px solid var(--gold)';
+        cEl.style.outlineOffset = '3px';
+        cEl.style.borderRadius = '8px';
+        cEl.style.cursor = 'default';
+        committedCardEl.appendChild(cEl);
+    } else if (committedArea) {
+        committedArea.style.display = 'none';
     }
 
     // Deck
     const _deals2 = state.deckCount > 0 ? Math.floor(state.deckCount / (state.playerNames.length * 4)) : 0;
     document.getElementById('basraDeckDisplay').textContent = state.deckCount > 0 ? (_deals2 > 0 ? _deals2 : '<1') : '✓';
 
-    // My hand — only shown in select phase
+    // My hand — shown always (cards in hand), not selectable during capture phase
     const myHandEl=document.getElementById('basraMyHand'); myHandEl.innerHTML='';
-    if (basraPlayPhase === 'select') {
-        (state.myHand||[]).forEach(card=>{
-            const sel=basraSelectedCard===card;
-            myHandEl.appendChild(basraRenderCard(card,true,sel,()=>{
-                if (!isMyTurn) return;
-                if (basraSelectedCard===card) { basraSelectedCard=null; basraSelectedCaptures=[]; }
-                else { basraSelectedCard=card; basraSelectedCaptures=[]; }
-                basraRender(state);
-            }));
-        });
-    }
+    (state.myHand||[]).forEach(card=>{
+        const sel = !inCommitPhase && basraSelectedCard===card;
+        myHandEl.appendChild(basraRenderCard(card,true,sel,()=>{
+            if (!state.isMyTurn || inCommitPhase) return;
+            if (basraSelectedCard===card) { basraSelectedCard=null; basraSelectedCaptures=[]; }
+            else { basraSelectedCard=card; basraSelectedCaptures=[]; }
+            basraRender(state);
+        }));
+    });
 
     // My info
     document.getElementById('basraMyInfo').textContent = 'תפוסים: '+(state.capturedCounts[myIdx]||0)+' | בסרות: '+(state.basraCounts[myIdx]||0);
@@ -4746,11 +4759,11 @@ function basraRender(state) {
     const playBtn    = document.getElementById('basraPlayBtn');
     const confirmBtn = document.getElementById('basraConfirmBtn');
     const cancelBtn  = document.getElementById('basraCancelBtn');
-    if (isMyTurn && basraPlayPhase === 'select') {
+    if (state.isMyTurn && !inCommitPhase) {
         playBtn.style.display    = basraSelectedCard ? 'block' : 'none';
         confirmBtn.style.display = 'none';
         cancelBtn.style.display  = basraSelectedCard ? 'block' : 'none';
-    } else if (isMyTurn && basraPlayPhase === 'capture') {
+    } else if (inCommitPhase) {
         playBtn.style.display    = 'none';
         confirmBtn.style.display = 'block';
         cancelBtn.style.display  = 'none';
@@ -4760,14 +4773,14 @@ function basraRender(state) {
 
     // Status
     const statusEl=document.getElementById('basraStatusMsg');
-    if (!isMyTurn) {
-        statusEl.textContent = 'תור של '+state.playerNames[state.currentPlayer];
-    } else if (basraPlayPhase === 'select') {
-        statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק קלף' : 'בחר קלף מהיד';
-    } else {
+    if (inCommitPhase) {
         statusEl.textContent = basraSelectedCaptures.length > 0
             ? 'בחרת '+basraSelectedCaptures.length+' קלפים — לחץ ✅ אסוף'
             : 'בחר קלפים לאיסוף, או ✅ אסוף ללא תפיסה';
+    } else if (!state.isMyTurn) {
+        statusEl.textContent = 'תור של '+state.playerNames[state.currentPlayer];
+    } else {
+        statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק קלף' : 'בחר קלף מהיד';
     }
 }
 
@@ -4819,6 +4832,11 @@ function basraCancelSelection() {
         <div id="basraTurnTimer" style="display:none;font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:var(--gold);letter-spacing:3px;text-align:center;min-width:60px;transition:color 0.3s;text-shadow:0 0 12px rgba(240,192,64,0.5);"></div>
         <div id="basraTableCards" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:72px;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(255,255,255,0.08);min-width:200px;"></div>
         <div id="basraTableEmpty" style="font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:1px;display:none;">שולחן ריק</div>
+        <!-- Committed card shown separately below table -->
+        <div id="basraCommittedArea" style="display:none;flex-direction:column;align-items:center;gap:4px;margin-top:4px;">
+            <div style="font-size:9px;color:rgba(255,200,50,0.5);letter-spacing:1px;">הקלף ששוחק</div>
+            <div id="basraCommittedCard" style=""></div>
+        </div>
     </div>
 
     <!-- Player area (bottom) -->
