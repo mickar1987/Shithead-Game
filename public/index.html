@@ -4843,7 +4843,10 @@ function basraCancelSelection() {
     <div style="position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 44px);background:var(--bg);z-index:503;"></div>
     <div style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 12px;z-index:504;">
         <div id="basraScoreBar" style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.6);letter-spacing:1.5px;"></div>
-        <button onclick="basraLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;">EXIT</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+            <button onclick="toggleLog()" style="background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:9px;padding:4px 8px;border-radius:4px;cursor:pointer;">📜 LOG</button>
+            <button onclick="basraLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;">EXIT</button>
+        </div>
     </div>
 
     <!-- Opponent area (top) -->
