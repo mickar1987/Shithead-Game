@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.60</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.62</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2899,6 +2899,21 @@ if (!onlineMode) return; // already left to menu
     socket.on('basraEvent', ({type, name}) => {
         if (type==='basra') showToast('\u26A1 BASRA! '+name);
     });
+    socket.on('basraTimerTick', ({ remaining, currentPlayer }) => {
+        const el = document.getElementById('basraTurnTimer');
+        if (!el) return;
+        if (remaining <= 0) { el.style.display = 'none'; return; }
+        el.style.display = 'block';
+        el.textContent = remaining;
+        el.style.color = remaining <= 5 ? '#ef4444' : 'var(--gold)';
+        el.style.textShadow = remaining <= 5 ? '0 0 16px rgba(239,68,68,0.8)' : '0 0 12px rgba(240,192,64,0.5)';
+        // highlight active player area
+        const isMyTurn = basraMySlot === currentPlayer;
+        const myArea = document.getElementById('basraPlayerArea');
+        const oppArea = document.getElementById('basraOpponentArea');
+        if (myArea) myArea.style.outline = isMyTurn && remaining <= 5 ? '2px solid #ef4444' : '';
+        if (oppArea) oppArea.style.outline = !isMyTurn && remaining <= 5 ? '2px solid #ef4444' : '';
+    });
     socket.on('basraRoundOver', ({scores, totalScores, pendingMajority}) => {
         const overlay=document.getElementById('basraResultOverlay');
         const scoresEl=document.getElementById('basraRoundScores');
@@ -3830,6 +3845,14 @@ function basraRender(state) {
     // Score bar
     document.getElementById('basraScoreBar').textContent =
         state.playerNames.map((n,i) => n.split(' ')[0]+': '+(state.scores[i]||0)).join('  |  ');
+
+    // Active player gold border
+    const myArea = document.getElementById('basraPlayerArea');
+    const oppArea = document.getElementById('basraOpponentArea');
+    if (myArea) myArea.style.outline = isMyTurn ? '2px solid var(--gold)' : 'none';
+    if (myArea) myArea.style.borderRadius = '12px';
+    if (oppArea) oppArea.style.outline = !isMyTurn ? '2px solid var(--gold)' : 'none';
+    if (oppArea) oppArea.style.borderRadius = '12px';
 
     // Opponent name — highlight in gold if their turn
     const oppNameEl = document.getElementById('basraOpponentName');
