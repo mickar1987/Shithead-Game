@@ -4745,22 +4745,7 @@ function basraLeave() {
 }
 
 // ── Card rendering ──
-function basraRenderCard(cardStr, faceUp, selected, clickFn) {
-    const el = document.createElement('div');
-    if (!faceUp) {
-        el.style.cssText = 'width:38px;height:54px;border-radius:6px;background:linear-gradient(135deg,#1a3a2a,#0d2016);border:1.5px solid rgba(255,255,255,0.15);flex-shrink:0;';
-        return el;
-    }
-    const rank = cardStr.slice(0,-1);
-    const suit = cardStr.slice(-1);
-    const suitMap = {h:'\u2665',d:'\u2666',c:'\u2663',s:'\u2660'};
-    const color = ['h','d'].includes(suit) ? '#e53e3e' : '#111';
-    const suitSym = suitMap[suit] || suit;
-    el.style.cssText = `width:44px;height:62px;border-radius:8px;background:#fff;border:2px solid ${selected?'#f5a623':'rgba(0,0,0,0.2)'};display:flex;flex-direction:column;justify-content:space-between;padding:3px 4px;cursor:pointer;flex-shrink:0;box-sizing:border-box;box-shadow:${selected?'0 0 0 3px #f5a623':'0 2px 6px rgba(0,0,0,0.3)'};transition:box-shadow 0.15s;`;
-    el.innerHTML = `<div style="font-size:12px;font-weight:700;color:${color};line-height:1;">${rank}</div><div style="font-size:18px;text-align:center;color:${color};line-height:1;">${suitSym}</div><div style="font-size:12px;font-weight:700;color:${color};transform:rotate(180deg);line-height:1;">${rank}</div>`;
-    if (clickFn) el.onclick = clickFn;
-    return el;
-}
+
 
 function basraAutoSelectCaptures(card, tableCards) {
     const rank = card.slice(0,-1);
