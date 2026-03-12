@@ -2882,12 +2882,16 @@ if (!onlineMode) return; // already left to menu
     socket.on('basraStart', () => {
         document.getElementById('basraGame').style.display='block';
         document.getElementById('setupOverlay').style.display='none';
+        const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
+        const pa = document.getElementById('playerArea'); if (pa) pa.style.display='none';
         showToast('המשחק התחיל!');
     });
     socket.on('basraState', state => {
         basraMySlot=state.mySlotIdx;
         document.getElementById('basraGame').style.display='block';
         document.getElementById('setupOverlay').style.display='none';
+        const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
+        const pa = document.getElementById('playerArea'); if (pa) pa.style.display='none';
         basraRender(state);
     });
     socket.on('basraEvent', ({type, name}) => {
@@ -3735,6 +3739,8 @@ function basraLeave() {
     if (socket) socket.emit('basraLeave');
     document.getElementById('basraGame').style.display = 'none';
     document.getElementById('basraResultOverlay').style.display = 'none';
+    const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='';
+    const pa = document.getElementById('playerArea'); if (pa) pa.style.display='';
     basraState = null; basraMySlot = null; basraRoomCode = null;
     basraCommittedCard = null; basraPlayPhase = 'select';
     basraClearTimer();
