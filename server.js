@@ -1722,15 +1722,24 @@ function registerBasraHandlers(socket) {
             room.gameStarted = true;
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
             basraEmitAll(room);
-            // Start first turn timer
+            // Start first turn timer via basraAdvanceTurn logic
             if (room.turnTimer > 0) {
-                room._timerStarted = Date.now();
+                basraClearBasraTimer(room);
+                room._timerRemaining = room.turnTimer;
+                room._timerInterval = setInterval(() => {
+                    room._timerRemaining--;
+                    basraBroadcast(room, 'basraTimerTick', { remaining: room._timerRemaining, currentPlayer: room.currentPlayer });
+                    if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
+                }, 1000);
                 room._timerTimeout = setTimeout(() => {
+                    if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
                     const p = room.slots[room.currentPlayer];
                     if (!p || p.hand.length === 0) return;
                     const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
                     p.hand.splice(p.hand.indexOf(randomCard), 1);
                     room.tableCards.push(randomCard);
+                    room.committedCard = null;
+                    room.committedBy = null;
                     basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
                     basraAdvanceTurn(room);
                 }, room.turnTimer * 1000);
