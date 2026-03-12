@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-title" content="שיט-הד">
     <link rel="apple-touch-icon" href="/icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rubik:wght@400;700;900&display=swap" rel="stylesheet">
-    
+    <script src="/socket.io/socket.io.js" async></script>
     <style>
         :root {
             --sat: env(safe-area-inset-top);
@@ -500,7 +500,6 @@
 
     <div id="menuMain" class="setup-grid">
         <!-- Profile + Coins bar -->
-        <div id="authDebug" style="display:none;"></div>
         <div id="mainCoinsBar" style="display:none;flex-direction:column;align-items:center;gap:4px;width:100%;max-width:280px;margin-bottom:4px;">
             <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.07);border-radius:20px;padding:6px 18px;width:100%;box-sizing:border-box;justify-content:center;">
                 <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:2px solid #f5c842;box-shadow:0 2px 6px rgba(245,168,35,0.5),inset 0 1px 2px rgba(255,255,255,0.4);font-size:11px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;">C</span>
@@ -517,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.76</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.78</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -827,7 +826,6 @@
 
 <script>
 'use strict';
-
 // ══════════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════════
@@ -2225,53 +2223,55 @@ let onlineState = null;
 //  AUTH & COINS
 // ══════════════════════════════════════════════
 function loadAuth() {
-
-    // Step 1: show cached data immediately (instant UI)
     try {
-        const saved = localStorage.getItem('shithead_auth');
-        if (saved) {
-            const { username, token } = JSON.parse(saved);
-            if (username && token) {
-                const cachedCoins   = parseInt(localStorage.getItem('shithead_coins') || '0');
-                const cachedDisplay = localStorage.getItem('shitheadPlayerName') || username;
-                const cachedFirst   = localStorage.getItem('shitheadFirstName') || '';
-                const cachedLast    = localStorage.getItem('shitheadLastName')  || '';
-                authUser = { username, token, coins: cachedCoins, firstName: cachedFirst, lastName: cachedLast, displayName: cachedDisplay };
-                updateCoinsUI();
-                console.log('[auth] loaded from localStorage:', username);
-            const dbgEl = document.getElementById('authDebug'); if(dbgEl) dbgEl.textContent = '🔑 localStorage: ' + username;
+        let saved = localStorage.getItem('shithead_auth');
+        // Fallback: restore from cookie if localStorage is empty
+        if (!saved) {
+            const cookieMatch = document.cookie.match(/shithead_auth=([^;]+)/);
+            if (cookieMatch) {
+                try {
+                    saved = decodeURIComponent(cookieMatch[1]);
+                    // Restore to localStorage from cookie
+                    localStorage.setItem('shithead_auth', saved);
+                    console.log('[auth] restored from cookie');
+                } catch(e) {}
             }
         }
-    } catch(e) {}
+        if (!saved) return;
+        const { username, token } = JSON.parse(saved);
+        if (!username || !token) return;
+        // Show cached data immediately while verifying
+        const cachedCoins = parseInt(localStorage.getItem('shithead_coins') || '0');
+        const cachedDisplay = localStorage.getItem('shitheadPlayerName') || username;
+        const cachedFirst = localStorage.getItem('shitheadFirstName') || '';
+        const cachedLast  = localStorage.getItem('shitheadLastName') || '';
+        authUser = { username, token, coins: cachedCoins, firstName: cachedFirst, lastName: cachedLast, displayName: cachedDisplay };
+        updateCoinsUI();
+        console.log('[auth] loaded from cache:', username, 'coins:', cachedCoins);
 
-    // Step 2: always call /api/me — server reads its own cookie (works even if localStorage cleared)
-    fetch('/api/me')
-        .then(r => r.json())
-        .then(data => {
-            console.log('[auth] /api/me response:', data.ok, data.username);
-            if (data.ok) {
-authUser = { username: data.username, token: data.token, coins: data.coins, firstName: data.firstName||'', lastName: data.lastName||'', displayName: data.displayName||data.username };
-                // Refresh localStorage
-                localStorage.setItem('shithead_auth', JSON.stringify({ username: data.username, token: data.token }));
-                localStorage.setItem('shithead_coins', data.coins);
-                localStorage.setItem('shitheadFirstName',  authUser.firstName);
-                localStorage.setItem('shitheadLastName',   authUser.lastName);
-                localStorage.setItem('shitheadPlayerName', authUser.displayName);
-                updateCoinsUI();
-                checkDailyAvailable();
-            } else if (!authUser) {
-                // Not logged in anywhere — show first-time prompt if needed
-                const first = localStorage.getItem('shitheadFirstName');
-                if (!first) setTimeout(() => showFirstTimeAuthPrompt(), 300);
-            }
-        })
-        .catch(() => {
-            console.log('[auth] server unreachable, keeping cache');
-if (!authUser) {
-                const first = localStorage.getItem('shitheadFirstName');
-                if (!first) setTimeout(() => showFirstTimeAuthPrompt(), 300);
-            }
-        });
+        // Verify with server
+        fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, token }) })
+            .then(r => r.json()).then(data => {
+                console.log('[auth] verify response:', data);
+                if (data.ok) {
+                    authUser = { username: data.username, token, coins: data.coins, firstName: data.firstName||'', lastName: data.lastName||'', displayName: data.displayName||data.username };
+                    localStorage.setItem('shithead_coins', data.coins);
+                    localStorage.setItem('shitheadFirstName', authUser.firstName);
+                    localStorage.setItem('shitheadLastName',  authUser.lastName);
+                    localStorage.setItem('shitheadPlayerName', authUser.displayName);
+                    updateCoinsUI();
+                    checkDailyAvailable();
+                } else {
+                    // Token mismatch - server may have restarted. Keep cached auth,
+                    // just show a soft warning. Don't force logout.
+                    console.log('[auth] verify failed - keeping cached auth, user may need to re-login');
+                    // Don't clear auth - user is still "logged in" with cached data
+                    // They'll get properly logged out only when they try an action that needs auth
+                }
+            }).catch(e => {
+                console.log('[auth] server unreachable, keeping cache:', e.message);
+            });
+    } catch(e) { console.error('[auth] loadAuth error:', e); }
 }
 
 function saveAuthLocal() {
@@ -2662,17 +2662,19 @@ let basraMySlot = null;
 // ── Timer display ──
 let basraTimerInterval = null;
 
+function waitForIO(cb) {
+    if (typeof io !== 'undefined') { cb(); return; }
+    let attempts = 0;
+    const t = setInterval(() => {
+        if (typeof io !== 'undefined') { clearInterval(t); cb(); }
+        if (++attempts > 100) clearInterval(t);
+    }, 100);
+}
 function initSocket() {
     if (socket) return;
-    if (typeof io === 'undefined') {
-        // Load socket.io dynamically (lazy load — doesn't block page)
-        const s = document.createElement('script');
-        s.src = '/socket.io/socket.io.js';
-        s.onload = () => initSocket();
-        document.head.appendChild(s);
-        return;
-    }
-    socket = io();
+    waitForIO(() => {
+        if (socket) return;
+        socket = io();
 
     // Reconnect to basra room if was in one
     socket.on('connect', () => {
@@ -2966,12 +2968,6 @@ if (!onlineMode) return; // already left to menu
 
 // Fetch stats on page load
 window.addEventListener('load', () => {
-    // Unregister old service workers so stale cache never serves old code
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-            regs.forEach(r => r.unregister());
-        });
-    }
     loadAuth();
     loadProfile();
     setTimeout(fetchOnlineStats, 500);
@@ -3026,6 +3022,8 @@ let reactionCooldown = false;
 
 
 
+
+    });
 }
 
 // ── Helper functions (global scope) ──
@@ -3109,7 +3107,13 @@ return `${first}.${initial}.`;
 }
 
 function loadProfile() {
-    // loadAuth handles auth persistence and first-time prompt
+const hasAuth = localStorage.getItem('shithead_auth');
+if (hasAuth) return; // logged in — nothing to do
+const first = localStorage.getItem('shitheadFirstName');
+if (!first) {
+    // First time — show auth prompt instead of name modal
+    setTimeout(() => showFirstTimeAuthPrompt(), 300);
+}
 }
 
 function showFirstTimeAuthPrompt() {
@@ -3181,7 +3185,8 @@ if (socket) {
     return;
 }
 // Lightweight temp connection just for stats
-const tmpSocket = io({ autoConnect: true, reconnection: false });
+if (typeof io === 'undefined') { return; }
+    const tmpSocket = io({ autoConnect: true, reconnection: false });
 tmpSocket.once('connect', () => tmpSocket.emit('getOnlineStats'));
 tmpSocket.once('onlineStats', ({ online, inGame }) => {
     const el = document.getElementById('onlineStats');
