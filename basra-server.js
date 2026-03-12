@@ -183,11 +183,6 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
         captureGroup = selectedCapture.map(idx => tableCards[idx]).filter(Boolean);
         if (captureGroup.length !== selectedCapture.length) return { ok: false, error: 'קלף לא על השולחן' };
 
-        // Validate the capture is legal
-        const valid = findCaptures(cardStr, tableCards);
-        // Check if captureGroup matches one of the valid capture possibilities
-        const captureSet = new Set(captureGroup);
-
         // For Jack and 7♦, capture all
         if (isJack(cardStr) || is7D(cardStr)) {
             captureGroup = tableCards.slice();
@@ -195,16 +190,35 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
             captureGroup = tableCards.filter(c => cardRank(c) === rank);
             if (captureGroup.length === 0) return { ok: false, error: 'אין קלף תואם לתפוס' };
         } else {
-            // Verify sum
-            let sum = 0;
-            let hasFace = false;
-            for (const c of captureGroup) {
-                const v = rankValue(cardRank(c));
-                if (v === null) { hasFace = true; break; }
-                sum += v;
-            }
+            // Validate: selected cards must be covered by non-overlapping valid capture groups.
+            // e.g. playing 9 against [9,6,2,A]: selecting all 4 is valid because {9} + {6,2,A} = 9
             const cardVal = rankValue(rank);
-            if (hasFace || sum !== cardVal) return { ok: false, error: 'תפיסה לא חוקית' };
+            if (cardVal === null) return { ok: false, error: 'תפיסה לא חוקית' };
+
+            // Get all valid groups (subsets of tableCards summing/matching to cardVal)
+            const allGroups = findCaptures(cardStr, tableCards); // array of card-string arrays
+            // Convert selectedCapture (indices) to card strings for matching
+            const selectedCards = captureGroup.slice(); // already mapped above
+
+            // Greedy cover: try to cover all selectedCards with non-overlapping valid groups
+            const remaining = [...selectedCards];
+            for (const group of allGroups) {
+                if (remaining.length === 0) break;
+                // Check if this group is a subset of remaining
+                const groupSet = new Set(group);
+                const canUse = group.every(gc => {
+                    const idx = remaining.indexOf(gc);
+                    return idx !== -1;
+                });
+                if (canUse) {
+                    // Remove used cards from remaining
+                    for (const gc of group) {
+                        const idx = remaining.indexOf(gc);
+                        if (idx !== -1) remaining.splice(idx, 1);
+                    }
+                }
+            }
+            if (remaining.length > 0) return { ok: false, error: 'תפיסה לא חוקית' };
         }
     } else if (isJack(cardStr) || is7D(cardStr)) {
         // Auto-capture all for Jack and 7♦

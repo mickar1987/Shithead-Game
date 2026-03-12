@@ -1777,11 +1777,17 @@ function registerBasraHandlers(socket) {
         if (room.committedBy !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
 
         const card = room.committedCard;
-        room.committedCard = null;
-        room.committedBy = null;
 
         const result = basra.playCard(room, slotIdx, card, captureIndices || [], true);
-        if (!result.ok) { socket.emit('basraError', result.error); return; }
+        if (!result.ok) {
+            // Keep committedCard so player can retry — it's still their turn
+            socket.emit('basraError', result.error);
+            basraEmitAll(room); // re-emit so client stays in capture phase
+            return;
+        }
+
+        room.committedCard = null;
+        room.committedBy = null;
 
         const p = room.slots[slotIdx];
         if (result.capturedCards.length > 0) {
