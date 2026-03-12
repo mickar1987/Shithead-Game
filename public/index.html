@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.67</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.68</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -791,7 +791,7 @@
         <div id="playerTable"></div>
         <div id="actionButtons" class="hidden">
             <button id="swapDoneBtn" onclick="endSwapPhase()" class="action-btn">✅ סיום החלפה</button>
-            <button id="playBtn" onclick="humanPlay()" class="action-btn">▶ שחק</button>
+            <button id="playBtn" onclick="humanPlay()" class="action-btn">▶ שחק קלף</button>
             <button id="takeBtn" onclick="humanTake()" class="action-btn">↙ קח</button>
             <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;">⚡ התפרץ!</button>
         </div>
@@ -2856,6 +2856,13 @@ if (!onlineMode) return; // already left to menu
     socket.on('basraError', msg => {
         showToast(msg);
         ['basraCreateError','basraJoinError'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=msg; });
+        // Show error in game status too (e.g. invalid capture)
+        const statusEl = document.getElementById('basraStatusMsg');
+        if (statusEl && document.getElementById('menuBasraGame')?.style.display !== 'none') {
+            statusEl.textContent = '❌ ' + msg;
+            statusEl.style.color = '#f87171';
+            setTimeout(() => { statusEl.style.color = ''; if (basraState) basraRender(basraState); }, 2000);
+        }
     });
     socket.on('basraJoined', ({code, slotIdx, playerCount, bet}) => {
         basraRoomCode=code; basraMySlot=slotIdx;
@@ -3812,16 +3819,7 @@ function basraRenderCard(cardStr, faceUp, selected, clickFn) {
 // ── Two-phase play logic ──
 // Phase 1: player selects card from hand → clicks "שחק" → card goes to table visually
 // Phase 2: player selects which table cards to capture → clicks "אסוף" → server validates + collects
-function basraCommitCard() {
-    // Send card to server — it will add to table and wait for capture decision
-    if (!basraSelectedCard) return;
-    socket.emit('basraCommitCard', { card: basraSelectedCard });
-    basraCommittedCard = basraSelectedCard;
-    basraSelectedCard = null;
-    basraSelectedCaptures = [];
-    basraPlayPhase = 'capture';
-    if (basraState) basraRender(basraState);
-}
+// basraCommitCard merged into basraPlaySelected
 function basraConfirmCapture() {
     socket.emit('basraPlay', { captureIndices: basraSelectedCaptures.slice() });
     basraCommittedCard = null;
@@ -4669,59 +4667,118 @@ function basraRender(state) {
     const isMyTurn = state.isMyTurn;
     const myIdx = state.mySlotIdx;
     const oppIdx = myIdx===0?1:0;
+
+    // Sync phase from server state
+    const inCommitPhase = !!(state.committedCard && state.committedBy === myIdx);
+    if (inCommitPhase) {
+        basraPlayPhase = 'capture';
+        basraCommittedCard = state.committedCard;
+    } else if (!state.committedCard) {
+        basraPlayPhase = 'select';
+        basraCommittedCard = null;
+        if (!isMyTurn) { basraSelectedCard = null; basraSelectedCaptures = []; }
+    }
+
+    // Score bar
     document.getElementById('basraScoreBar').textContent =
         state.playerNames.map((n,i)=>n.split(' ')[0]+': '+(state.scores[i]||0)).join('  |  ');
+
     // Gold border around active player area
     const myArea = document.getElementById('basraPlayerArea');
     const oppArea = document.getElementById('basraOpponentArea');
     if (myArea) { myArea.style.outline = isMyTurn ? '2px solid var(--gold)' : 'none'; myArea.style.borderRadius='12px'; }
     if (oppArea) { oppArea.style.outline = !isMyTurn ? '2px solid var(--gold)' : 'none'; oppArea.style.borderRadius='12px'; }
+
+    // Opponent
     document.getElementById('basraOpponentName').textContent = (state.currentPlayer===oppIdx?'▶ ':'')+state.playerNames[oppIdx];
     document.getElementById('basraOpponentInfo').textContent = 'תפוסים: '+(state.capturedCounts[oppIdx]||0)+' | בסרות: '+(state.basraCounts[oppIdx]||0);
     const oppHandEl=document.getElementById('basraOpponentHand'); oppHandEl.innerHTML='';
     ((state.handCounts||[])[oppIdx]||0) && Array.from({length:(state.handCounts||[])[oppIdx]}).forEach(()=>oppHandEl.appendChild(basraRenderCard('',false,false,null)));
-    const tableEl=document.getElementById('basraTableCards'); const emptyEl=document.getElementById('basraTableEmpty');
+
+    // Table cards
+    const tableEl=document.getElementById('basraTableCards');
+    const emptyEl=document.getElementById('basraTableEmpty');
     tableEl.innerHTML='';
-    if (state.tableCards.length===0) emptyEl.style.display='block';
-    else {
-        emptyEl.style.display='none';
-        state.tableCards.forEach((card,idx)=>{
-            const sel=basraSelectedCaptures.includes(idx);
-            tableEl.appendChild(basraRenderCard(card,true,sel,()=>{
-                if (!isMyTurn||!basraSelectedCard) return;
-                const pos=basraSelectedCaptures.indexOf(idx);
-                if(pos>-1) basraSelectedCaptures.splice(pos,1); else basraSelectedCaptures.push(idx);
+    const hasTableContent = state.tableCards.length > 0 || state.committedCard;
+    emptyEl.style.display = hasTableContent ? 'none' : 'block';
+    // Regular table cards — selectable in capture phase
+    state.tableCards.forEach((card,idx)=>{
+        const sel = basraSelectedCaptures.includes(idx);
+        const canSelect = isMyTurn && basraPlayPhase === 'capture';
+        tableEl.appendChild(basraRenderCard(card,true,sel,()=>{
+            if (!canSelect) return;
+            const pos=basraSelectedCaptures.indexOf(idx);
+            if(pos>-1) basraSelectedCaptures.splice(pos,1); else basraSelectedCaptures.push(idx);
+            basraRender(state);
+        }));
+    });
+    // Committed card — shown with gold outline, not selectable
+    if (state.committedCard) {
+        const committedEl = basraRenderCard(state.committedCard, true, false, null);
+        committedEl.style.outline = '3px solid var(--gold)';
+        committedEl.style.outlineOffset = '2px';
+        committedEl.style.cursor = 'default';
+        tableEl.appendChild(committedEl);
+    }
+
+    // Deck
+    const _deals2 = state.deckCount > 0 ? Math.floor(state.deckCount / (state.playerNames.length * 4)) : 0;
+    document.getElementById('basraDeckDisplay').textContent = state.deckCount > 0 ? (_deals2 > 0 ? _deals2 : '<1') : '✓';
+
+    // My hand — only shown in select phase
+    const myHandEl=document.getElementById('basraMyHand'); myHandEl.innerHTML='';
+    if (basraPlayPhase === 'select') {
+        (state.myHand||[]).forEach(card=>{
+            const sel=basraSelectedCard===card;
+            myHandEl.appendChild(basraRenderCard(card,true,sel,()=>{
+                if (!isMyTurn) return;
+                if (basraSelectedCard===card) { basraSelectedCard=null; basraSelectedCaptures=[]; }
+                else { basraSelectedCard=card; basraSelectedCaptures=[]; }
                 basraRender(state);
             }));
         });
     }
-    const _deals2 = state.deckCount > 0 ? Math.floor(state.deckCount / (state.playerNames.length * 4)) : 0;
-    document.getElementById('basraDeckDisplay').textContent = state.deckCount > 0 ? (_deals2 > 0 ? _deals2 : '<1') : '✓';
-    const myHandEl=document.getElementById('basraMyHand'); myHandEl.innerHTML='';
-    (state.myHand||[]).forEach(card=>{
-        const sel=basraSelectedCard===card;
-        myHandEl.appendChild(basraRenderCard(card,true,sel,()=>{
-            if (!isMyTurn) return;
-            if (basraSelectedCard===card) { basraSelectedCard=null; basraSelectedCaptures=[]; }
-            else { basraSelectedCard=card; basraSelectedCaptures=[]; basraAutoSelectCaptures(card,state.tableCards); }
-            basraRender(state);
-        }));
-    });
+
+    // My info
     document.getElementById('basraMyInfo').textContent = 'תפוסים: '+(state.capturedCounts[myIdx]||0)+' | בסרות: '+(state.basraCounts[myIdx]||0);
-    const playBtn=document.getElementById('basraPlayBtn'); const cancelBtn=document.getElementById('basraCancelBtn');
-    playBtn.style.display=(isMyTurn&&basraSelectedCard)?'block':'none';
-    cancelBtn.style.display=(isMyTurn&&basraSelectedCard)?'block':'none';
+
+    // Buttons
+    const playBtn    = document.getElementById('basraPlayBtn');
+    const confirmBtn = document.getElementById('basraConfirmBtn');
+    const cancelBtn  = document.getElementById('basraCancelBtn');
+    if (isMyTurn && basraPlayPhase === 'select') {
+        playBtn.style.display    = basraSelectedCard ? 'block' : 'none';
+        confirmBtn.style.display = 'none';
+        cancelBtn.style.display  = basraSelectedCard ? 'block' : 'none';
+    } else if (isMyTurn && basraPlayPhase === 'capture') {
+        playBtn.style.display    = 'none';
+        confirmBtn.style.display = 'block';
+        cancelBtn.style.display  = 'none';
+    } else {
+        playBtn.style.display = confirmBtn.style.display = cancelBtn.style.display = 'none';
+    }
+
+    // Status
     const statusEl=document.getElementById('basraStatusMsg');
-    if (!isMyTurn) statusEl.textContent='תור של '+state.playerNames[state.currentPlayer];
-    else if (!basraSelectedCard) statusEl.textContent='בחר קלף מהיד';
-    else if (basraSelectedCaptures.length===0) statusEl.textContent='בחר קלפים לתפוס (או שחק ללא תפיסה)';
-    else statusEl.textContent='תופס '+basraSelectedCaptures.length+' קלפים';
+    if (!isMyTurn) {
+        statusEl.textContent = 'תור של '+state.playerNames[state.currentPlayer];
+    } else if (basraPlayPhase === 'select') {
+        statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק קלף' : 'בחר קלף מהיד';
+    } else {
+        statusEl.textContent = basraSelectedCaptures.length > 0
+            ? 'בחרת '+basraSelectedCaptures.length+' קלפים — לחץ ✅ אסוף'
+            : 'בחר קלפים לאיסוף, או ✅ אסוף ללא תפיסה';
+    }
 }
 
 function basraPlaySelected() {
-    if (!basraSelectedCard) return;
-    socket.emit('basraPlay', { card: basraSelectedCard, captureIndices: basraSelectedCaptures.slice() });
-    basraSelectedCard=null; basraSelectedCaptures=[];
+    if (!basraSelectedCard) { showToast('בחר קלף מהיד'); return; }
+    socket.emit('basraCommitCard', { card: basraSelectedCard });
+    basraCommittedCard = basraSelectedCard;
+    basraSelectedCard = null;
+    basraSelectedCaptures = [];
+    basraPlayPhase = 'capture';
+    if (basraState) basraRender(basraState);
 }
 function basraCancelSelection() {
     basraSelectedCard=null; basraSelectedCaptures=[];
@@ -4769,7 +4826,7 @@ function basraCancelSelection() {
         <div id="basraMyInfo" style="font-size:11px;color:rgba(255,200,50,0.6);"></div>
         <div id="basraMyHand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;"></div>
         <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
-            <button id="basraPlayBtn" onclick="basraCommitCard()" class="action-btn" style="display:none;">▶ שחק</button>
+            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;">▶ שחק קלף</button>
             <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);">✅ אסוף</button>
             <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
         </div>
