@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.63</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.64</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3656,8 +3656,8 @@ let basraSelectedCaptures = [];
 
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.getElementById('basraCount2').style.borderColor = n===2 ? 'var(--gold)' : '';
-    document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
 }
 
 let basraAccessVerified = false;
@@ -3692,14 +3692,13 @@ function basraVerifyAccess() {
 }
 function setBasraRoomType(type) {
     selectedBasraRoomType = type;
-    document.getElementById('basraRoomTypePublic').style.borderColor  = type==='public'  ? 'var(--gold)' : '';
-    document.getElementById('basraRoomTypePrivate').style.borderColor = type==='private' ? 'var(--gold)' : '';
+    document.querySelectorAll('#basraRoomTypePublic').forEach(b => b.style.borderColor = type==='public' ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraRoomTypePrivate').forEach(b => b.style.borderColor = type==='private' ? 'var(--gold)' : '');
 }
 function setBasraBet(val) {
     selectedBasraBet = val;
     [0,50,100,200,500].forEach(v => {
-        const b = document.getElementById('basraBetBtn'+v);
-        if (b) b.style.borderColor = v===val ? 'var(--gold)' : '';
+        document.querySelectorAll('#basraBetBtn'+v).forEach(b => b.style.borderColor = v===val ? 'var(--gold)' : '');
     });
     const warn = document.getElementById('basraBetWarning');
     if (warn && val > 0 && authUser && authUser.coins < val) {
@@ -3710,14 +3709,15 @@ function setBasraBet(val) {
 function setBasraTimer(val) {
     selectedBasraTimer = val;
     [15,30,60,0].forEach(v => {
-        const b = document.getElementById('basraTimerBtn'+v);
-        if (b) b.style.borderColor = v===val ? 'var(--gold)' : '';
+        document.querySelectorAll('#basraTimerBtn'+v).forEach(b => {
+            b.style.borderColor = v===val ? 'var(--gold)' : '';
+        });
     });
 }
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.getElementById('basraCount2').style.borderColor = n===2 ? 'var(--gold)' : '';
-    document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
 }
 function basraGetMyName() {
     if (authUser) {
@@ -4547,8 +4547,8 @@ function showReactionLocal(emoji, name) {
 
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.getElementById('basraCount2').style.borderColor = n===2 ? 'var(--gold)' : '';
-    document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
 }
 
 
@@ -4578,14 +4578,13 @@ function basraVerifyAccess() {
 }
 function setBasraRoomType(type) {
     selectedBasraRoomType = type;
-    document.getElementById('basraRoomTypePublic').style.borderColor  = type==='public'  ? 'var(--gold)' : '';
-    document.getElementById('basraRoomTypePrivate').style.borderColor = type==='private' ? 'var(--gold)' : '';
+    document.querySelectorAll('#basraRoomTypePublic').forEach(b => b.style.borderColor = type==='public' ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraRoomTypePrivate').forEach(b => b.style.borderColor = type==='private' ? 'var(--gold)' : '');
 }
 function setBasraBet(val) {
     selectedBasraBet = val;
     [0,50,100,200,500].forEach(v => {
-        const b = document.getElementById('basraBetBtn'+v);
-        if (b) b.style.borderColor = v===val ? 'var(--gold)' : '';
+        document.querySelectorAll('#basraBetBtn'+v).forEach(b => b.style.borderColor = v===val ? 'var(--gold)' : '');
     });
     const warn = document.getElementById('basraBetWarning');
     if (warn && val > 0 && authUser && authUser.coins < val) {
@@ -4595,8 +4594,8 @@ function setBasraBet(val) {
 }
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.getElementById('basraCount2').style.borderColor = n===2 ? 'var(--gold)' : '';
-    document.getElementById('basraCount4').style.borderColor = n===4 ? 'var(--gold)' : '';
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
 }
 
 function basraGetMyName() {
