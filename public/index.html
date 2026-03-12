@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.69</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.70</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2856,12 +2856,17 @@ if (!onlineMode) return; // already left to menu
     socket.on('basraError', msg => {
         showToast(msg);
         ['basraCreateError','basraJoinError'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=msg; });
-        // Show error in game status too (e.g. invalid capture)
+        // Show error in game status — keep phase intact so player can retry
         const statusEl = document.getElementById('basraStatusMsg');
-        if (statusEl && document.getElementById('menuBasraGame')?.style.display !== 'none') {
+        if (statusEl) {
             statusEl.textContent = '❌ ' + msg;
             statusEl.style.color = '#f87171';
-            setTimeout(() => { statusEl.style.color = ''; if (basraState) basraRender(basraState); }, 2000);
+            setTimeout(() => { statusEl.style.color = ''; if (basraState) basraRender(basraState); }, 2500);
+        }
+        // If capture error while in commit phase, clear selection but keep committed card visible
+        if (basraPlayPhase === 'capture') {
+            basraSelectedCaptures = [];
+            if (basraState) basraRender(basraState);
         }
     });
     socket.on('basraJoined', ({code, slotIdx, playerCount, bet}) => {
@@ -4645,20 +4650,49 @@ function basraLeave() {
 // ── Card rendering ──
 
 
-function basraAutoSelectCaptures(card, tableCards) {
+// Returns all valid capture groups (array of index-arrays) for a card against tableCards
+function basraFindValidCaptures(card, tableCards) {
     const rank = card.slice(0,-1);
-    basraSelectedCaptures = [];
-    if (rank === 'J' || card === '7d') { basraSelectedCaptures = tableCards.map((_,i)=>i); return; }
-    if (rank === 'Q' || rank === 'K') { tableCards.forEach((c,i)=>{ if(c.slice(0,-1)===rank) basraSelectedCaptures.push(i); }); return; }
-    const val = rank==='A'?1:parseInt(rank);
-    if (isNaN(val)) return;
-    const pairIdx = tableCards.findIndex(c=>c.slice(0,-1)===rank);
-    if (pairIdx>-1) { basraSelectedCaptures=[pairIdx]; return; }
-    for (let i=0;i<tableCards.length;i++) for (let j=i+1;j<tableCards.length;j++) {
-        const vi=tableCards[i].slice(0,-1), vj=tableCards[j].slice(0,-1);
-        const ni=vi==='A'?1:parseInt(vi), nj=vj==='A'?1:parseInt(vj);
-        if (!isNaN(ni)&&!isNaN(nj)&&ni+nj===val) { basraSelectedCaptures=[i,j]; return; }
+    const faceRanks = ['J','Q','K'];
+    const rankVal = r => r==='A'?1:(faceRanks.includes(r)?null:parseInt(r));
+    if (rank==='J' || card==='7d') return tableCards.length>0?[tableCards.map((_,i)=>i)]:[];
+    if (rank==='Q'||rank==='K') {
+        const g = tableCards.map((c,i)=>({c,i})).filter(x=>x.c.slice(0,-1)===rank).map(x=>x.i);
+        return g.length>0?[g]:[];
     }
+    const val = rankVal(rank);
+    if (val===null||isNaN(val)) return [];
+    const n = tableCards.length;
+    const result = [];
+    for (let mask=1;mask<(1<<n);mask++) {
+        let sum=0, group=[], valid=true;
+        for (let i=0;i<n;i++) {
+            if (mask&(1<<i)) {
+                const v = rankVal(tableCards[i].slice(0,-1));
+                if (v===null){valid=false;break;}
+                sum+=v; group.push(i);
+            }
+        }
+        if (valid&&sum===val) result.push(group);
+    }
+    return result;
+}
+
+function basraAutoSelectCaptures(card, tableCards) {
+    basraSelectedCaptures = [];
+    const groups = basraFindValidCaptures(card, tableCards);
+    if (groups.length > 0) basraSelectedCaptures = groups[0].slice();
+}
+
+// Validate client-side if current capture selection is legal
+function basraIsCaptureValid(card, tableCards, selectedIndices) {
+    if (!selectedIndices || selectedIndices.length === 0) return true; // no capture = always ok
+    const groups = basraFindValidCaptures(card, tableCards);
+    if (!groups.length) return false;
+    const rank = card.slice(0,-1);
+    if (rank==='J' || card==='7d') return true; // auto capture all
+    const selSet = JSON.stringify([...selectedIndices].sort((a,b)=>a-b));
+    return groups.some(g => JSON.stringify([...g].sort((a,b)=>a-b)) === selSet);
 }
 
 function basraRender(state) {
@@ -4716,7 +4750,16 @@ function basraRender(state) {
         tableEl.appendChild(basraRenderCard(card,true,sel,()=>{
             if (!canSelect) return;
             const pos=basraSelectedCaptures.indexOf(idx);
-            if(pos>-1) basraSelectedCaptures.splice(pos,1); else basraSelectedCaptures.push(idx);
+            const newSel = [...basraSelectedCaptures];
+            if(pos>-1) newSel.splice(pos,1); else newSel.push(idx);
+            // Client-side validation feedback
+            const valid = basraIsCaptureValid(state.committedCard, state.tableCards, newSel);
+            basraSelectedCaptures = newSel;
+            const statusEl = document.getElementById('basraStatusMsg');
+            if (!valid && newSel.length > 0 && statusEl) {
+                statusEl.textContent = '⚠️ בחירה לא חוקית';
+                statusEl.style.color = '#f87171';
+            } else if (statusEl) { statusEl.style.color = ''; }
             basraRender(state);
         }));
     });
@@ -4821,21 +4864,21 @@ function basraCancelSelection() {
         <div id="basraOpponentInfo" style="font-size:11px;color:rgba(255,200,50,0.6);"></div>
     </div>
 
+    <!-- Deck — fixed top-right corner -->
+    <div id="basraDeckArea" style="position:fixed;top:calc(env(safe-area-inset-top) + 56px);right:12px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:502;">
+        <div id="basraDeckDisplay" style="width:40px;height:56px;border-radius:8px;background:linear-gradient(135deg,#1a3a2a,#0d2016);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:rgba(255,255,255,0.4);"></div>
+        <div style="font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:1px;">קופה</div>
+    </div>
+
     <!-- Table (center) -->
     <div id="basraTableArea" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:501;">
-        <div id="basraDeckArea" style="display:flex;align-items:center;gap:12px;">
-            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-                <div id="basraDeckDisplay" style="width:44px;height:62px;border-radius:8px;background:linear-gradient(135deg,#1a3a2a,#0d2016);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:rgba(255,255,255,0.4);"></div>
-                <div style="font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:1px;">קופה</div>
-            </div>
-        </div>
         <div id="basraTurnTimer" style="display:none;font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:var(--gold);letter-spacing:3px;text-align:center;min-width:60px;transition:color 0.3s;text-shadow:0 0 12px rgba(240,192,64,0.5);"></div>
-        <div id="basraTableCards" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:72px;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(255,255,255,0.08);min-width:200px;"></div>
+        <div id="basraTableCards" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:72px;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(255,255,255,0.08);min-width:200px;max-width:320px;"></div>
         <div id="basraTableEmpty" style="font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:1px;display:none;">שולחן ריק</div>
         <!-- Committed card shown separately below table -->
-        <div id="basraCommittedArea" style="display:none;flex-direction:column;align-items:center;gap:4px;margin-top:4px;">
+        <div id="basraCommittedArea" style="display:none;flex-direction:column;align-items:center;gap:4px;margin-top:6px;">
             <div style="font-size:9px;color:rgba(255,200,50,0.5);letter-spacing:1px;">הקלף ששוחק</div>
-            <div id="basraCommittedCard" style=""></div>
+            <div id="basraCommittedCard"></div>
         </div>
     </div>
 
