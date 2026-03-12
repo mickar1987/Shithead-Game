@@ -1585,6 +1585,7 @@ io.on('basraConnection', () => {}); // no-op, handled in main io.on
 
 function basraClearBasraTimer(room) {
     if (room._timerTimeout) { clearTimeout(room._timerTimeout); room._timerTimeout = null; }
+    if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
 }
 
 function basraAdvanceTurn(room) {
@@ -1623,8 +1624,14 @@ function basraAdvanceTurn(room) {
     if (room.turnTimer > 0 && !room.gameOver && !room.roundOver) {
         basraClearBasraTimer(room);
         room._timerStarted = Date.now();
+        room._timerRemaining = room.turnTimer;
+        room._timerInterval = setInterval(() => {
+            room._timerRemaining--;
+            basraBroadcast(room, 'basraTimerTick', { remaining: room._timerRemaining, currentPlayer: room.currentPlayer });
+            if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
+        }, 1000);
         room._timerTimeout = setTimeout(() => {
-            // Auto-play random card without capture
+            if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
             const p = room.slots[room.currentPlayer];
             if (!p || p.hand.length === 0) return;
             const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
