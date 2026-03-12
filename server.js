@@ -199,6 +199,16 @@ app.post('/api/verify', async (req, res) => {
     } catch(e) { console.error('[verify error]', e); res.json({ ok: false }); }
 });
 
+app.post('/api/coins', async (req, res) => {
+    const { username, token } = req.body || {};
+    if (!username || !token) return res.json({ ok: false });
+    try {
+        const user = await db.collection('users').findOne({ username });
+        if (!user || user.token !== token) return res.json({ ok: false });
+        res.json({ ok: true, coins: user.coins || 0 });
+    } catch(e) { res.json({ ok: false }); }
+});
+
 app.post('/api/daily', async (req, res) => {
     try {
         const { username, token } = req.body;
