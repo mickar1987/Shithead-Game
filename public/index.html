@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.70</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.73</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3826,7 +3826,15 @@ function basraRenderCard(cardStr, faceUp, selected, clickFn) {
 // Phase 2: player selects which table cards to capture → clicks "אסוף" → server validates + collects
 // basraCommitCard merged into basraPlaySelected
 function basraConfirmCapture() {
+    if (basraSelectedCaptures.length === 0) { showToast('בחר קלפים לאיסוף'); return; }
     socket.emit('basraPlay', { captureIndices: basraSelectedCaptures.slice() });
+    basraCommittedCard = null;
+    basraPlayPhase = 'select';
+    basraSelectedCaptures = [];
+}
+function basraThrowCard() {
+    // Throw committed card to table (no capture)
+    socket.emit('basraPlay', { captureIndices: [] });
     basraCommittedCard = null;
     basraPlayPhase = 'select';
     basraSelectedCaptures = [];
@@ -4685,14 +4693,21 @@ function basraAutoSelectCaptures(card, tableCards) {
 }
 
 // Validate client-side if current capture selection is legal
+// Supports multiple non-overlapping groups: e.g. playing 9, selecting [9, 6, 2, A] = {9} + {6+2+A}
 function basraIsCaptureValid(card, tableCards, selectedIndices) {
-    if (!selectedIndices || selectedIndices.length === 0) return true; // no capture = always ok
-    const groups = basraFindValidCaptures(card, tableCards);
-    if (!groups.length) return false;
+    if (!selectedIndices || selectedIndices.length === 0) return true;
     const rank = card.slice(0,-1);
-    if (rank==='J' || card==='7d') return true; // auto capture all
-    const selSet = JSON.stringify([...selectedIndices].sort((a,b)=>a-b));
-    return groups.some(g => JSON.stringify([...g].sort((a,b)=>a-b)) === selSet);
+    if (rank==='J' || card==='7d') return true;
+    const groups = basraFindValidCaptures(card, tableCards); // array of index-arrays
+    if (!groups.length) return false;
+    // Try to cover all selectedIndices with non-overlapping valid groups
+    const remaining = [...selectedIndices];
+    for (const group of groups) {
+        if (remaining.length === 0) break;
+        const canUse = group.every(i => remaining.includes(i));
+        if (canUse) group.forEach(i => { const pos = remaining.indexOf(i); if(pos>-1) remaining.splice(pos,1); });
+    }
+    return remaining.length === 0;
 }
 
 function basraRender(state) {
@@ -4801,17 +4816,20 @@ function basraRender(state) {
     // Buttons
     const playBtn    = document.getElementById('basraPlayBtn');
     const confirmBtn = document.getElementById('basraConfirmBtn');
+    const throwBtn   = document.getElementById('basraThrowBtn');
     const cancelBtn  = document.getElementById('basraCancelBtn');
     if (state.isMyTurn && !inCommitPhase) {
         playBtn.style.display    = basraSelectedCard ? 'block' : 'none';
         confirmBtn.style.display = 'none';
+        throwBtn.style.display   = 'none';
         cancelBtn.style.display  = basraSelectedCard ? 'block' : 'none';
     } else if (inCommitPhase) {
         playBtn.style.display    = 'none';
         confirmBtn.style.display = 'block';
+        throwBtn.style.display   = 'block';
         cancelBtn.style.display  = 'none';
     } else {
-        playBtn.style.display = confirmBtn.style.display = cancelBtn.style.display = 'none';
+        playBtn.style.display = confirmBtn.style.display = throwBtn.style.display = cancelBtn.style.display = 'none';
     }
 
     // Status
@@ -4889,6 +4907,7 @@ function basraCancelSelection() {
         <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
             <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;">▶ שחק קלף</button>
             <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);">✅ אסוף</button>
+            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">↓ זרוק קלף</button>
             <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
