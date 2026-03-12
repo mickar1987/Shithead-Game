@@ -1832,6 +1832,35 @@ function registerBasraHandlers(socket) {
         socket.data.basraRoom = null;
         socket.data.basraSlot = null;
     });
+
+    socket.on('basraForfeit', () => {
+        const code = socket.data.basraRoom;
+        if (!code || !basraRooms[code]) return;
+        const room = basraRooms[code];
+        const slotIdx = socket.data.basraSlot;
+        const slot = room.slots[slotIdx];
+        if (!slot) return;
+
+        basraClearBasraTimer(room);
+        room.gameOver = true;
+
+        // Find winner(s) — everyone else
+        const winners = room.slots.filter((s, i) => i !== slotIdx);
+        const loserName = slot.name;
+
+        basraBroadcast(room, 'toast', `${loserName} עזב — המשחק הסתיים`);
+        basraBroadcast(room, 'basraGameOver', {
+            names: room.slots.map(s => s.name),
+            scores: room.slots.map(s => s.score || 0),
+            forfeitBy: slotIdx,
+            forfeitName: loserName,
+        });
+
+        slot.connected = false;
+        slot.socketId = null;
+        socket.data.basraRoom = null;
+        socket.data.basraSlot = null;
+    });
 }
 
 
