@@ -2957,12 +2957,9 @@ if (!onlineMode) return; // already left to menu
 
 
 // Fetch stats on page load
-// Run loadAuth early so user sees their profile immediately
-document.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('load', () => {
     loadAuth();
     loadProfile();
-});
-window.addEventListener('load', () => {
     setTimeout(fetchOnlineStats, 500);
 });
 

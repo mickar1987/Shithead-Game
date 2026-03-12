@@ -1,9 +1,9 @@
-const CACHE = 'shithead-v6';
-const STATIC_ASSETS = ['/manifest.json', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'shithead-v7';
+const ASSETS = ['/', '/index.html', '/manifest.json', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS)));
-    self.skipWaiting(); // activate immediately
+    e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+    self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
@@ -15,15 +15,10 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const url = e.request.url;
-    // Never intercept API calls or socket.io
-    if (url.includes('/api/') || url.includes('socket.io')) return;
-    // Never cache HTML — always fetch fresh from network
-    if (e.request.destination === 'document' || url.endsWith('/') || url.endsWith('.html')) {
-        e.respondWith(fetch(e.request).catch(() => caches.match('/')));
-        return;
-    }
-    // Static assets: cache first
+    // Never intercept API calls
+    if (url.includes('/api/')) return;
+    // Network first for everything — fallback to cache when server is sleeping
     e.respondWith(
-        caches.match(e.request).then(cached => cached || fetch(e.request))
+        fetch(e.request).catch(() => caches.match(e.request))
     );
 });
