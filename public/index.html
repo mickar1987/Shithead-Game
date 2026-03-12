@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.73</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.75</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2919,12 +2919,14 @@ if (!onlineMode) return; // already left to menu
         el.textContent = remaining;
         el.style.color = remaining <= 5 ? '#ef4444' : 'var(--gold)';
         el.style.textShadow = remaining <= 5 ? '0 0 16px rgba(239,68,68,0.8)' : '0 0 12px rgba(240,192,64,0.5)';
-        // highlight active player area
+        // Turn border: red when urgent, gold otherwise — don't clear it
         const isMyTurn = basraMySlot === currentPlayer;
         const myArea = document.getElementById('basraPlayerArea');
         const oppArea = document.getElementById('basraOpponentArea');
-        if (myArea) myArea.style.outline = isMyTurn && remaining <= 5 ? '2px solid #ef4444' : '';
-        if (oppArea) oppArea.style.outline = !isMyTurn && remaining <= 5 ? '2px solid #ef4444' : '';
+        const urgentColor = '#ef4444';
+        const normalColor = 'var(--gold)';
+        if (myArea && isMyTurn) myArea.style.outline = `2px solid ${remaining <= 5 ? urgentColor : normalColor}`;
+        if (oppArea && !isMyTurn) oppArea.style.outline = `2px solid ${remaining <= 5 ? urgentColor : normalColor}`;
     });
     socket.on('basraRoundOver', ({scores, totalScores, pendingMajority}) => {
         const overlay=document.getElementById('basraResultOverlay');
@@ -4742,9 +4744,10 @@ function basraRender(state) {
     // Gold border around active player area
     const myArea = document.getElementById('basraPlayerArea');
     const oppArea = document.getElementById('basraOpponentArea');
+    // showMyTurn: my turn to act = server says it's my turn, OR I committed and waiting for capture choice
     const showMyTurn = state.isMyTurn || inCommitPhase;
-    if (myArea) { myArea.style.outline = showMyTurn ? '2px solid var(--gold)' : 'none'; myArea.style.borderRadius='12px'; }
-    if (oppArea) { oppArea.style.outline = !showMyTurn ? '2px solid var(--gold)' : 'none'; oppArea.style.borderRadius='12px'; }
+    if (myArea) { myArea.style.outline = showMyTurn ? '2px solid var(--gold)' : '2px solid transparent'; myArea.style.borderRadius='12px'; }
+    if (oppArea) { oppArea.style.outline = !showMyTurn ? '2px solid var(--gold)' : '2px solid transparent'; oppArea.style.borderRadius='12px'; }
 
     // Opponent
     document.getElementById('basraOpponentName').textContent = (!state.isMyTurn && !inCommitPhase ?'▶ ':'')+state.playerNames[oppIdx];
@@ -4907,7 +4910,7 @@ function basraCancelSelection() {
         <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
             <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;">▶ שחק קלף</button>
             <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);">✅ אסוף</button>
-            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">↓ זרוק קלף</button>
+            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;">↓ זרוק קלף</button>
             <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
