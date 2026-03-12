@@ -516,7 +516,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.56</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.60</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2884,6 +2884,7 @@ if (!onlineMode) return; // already left to menu
         document.getElementById('setupOverlay').style.display='none';
         const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
         const pa = document.getElementById('playerArea'); if (pa) pa.style.display='none';
+        document.querySelectorAll('.log-btn').forEach(el => el.style.display='none');
         showToast('המשחק התחיל!');
     });
     socket.on('basraState', state => {
@@ -2892,6 +2893,7 @@ if (!onlineMode) return; // already left to menu
         document.getElementById('setupOverlay').style.display='none';
         const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
         const pa = document.getElementById('playerArea'); if (pa) pa.style.display='none';
+        document.querySelectorAll('.log-btn').forEach(el => el.style.display='none');
         basraRender(state);
     });
     socket.on('basraEvent', ({type, name}) => {
@@ -3741,6 +3743,7 @@ function basraLeave() {
     document.getElementById('basraResultOverlay').style.display = 'none';
     const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='';
     const pa = document.getElementById('playerArea'); if (pa) pa.style.display='';
+    document.querySelectorAll('.log-btn').forEach(el => el.style.display='');
     basraState = null; basraMySlot = null; basraRoomCode = null;
     basraCommittedCard = null; basraPlayPhase = 'select';
     basraClearTimer();
@@ -3883,7 +3886,8 @@ function basraRender(state) {
     }
 
     // Deck
-    document.getElementById('basraDeckDisplay').textContent = state.deckCount || 0;
+    const _deals = state.deckCount > 0 ? Math.floor(state.deckCount / (state.playerNames.length * 4)) : 0;
+    document.getElementById('basraDeckDisplay').textContent = state.deckCount > 0 ? (_deals > 0 ? _deals : '<1') : '✓';
 
     // My hand
     const myHandEl = document.getElementById('basraMyHand');
@@ -4796,7 +4800,8 @@ function basraRender(state) {
             }));
         });
     }
-    document.getElementById('basraDeckDisplay').textContent = state.deckCount||0;
+    const _deals2 = state.deckCount > 0 ? Math.floor(state.deckCount / (state.playerNames.length * 4)) : 0;
+    document.getElementById('basraDeckDisplay').textContent = state.deckCount > 0 ? (_deals2 > 0 ? _deals2 : '<1') : '✓';
     const myHandEl=document.getElementById('basraMyHand'); myHandEl.innerHTML='';
     (state.myHand||[]).forEach(card=>{
         const sel=basraSelectedCard===card;

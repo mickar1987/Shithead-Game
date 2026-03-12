@@ -1,4 +1,4 @@
-const CACHE = 'shithead-v4';
+const CACHE = 'shithead-v5';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
