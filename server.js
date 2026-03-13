@@ -1667,9 +1667,9 @@ function basraAdvanceTurn(room) {
                     if (teamScores[0] !== teamScores[1]) {
                         room.gameOver = true;
                         const winTeamIdx = teamScores[0] > teamScores[1] ? 0 : 1;
-                        const sorted = [...room.slots].sort((a,b)=>(b.score||0)-(a.score||0));
                         basraBroadcast(room, 'basraGameOver', {
-                            names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0),
+                            names: room.slots.map(s=>s.name),
+                            scores: room.slots.map(s=>s.score||0),
                             teams: room.teams, teamScores
                         });
                         const winnerSlot = room.teams[winTeamIdx][0];
@@ -1846,13 +1846,10 @@ function registerBasraHandlers(socket) {
         const allConnected = room.slots.every(s => s.connected);
         if (allConnected) {
             room.gameStarted = true;
-            // Assign teams for 4-player: shuffle seat order randomly
+            // Teams for 4-player: slots 0+2 (top/bottom = face each other) vs slots 1+3 (left/right)
+            // Seating is random by join order, so teams are already randomized
             if (room.slots.length === 4 && !room.teams) {
-                const order = [0,1,2,3].sort(() => Math.random()-0.5);
-                // Map: physical slot → shuffled position
-                // We keep slots as-is but assign team membership based on shuffled order
-                // order[0] & order[2] = team A, order[1] & order[3] = team B
-                room.teams = [[order[0], order[2]], [order[1], order[3]]];
+                room.teams = [[0, 2], [1, 3]];
             }
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
             if (room.teams) {
