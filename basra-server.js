@@ -294,41 +294,47 @@ function scoreRound(room) {
     }));
 
     if (room.teams) {
-        // 4-player team mode: combine cards and basras per team
-        room.teams.forEach((team, ti) => {
+        // 4-player team mode: combine ALL stats per team → single team score
+        const teamStats = room.teams.map((team, ti) => {
             const teamCards = team.reduce((sum, idx) => sum + scores[idx].cards, 0);
-            const teamBasras = team.reduce((sum, idx) => sum + scores[idx].basras, 0);
-            const teamJackBasras = team.reduce((sum, idx) => sum + scores[idx].jackBasras, 0);
+            const teamBasras = team.reduce((sum, idx) => sum + (room.slots[idx].basras||0), 0);
+            const teamJackBasras = team.reduce((sum, idx) => sum + (room.slots[idx].jackBasras||0), 0);
             team.forEach(idx => {
                 scores[idx].teamIdx = ti;
                 scores[idx].teamCards = teamCards;
+                scores[idx].teamBasras = teamBasras;
+                scores[idx].teamJackBasras = teamJackBasras;
             });
+            return { teamCards, teamBasras, teamJackBasras };
         });
 
-        // Majority: compare team totals
-        const teamTotals = room.teams.map(team =>
-            team.reduce((sum, idx) => sum + scores[idx].cards, 0));
-        const maxTeamCards = Math.max(...teamTotals);
-        const winningTeams = room.teams.filter((_, ti) => teamTotals[ti] === maxTeamCards);
+        // Majority: compare combined team card counts
+        const maxTeamCards = Math.max(...teamStats.map(t => t.teamCards));
+        const winningTeamIdx = teamStats.findIndex(t => t.teamCards === maxTeamCards);
+        const tiedMajority = teamStats.filter(t => t.teamCards === maxTeamCards).length > 1;
 
-        if (winningTeams.length === 1) {
-            const pts = 30 + room.pendingMajorityPoints;
-            winningTeams[0].forEach(idx => {
-                scores[idx].points += pts;
-                scores[idx].majorityPoints = pts;
+        room.teams.forEach((team, ti) => {
+            const st = teamStats[ti];
+            // Combined team points = majority + basras
+            let teamPts = 0;
+            let majorityPts = 0;
+            if (!tiedMajority && ti === winningTeamIdx) {
+                majorityPts = 30 + room.pendingMajorityPoints;
+                teamPts += majorityPts;
+            }
+            const regularBasras = st.teamBasras - st.teamJackBasras;
+            teamPts += regularBasras * 10 + st.teamJackBasras * 20;
+            // Both team members get identical points
+            team.forEach(idx => {
+                scores[idx].points = teamPts;
+                scores[idx].majorityPoints = majorityPts;
             });
+        });
+        if (!tiedMajority) {
             room.pendingMajorityPoints = 0;
         } else {
             room.pendingMajorityPoints += 30;
         }
-
-        // Basra bonus per player
-        room.teams.forEach(team => {
-            team.forEach(idx => {
-                const s = room.slots[idx];
-                scores[idx].points += ((s.basras||0)-(s.jackBasras||0))*10 + (s.jackBasras||0)*20;
-            });
-        });
 
     } else {
         // 2-player mode
@@ -349,9 +355,18 @@ function scoreRound(room) {
     }
 
     // Apply to cumulative scores
-    scores.forEach((sc, i) => {
-        room.slots[i].score = (room.slots[i].score || 0) + sc.points;
-    });
+    if (room.teams) {
+        // Both team members share the same points
+        room.teams.forEach(team => {
+            team.forEach(idx => {
+                room.slots[idx].score = (room.slots[idx].score || 0) + scores[idx].points;
+            });
+        });
+    } else {
+        scores.forEach((sc, i) => {
+            room.slots[i].score = (room.slots[i].score || 0) + sc.points;
+        });
+    }
 
     return scores;
 }

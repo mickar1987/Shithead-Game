@@ -1654,6 +1654,7 @@ function basraAdvanceTurn(room) {
                 scores: roundScores,
                 totalScores: room.slots.map(s => s.score || 0),
                 pendingMajority: room.pendingMajorityPoints,
+                teams: room.teams || null,
             });
             const winThreshold = room.winScore || 120;
             if (room.teams) {
