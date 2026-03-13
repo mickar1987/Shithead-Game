@@ -1531,6 +1531,14 @@ emitStateToAll(room);
 //  BASRA SOCKET EVENTS
 // ══════════════════════════════════════════════
 
+function basraBroadcastExcept(room, excludeSocketId, event, data) {
+    room.slots.forEach(s => {
+        if (s.socketId && s.socketId !== excludeSocketId) {
+            io.to(s.socketId).emit(event, data);
+        }
+    });
+}
+
 function basraBroadcast(room, event, data) {
     room.slots.forEach(s => {
         if (s.socketId) io.to(s.socketId).emit(event, data);
@@ -1790,6 +1798,14 @@ function registerBasraHandlers(socket) {
     });
 
     // ── Phase 2: confirm capture ──
+    socket.on('basraCapturePreview', ({ captureIndices, groups }) => {
+        const code = socket.data.basraRoom;
+        if (!code || !basraRooms[code]) return;
+        const room = basraRooms[code];
+        // Broadcast to all OTHER players in room
+        basraBroadcastExcept(room, socket.id, 'basraCapturePreview', { captureIndices, groups });
+    });
+
     socket.on('basraPlay', ({ captureIndices }) => {
         const code = socket.data.basraRoom;
         const slotIdx = socket.data.basraSlot;

@@ -93,8 +93,11 @@ function isBasra(playedCard, capturedCards, tableCards) {
     // Jack: basra only if it clears a single card from the table
     if (rank === 'J') return tableCards.length === 1;
 
-    // 7♦: basra only if table total ≤ 10 and no face cards
+    // 7♦: various basra cases
     if (is7D(playedCard)) {
+        // If table has only 1 J → jack basra (20pts)
+        if (tableCards.length === 1 && cardRank(tableCards[0]) === 'J') return true;
+        // Otherwise: basra only if no face cards and total ≤ 10
         const hasFace = tableCards.some(c => ['J','Q','K'].includes(cardRank(c)));
         if (hasFace) return false;
         const total = tableCards.reduce((s, c) => s + (rankValue(cardRank(c)) || 0), 0);
@@ -254,7 +257,7 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
                 p.basras++;
                 if (!p.basraCards) p.basraCards = [];
                 // If J is involved (played card is J, or captured cards include J) → jack basra (20pts)
-                const jackInvolved = cardRank(cardStr) === 'J' || capturedCards.some(cc => cardRank(cc) === 'J');
+                const jackInvolved = cardRank(cardStr) === 'J' || capturedCards.some(cc => cardRank(cc) === 'J') || (is7D(cardStr) && tableCards.some(cc => cardRank(cc) === 'J'));
                 const basraCard = jackInvolved ? (cardRank(cardStr) === 'J' ? cardStr : capturedCards.find(cc => cardRank(cc) === 'J')) : cardStr;
                 p.basraCards.push({ card: basraCard, jack: jackInvolved });
                 if (jackInvolved) p.jackBasras = (p.jackBasras || 0) + 1;
