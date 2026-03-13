@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.34</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.35</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3124,7 +3124,7 @@ if (!onlineMode) return; // already left to menu
         }
     });
 
-    socket.on('basraGameOver', ({names, scores, forfeitBy, forfeitName}) => {
+    socket.on('basraGameOver', ({names, scores, forfeitBy, forfeitName, teams, teamScores}) => {
         // Cancel round countdown if running
         if (window._basraRoundTimer) { clearInterval(window._basraRoundTimer); window._basraRoundTimer = null; }
         const overlay=document.getElementById('basraResultOverlay');
@@ -3137,7 +3137,21 @@ if (!onlineMode) return; // already left to menu
             html += '<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🏆 משחק הסתיים!</div>';
         }
         html += '<div style="display:flex;flex-direction:column;gap:8px;">';
-        html += names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;" id="basra-go-row-${i}"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('');
+        if (teams && teamScores) {
+            // 4p team mode — show 2 rows
+            const teamColors = ['rgba(251,191,36,0.8)','rgba(96,165,250,0.8)'];
+            const winTeamIdx = teamScores[0] >= teamScores[1] ? 0 : 1;
+            teams.forEach((team, ti) => {
+                const teamNames = team.map(idx => names[idx].split(' ')[0]).join(' + ');
+                const medal = ti === winTeamIdx ? '🥇' : '🥈';
+                html += `<div style="display:flex;justify-content:space-between;gap:16px;font-size:14px;color:#fff;padding:4px 0;">
+                    <span style="color:${teamColors[ti]};font-weight:700;">${medal} ${teamNames}</span>
+                    <span style="color:var(--gold);">${teamScores[ti]} נק'</span>
+                </div>`;
+            });
+        } else {
+            html += names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;" id="basra-go-row-${i}"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('');
+        }
         html += '</div>';
         html += '<div id="basraCoinsResult" style="margin-top:10px;"></div>';
         document.getElementById('basraRoundScores').innerHTML = html;
