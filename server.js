@@ -1616,11 +1616,20 @@ function basraAdvanceTurn(room) {
                 totalScores: room.slots.map(s => s.score || 0),
                 pendingMajority: room.pendingMajorityPoints,
             });
-            const winner = room.slots.find(sl => (sl.score || 0) >= 101);
-            if (winner) {
-                room.gameOver = true;
-                const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
-                basraBroadcast(room, 'basraGameOver', { names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0) });
+            const winThreshold = room.winScore || 120;
+            const overThreshold = room.slots.filter(sl => (sl.score || 0) > winThreshold);
+            if (overThreshold.length > 0) {
+                const maxScore = Math.max(...room.slots.map(s => s.score || 0));
+                const tied = room.slots.filter(s => (s.score || 0) === maxScore);
+                if (tied.length === 1) {
+                    // Clear winner
+                    room.gameOver = true;
+                    const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                    basraBroadcast(room, 'basraGameOver', { names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0) });
+                } else {
+                    // Tiebreaker: continue playing, broadcast tiebreaker notice
+                    basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
+                }
             }
             basraEmitAll(room);
             return;
@@ -1683,7 +1692,7 @@ function registerBasraHandlers(socket) {
         socket.emit('basraAccessVerified', { ok: accessCode === basra.BASRA_ACCESS_CODE });
     });
 
-    socket.on('basraCreate', ({ name, playerCount, isPublic, bet, turnTimer, accessCode, username, token }) => {
+    socket.on('basraCreate', ({ name, playerCount, isPublic, bet, turnTimer, winScore, accessCode, username, token }) => {
         if (accessCode !== basra.BASRA_ACCESS_CODE) {
             socket.emit('basraError', 'קוד גישה שגוי'); return;
         }
@@ -1701,6 +1710,7 @@ function registerBasraHandlers(socket) {
         }));
 
         const room = basra.createBasraRoom(code, slots, bet || 0);
+        room.winScore = winScore || 120;
         room.isPublic = !!isPublic;
         room.turnTimer = parseInt(turnTimer) || 0;
         console.log(`[basra] room created, turnTimer=${room.turnTimer}, raw=${turnTimer}`);
