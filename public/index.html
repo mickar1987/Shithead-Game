@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.26</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.27</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3829,8 +3829,8 @@ let basraSelectedCaptures = [];
 
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
-    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
 }
 
 let basraAccessVerified = false;
@@ -3865,13 +3865,13 @@ function basraVerifyAccess() {
 }
 function setBasraRoomType(type) {
     selectedBasraRoomType = type;
-    document.querySelectorAll('#basraRoomTypePublic').forEach(b => b.style.borderColor = type==='public' ? 'var(--gold)' : '');
-    document.querySelectorAll('#basraRoomTypePrivate').forEach(b => b.style.borderColor = type==='private' ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraRoomTypePublic').forEach(b => b.style.borderColor = type==='public' ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
+    document.querySelectorAll('#basraRoomTypePrivate').forEach(b => b.style.borderColor = type==='private' ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
 }
 function setBasraBet(val) {
     selectedBasraBet = val;
     [0,50,100,200,500].forEach(v => {
-        document.querySelectorAll('#basraBetBtn'+v).forEach(b => b.style.borderColor = v===val ? 'var(--gold)' : '');
+        document.querySelectorAll('#basraBetBtn'+v).forEach(b => b.style.borderColor = v===val ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
     });
     const warn = document.getElementById('basraBetWarning');
     if (warn && val > 0 && authUser && authUser.coins < val) {
@@ -3880,6 +3880,18 @@ function setBasraBet(val) {
     if (warn) warn.textContent = '';
 }
 let selectedBasraWinScore = 120;
+
+// Init default selections visually
+document.addEventListener('DOMContentLoaded', () => {
+    // Run after DOM ready to highlight correct defaults
+    setTimeout(() => {
+        setBasraRoomType('public');
+        setBasraBet(0);
+        setBasraTimer(30);
+        setBasraWinScore(120);
+        selectBasraCount(2);
+    }, 100);
+});
 function setBasraWinScore(s) {
     selectedBasraWinScore = s;
     [40,80,120,180,220].forEach(v => {
@@ -3898,8 +3910,8 @@ function setBasraTimer(val) {
 }
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
-    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
 }
 function basraGetMyName() {
     if (authUser) {
@@ -4812,8 +4824,8 @@ function showReactionLocal(emoji, name) {
 
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
-    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
 }
 
 
@@ -4843,13 +4855,13 @@ function basraVerifyAccess() {
 }
 function setBasraRoomType(type) {
     selectedBasraRoomType = type;
-    document.querySelectorAll('#basraRoomTypePublic').forEach(b => b.style.borderColor = type==='public' ? 'var(--gold)' : '');
-    document.querySelectorAll('#basraRoomTypePrivate').forEach(b => b.style.borderColor = type==='private' ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraRoomTypePublic').forEach(b => b.style.borderColor = type==='public' ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
+    document.querySelectorAll('#basraRoomTypePrivate').forEach(b => b.style.borderColor = type==='private' ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
 }
 function setBasraBet(val) {
     selectedBasraBet = val;
     [0,50,100,200,500].forEach(v => {
-        document.querySelectorAll('#basraBetBtn'+v).forEach(b => b.style.borderColor = v===val ? 'var(--gold)' : '');
+        document.querySelectorAll('#basraBetBtn'+v).forEach(b => b.style.borderColor = v===val ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
     });
     const warn = document.getElementById('basraBetWarning');
     if (warn && val > 0 && authUser && authUser.coins < val) {
@@ -4859,8 +4871,8 @@ function setBasraBet(val) {
 }
 function selectBasraCount(n) {
     selectedBasraCount = n;
-    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : '');
-    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : '');
+    document.querySelectorAll('#basraCount2').forEach(b => b.style.borderColor = n===2 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
+    document.querySelectorAll('#basraCount4').forEach(b => b.style.borderColor = n===4 ? 'var(--gold)' : 'rgba(255,255,255,0.15)');
 }
 
 function basraGetMyName() {
