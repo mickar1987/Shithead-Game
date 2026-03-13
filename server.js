@@ -1770,6 +1770,7 @@ function registerBasraHandlers(socket) {
             players: r.slots.filter(s=>s.connected).length,
             total: r.slots.length,
             bet: r.bet || 0,
+            winScore: r.winScore || 120,
         })));
     });
 
