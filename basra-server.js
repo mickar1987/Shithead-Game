@@ -126,6 +126,7 @@ function createBasraRoom(code, slots, bet = 0) {
         s.hand = [];
         s.captured = [];
         s.basras = 0;
+        s.basraCards = [];
         s.score = 0; // cumulative game score
     });
 
@@ -247,7 +248,8 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
             basraScored = isBasra(cardStr, capturedCards, tableCards);
             if (basraScored) {
                 p.basras++;
-                // Mark basra in capture pile (conceptually — we track count)
+                if (!p.basraCards) p.basraCards = [];
+                p.basraCards.push(cardStr);
             }
         }
     } else {
@@ -334,6 +336,7 @@ function resetRound(room) {
         s.hand = [];
         s.captured = [];
         s.basras = 0;
+        s.basraCards = [];
     });
 
     for (let i = 0; i < 4; i++) {
