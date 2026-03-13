@@ -3,7 +3,7 @@
 //  BASRA GAME LOGIC (server-side module)
 // ══════════════════════════════════════════════
 
-const BASRA_ACCESS_CODE = '9218';
+const BASRA_ACCESS_CODE = null; // no access code required
 
 function makeDeck() {
     const suits = ['h','d','c','s'];
@@ -146,16 +146,8 @@ function createBasraRoom(code, slots, bet = 0) {
         slots.forEach(s => s.hand.push(deck.shift()));
     }
 
-    // For 4-player: shuffle seating randomly, assign teams (seats 0+2 vs 1+3)
+    // Teams assigned externally after all players join
     let teams = null;
-    if (slots.length === 4) {
-        // Shuffle slot order
-        const order = [0,1,2,3].sort(() => Math.random()-0.5);
-        const shuffled = order.map(i => slots[i]);
-        slots.forEach((s,i) => { Object.assign(slots[i], shuffled[i]); });
-        // Teams: slots 0&2 vs slots 1&3
-        teams = [[0,2],[1,3]];
-    }
 
     return {
         code,

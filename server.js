@@ -1766,13 +1766,10 @@ function basraAdvanceTurn(room) {
 function registerBasraHandlers(socket) {
 
     socket.on('basraVerifyAccess', ({ accessCode }) => {
-        socket.emit('basraAccessVerified', { ok: accessCode === basra.BASRA_ACCESS_CODE });
+        socket.emit('basraAccessVerified', { ok: true }); // no access code required
     });
 
     socket.on('basraCreate', async ({ name, playerCount, isPublic, bet, turnTimer, winScore, accessCode, username, token }) => {
-        if (accessCode !== basra.BASRA_ACCESS_CODE) {
-            socket.emit('basraError', 'קוד גישה שגוי'); return;
-        }
         const count = parseInt(playerCount) || 2;
         if (![2, 4].includes(count)) { socket.emit('basraError', 'שחקנים: 2 או 4'); return; }
 
@@ -1822,9 +1819,6 @@ function registerBasraHandlers(socket) {
     });
 
     socket.on('basraJoin', async ({ code, name, accessCode, username, token }) => {
-        if (accessCode !== basra.BASRA_ACCESS_CODE) {
-            socket.emit('basraError', 'קוד גישה שגוי'); return;
-        }
         const room = basraRooms[code?.toUpperCase()];
         if (!room) { socket.emit('basraError', 'חדר לא נמצא'); return; }
         if (room.gameStarted) { socket.emit('basraError', 'המשחק כבר התחיל'); return; }
@@ -1851,6 +1845,14 @@ function registerBasraHandlers(socket) {
         const allConnected = room.slots.every(s => s.connected);
         if (allConnected) {
             room.gameStarted = true;
+            // Assign teams for 4-player: shuffle seat order randomly
+            if (room.slots.length === 4 && !room.teams) {
+                const order = [0,1,2,3].sort(() => Math.random()-0.5);
+                // Map: physical slot → shuffled position
+                // We keep slots as-is but assign team membership based on shuffled order
+                // order[0] & order[2] = team A, order[1] & order[3] = team B
+                room.teams = [[order[0], order[2]], [order[1], order[3]]];
+            }
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
             if (room.teams) {
                 const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
