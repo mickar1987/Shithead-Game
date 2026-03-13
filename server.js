@@ -62,6 +62,33 @@ async function settleCoins(room) {
 }
 
 
+async function settleBasraCoins(room, winnerSlotIdx) {
+    if (room.coinsSettled || !room.bet || room.bet === 0) return;
+    room.coinsSettled = true;
+    const bet = room.bet;
+    const results = [];
+    for (let i = 0; i < room.slots.length; i++) {
+        const slot = room.slots[i];
+        const delta = i === winnerSlotIdx ? bet * (room.slots.length - 1) : -bet;
+        let finalCoins = null;
+        if (slot.username) {
+            try {
+                const u = await getUser(slot.username);
+                if (u) {
+                    finalCoins = Math.max(0, (u.coins || 0) + delta);
+                    await saveUser(slot.username, { coins: finalCoins });
+                    console.log(`[basra coins] ${slot.username}: ${delta>=0?'+':''}${delta} = ${finalCoins}`);
+                }
+            } catch(e) { console.error('[basra coins] error:', e.message); }
+        }
+        results.push({ name: slot.name, delta, coins: finalCoins, slotIdx: i });
+    }
+    // Emit to all players in basra room
+    room.slots.forEach(s => {
+        if (s.socketId) io.to(s.socketId).emit('coinsResult', results);
+    });
+}
+
 function buildDisplayName(first, last) {
     first = (first || '').trim();
     last  = (last  || '').trim();
@@ -1625,7 +1652,9 @@ function basraAdvanceTurn(room) {
                     // Clear winner
                     room.gameOver = true;
                     const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                    const winnerSlotIdx = room.slots.indexOf(sorted[0]);
                     basraBroadcast(room, 'basraGameOver', { names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0) });
+                    setTimeout(() => settleBasraCoins(room, winnerSlotIdx).catch(e => console.error('[basra coins]', e.message)), 300);
                 } else {
                     // Tiebreaker: continue playing, broadcast tiebreaker notice
                     basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
@@ -1877,6 +1906,13 @@ function registerBasraHandlers(socket) {
             const slotIdx = socket.data.basraSlot;
             const slot = room.slots[slotIdx];
             if (slot) { slot.connected = false; slot.socketId = null; }
+            // If game already over, ensure remaining players see the result
+            if (room.gameOver) {
+                const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                basraBroadcastExcept(room, socket.id, 'basraGameOver', {
+                    names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0)
+                });
+            }
             // If game was in progress, declare forfeit
             if (room.gameStarted && !room.gameOver) {
                 basraClearBasraTimer(room);
@@ -1889,6 +1925,8 @@ function registerBasraHandlers(socket) {
                     forfeitName: slot?.name || 'שחקן',
                 });
                 basraEmitAll(room);
+                const forfeitWinner = room.slots.findIndex((s,i) => i !== slotIdx);
+                setTimeout(() => settleBasraCoins(room, forfeitWinner).catch(e => console.error('[basra coins]', e.message)), 300);
             } else {
                 basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב`);
             }
@@ -1919,6 +1957,8 @@ function registerBasraHandlers(socket) {
             forfeitBy: slotIdx,
             forfeitName: loserName,
         });
+        const fWinner = room.slots.findIndex((s,i) => i !== slotIdx);
+        setTimeout(() => settleBasraCoins(room, fWinner).catch(e => console.error('[basra coins]', e.message)), 300);
 
         slot.connected = false;
         slot.socketId = null;
