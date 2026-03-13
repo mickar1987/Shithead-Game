@@ -1846,9 +1846,25 @@ function registerBasraHandlers(socket) {
         const allConnected = room.slots.every(s => s.connected);
         if (allConnected) {
             room.gameStarted = true;
-            // Teams for 4-player: slots 0+2 (top/bottom = face each other) vs slots 1+3 (left/right)
-            // Seating is random by join order, so teams are already randomized
+            // Teams for 4-player: shuffle players into seats, then 0+2 vs 1+3
             if (room.slots.length === 4 && !room.teams) {
+                // Shuffle the slot data (name, socketId, username) randomly
+                const indices = [0,1,2,3].sort(() => Math.random()-0.5);
+                const snapshot = room.slots.map(s => ({
+                    name: s.name, socketId: s.socketId, username: s.username,
+                    connected: s.connected, id: s.id
+                }));
+                indices.forEach((srcIdx, dstIdx) => {
+                    room.slots[dstIdx].name = snapshot[srcIdx].name;
+                    room.slots[dstIdx].socketId = snapshot[srcIdx].socketId;
+                    room.slots[dstIdx].username = snapshot[srcIdx].username;
+                    room.slots[dstIdx].connected = snapshot[srcIdx].connected;
+                    // Update socket's slot reference
+                    if (snapshot[srcIdx].socketId) {
+                        const sock = io.sockets.sockets.get(snapshot[srcIdx].socketId);
+                        if (sock) sock.data.basraSlot = dstIdx;
+                    }
+                });
                 room.teams = [[0, 2], [1, 3]];
             }
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
