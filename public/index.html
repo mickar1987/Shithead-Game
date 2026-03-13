@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.03</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.04</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4859,14 +4859,12 @@ function basraRenderPile(containerId, capturedCount, basraCards) {
     if (!capturedCount && (!basraCards || basraCards.length === 0)) return;
 
     const suitMap = {h:'\u2665\uFE0E', d:'\u2666\uFE0E', c:'\u2663\uFE0E', s:'\u2660\uFE0E'};
-    const fanAngles = { 1:[0], 2:[-28,0], 3:[-42,-18,10], 4:[-54,-26,-2,22] };
+    const fanAngles = { 1:[0], 2:[-20,20], 3:[-30,0,30], 4:[-45,-15,15,45] };
     const layers = Math.min(8, Math.floor(capturedCount / 3));
     const hasFan = basraCards && basraCards.length > 0;
 
     const wrapper = document.createElement('div');
-    const fanCount = hasFan ? Math.min(basraCards.length, 4) : 0;
-    const fanOffset = [0, 0, 12, 14, 12][fanCount];
-    wrapper.style.cssText = 'position:relative;width:34px;display:inline-block;margin-left:'+fanOffset+'px;';
+    wrapper.style.cssText = 'position:relative;width:34px;display:inline-block;';
 
     // stacked layers below top card (grow downward)
     for (let i = 1; i <= layers; i++) {
