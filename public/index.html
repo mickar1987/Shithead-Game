@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.01</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.02</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4864,7 +4864,7 @@ function basraRenderPile(containerId, capturedCount, basraCards) {
     const hasFan = basraCards && basraCards.length > 0;
 
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:relative;width:34px;display:inline-block;';
+    wrapper.style.cssText = 'position:relative;width:34px;display:inline-block;margin-left:8px;';
 
     // stacked layers below top card (grow downward)
     for (let i = 1; i <= layers; i++) {
@@ -4892,13 +4892,13 @@ function basraRenderPile(containerId, capturedCount, basraCards) {
             const isRed = suit === 'h' || suit === 'd';
             const angle = angles[i] || 0;
             const cardEl = document.createElement('div');
-            cardEl.style.cssText = 'position:absolute;top:-24px;left:0;width:34px;height:48px;background:#fff;border:2px solid #d4a017;border-radius:4px;z-index:'+(i+1)+';transform:rotate('+angle+'deg);transform-origin:bottom center;display:flex;align-items:flex-start;justify-content:space-between;padding:3px 4px;box-sizing:border-box;direction:ltr;';
+            cardEl.style.cssText = 'position:absolute;top:-24px;left:0;width:34px;height:48px;background:#fff;border:2px solid #d4a017;border-radius:4px;z-index:'+(i+1)+';transform:rotate('+angle+'deg);transform-origin:bottom center;display:flex;align-items:center;justify-content:space-between;padding:3px 6px;box-sizing:border-box;direction:ltr;';
             cardEl.innerHTML = '<span style="font-size:0.9rem;font-weight:600;color:'+(isRed?'#cc2200':'#1a1a1a')+';line-height:1;">'+rank+'</span><span style="font-size:0.65rem;color:'+(isRed?'#cc2200':'#1a1a1a')+';line-height:1;">'+(suitMap[suit]||suit)+'</span>';
             wrapper.appendChild(cardEl);
         });
     }
 
-    el.style.cssText = 'display:flex;justify-content:center;padding-top:'+(hasFan ? '28px' : '14px')+';';
+    el.style.cssText = 'display:flex;justify-content:center;align-items:flex-start;padding-top:'+(hasFan ? '32px' : '14px')+';';
     el.appendChild(wrapper);
 }
 
@@ -5164,7 +5164,7 @@ function basraCancelSelection() {
     </div>
 
     <!-- Player area (bottom) -->
-    <div id="basraPlayerArea" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:fit-content;min-width:220px;max-width:280px;display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px);padding-top:8px;background:linear-gradient(transparent, rgba(0,0,0,0.6) 30%);z-index:501;padding-left:10px;padding-right:10px;border-radius:12px 12px 0 0;">
+    <div id="basraPlayerArea" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:fit-content;min-width:300px;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px);padding-top:8px;background:linear-gradient(transparent, rgba(0,0,0,0.6) 30%);z-index:501;padding-left:10px;padding-right:10px;border-radius:12px 12px 0 0;">
         <div id="basraMyInfo" style="font-size:11px;color:rgba(255,200,50,0.6);"></div>
         <div style="display:flex;align-items:flex-end;gap:10px;justify-content:center;width:100%;">
             <div id="basraMyHand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;flex:1;"></div>
