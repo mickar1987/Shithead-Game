@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.17</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.18</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3837,8 +3837,9 @@ let selectedBasraWinScore = 120;
 function setBasraWinScore(s) {
     selectedBasraWinScore = s;
     [40,80,120,180,220].forEach(v => {
-        const btn = document.getElementById('basraWinBtn'+v);
-        if (btn) btn.setAttribute('style', btn.getAttribute('style').replace(/border-color:[^;]+;?/g,'') + (v===s ? ';border-color:var(--gold)' : ';border-color:rgba(255,255,255,0.15)'));
+        document.querySelectorAll('#basraWinBtn'+v).forEach(btn => {
+            btn.style.borderColor = v===s ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
+        });
     });
 }
 function setBasraTimer(val) {
