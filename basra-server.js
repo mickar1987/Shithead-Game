@@ -90,8 +90,8 @@ function isBasra(playedCard, capturedCards, tableCards) {
 
     const rank = cardRank(playedCard);
 
-    // Jack: never basra
-    if (rank === 'J') return false;
+    // Jack: basra only if it clears a single card from the table
+    if (rank === 'J') return tableCards.length === 1;
 
     // 7♦: basra only if table total ≤ 10 and no face cards
     if (is7D(playedCard)) {
@@ -100,6 +100,9 @@ function isBasra(playedCard, capturedCards, tableCards) {
         const total = tableCards.reduce((s, c) => s + (rankValue(cardRank(c)) || 0), 0);
         return total <= 10;
     }
+
+    // If table had only 7♦ (the "trap") and played card captured it → basra
+    if (tableCards.length === 1 && is7D(tableCards[0])) return true;
 
     // Numeric card: basra if it clears the table
     return true;

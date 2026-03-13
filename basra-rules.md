@@ -21,8 +21,9 @@
 
 ## Basra (bonus)
 - Clear ALL table cards with a single numeric card → BASRA = 10 pts
-- 7♦ clears all + table total ≤ 10 + no face cards → BASRA = 10 pts  
-- Jack clears all → NOT a basra
+- 7♦ clears all + table total ≤ 10 + no face cards → BASRA = 10 pts
+- 7♦ thrown on empty table → any card that captures it = BASRA ("trap")  
+- Jack clears all → NOT a basra (exception: if only 1 card on table → BASRA)
 - After last card played → last capturer takes remaining table cards (no basra)
 
 ## Scoring (per round)
