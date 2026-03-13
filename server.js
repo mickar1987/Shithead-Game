@@ -1554,7 +1554,7 @@ function basraStateForPlayer(room, slotIdx) {
         handCounts: room.slots.map(s => s.hand.length),
         scores: room.slots.map(s => s.score || 0),
         basraCounts: room.slots.map(s => s.basras || 0),
-        basraCards: room.slots.map(s => s.basraCards || []),
+        basraCards: room.slots.map(s => (s.basraCards || []).map(b => typeof b === 'string' ? b : b.card)),
         roundOver: room.roundOver,
         gameOver: room.gameOver,
         lastCapturer: room.lastCapturer,

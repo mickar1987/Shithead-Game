@@ -130,6 +130,7 @@ function createBasraRoom(code, slots, bet = 0) {
         s.captured = [];
         s.basras = 0;
         s.basraCards = [];
+        s.jackBasras = 0;
         s.score = 0; // cumulative game score
     });
 
@@ -252,7 +253,11 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
             if (basraScored) {
                 p.basras++;
                 if (!p.basraCards) p.basraCards = [];
-                p.basraCards.push(cardStr);
+                // If J is involved (played card is J, or captured cards include J) → jack basra (20pts)
+                const jackInvolved = cardRank(cardStr) === 'J' || capturedCards.some(cc => cardRank(cc) === 'J');
+                const basraCard = jackInvolved ? (cardRank(cardStr) === 'J' ? cardStr : capturedCards.find(cc => cardRank(cc) === 'J')) : cardStr;
+                p.basraCards.push({ card: basraCard, jack: jackInvolved });
+                if (jackInvolved) p.jackBasras = (p.jackBasras || 0) + 1;
             }
         }
     } else {
@@ -297,8 +302,8 @@ function scoreRound(room) {
             if (card === '2c') sc.points += 2;
             if (card === '10d') sc.points += 3;
         }
-        // Basra bonus
-        sc.points += s.basras * 10;
+        // Basra bonus: regular=10pts, jack basra=20pts
+        sc.points += ((s.basras || 0) - (s.jackBasras || 0)) * 10 + (s.jackBasras || 0) * 20;
     }
 
     // Apply to cumulative scores
@@ -340,6 +345,7 @@ function resetRound(room) {
         s.captured = [];
         s.basras = 0;
         s.basraCards = [];
+        s.jackBasras = 0;
     });
 
     for (let i = 0; i < 4; i++) {
