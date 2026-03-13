@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.92</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.93</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2967,13 +2967,20 @@ if (!onlineMode) return; // already left to menu
         btnsEl.innerHTML='<button onclick="basraNextRound()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);width:220px;">▶ סיבוב הבא</button>';
         overlay.style.display='flex';
     });
-    socket.on('basraGameOver', ({names, scores}) => {
+    socket.on('basraGameOver', ({names, scores, forfeitBy, forfeitName}) => {
         const overlay=document.getElementById('basraResultOverlay');
-        document.getElementById('basraRoundScores').innerHTML=
-            '<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🏆 משחק הסתיים!</div>'+
-            '<div style="display:flex;flex-direction:column;gap:8px;">'+
-            names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('')+
-            '</div>';
+        let html = '';
+        if (forfeitName !== undefined) {
+            const iMeLost = forfeitBy === basraMySlot;
+            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:${iMeLost?'#f87171':'var(--gold)'};letter-spacing:3px;text-align:center;margin-bottom:8px;">${iMeLost ? '😞 הפסדת' : '🏆 ניצחת!'}</div>`;
+            html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:12px;">${forfeitName} עזב/פסל עצמו</div>`;
+        } else {
+            html += '<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🏆 משחק הסתיים!</div>';
+        }
+        html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+        html += names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('');
+        html += '</div>';
+        document.getElementById('basraRoundScores').innerHTML = html;
         document.getElementById('basraRoundBtns').innerHTML='<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 צא לתפריט</button>';
         overlay.style.display='flex';
     });
