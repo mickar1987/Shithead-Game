@@ -282,7 +282,9 @@ function scoreRound(room) {
         slotIdx: i,
         name: s.name,
         cards: s.captured.length,
-        basras: s.basras,
+        basras: s.basras || 0,
+        jackBasras: s.jackBasras || 0,
+        majorityPoints: 0,
         points: 0,
     }));
 
@@ -294,23 +296,16 @@ function scoreRound(room) {
     if (leaders.length === 1) {
         const pts = 30 + room.pendingMajorityPoints;
         leaders[0].points += pts;
+        leaders[0].majorityPoints = pts;
         room.pendingMajorityPoints = 0;
     } else {
         room.pendingMajorityPoints += 30;
     }
 
-    // Card bonuses
+    // Basra bonus only: regular=10pts, jack basra=20pts
     for (const s of room.slots) {
-        const idx = s.captured ? room.slots.indexOf(s) : -1;
-        if (idx === -1) continue;
+        const idx = room.slots.indexOf(s);
         const sc = scores[idx];
-        for (const card of (s.captured || [])) {
-            const r = cardRank(card);
-            if (r === 'A' || r === 'J') sc.points += 1;
-            if (card === '2c') sc.points += 2;
-            if (card === '10d') sc.points += 3;
-        }
-        // Basra bonus: regular=10pts, jack basra=20pts
         sc.points += ((s.basras || 0) - (s.jackBasras || 0)) * 10 + (s.jackBasras || 0) * 20;
     }
 
