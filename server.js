@@ -1740,6 +1740,13 @@ function registerBasraHandlers(socket) {
 
         const room = basra.createBasraRoom(code, slots, bet || 0);
         room.winScore = winScore || 120;
+        // Validate creator token
+        if (username && token) {
+            getUser(username).then(u => {
+                if (u && u.token === token) room.slots[0].username = username;
+                else room.slots[0].username = null;
+            }).catch(() => { room.slots[0].username = null; });
+        } else { room.slots[0].username = null; }
         room.isPublic = !!isPublic;
         room.turnTimer = parseInt(turnTimer) || 0;
         console.log(`[basra] room created, turnTimer=${room.turnTimer}, raw=${turnTimer}`);
@@ -1780,7 +1787,12 @@ function registerBasraHandlers(socket) {
         freeSlot.name = name;
         freeSlot.socketId = socket.id;
         freeSlot.connected = true;
-        freeSlot.username = username || null;
+        // Validate joiner token
+        if (username && token) {
+            getUser(username).then(u => {
+                freeSlot.username = (u && u.token === token) ? username : null;
+            }).catch(() => { freeSlot.username = null; });
+        } else { freeSlot.username = null; }
 
         socket.data.basraRoom = code.toUpperCase();
         socket.data.basraSlot = freeSlot.id;
