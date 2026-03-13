@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.28</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.29</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5065,7 +5065,12 @@ function basraRender(state) {
     if (!state) return;
     basraState = state;
     const myIdx = state.mySlotIdx;
-    const oppIdx = myIdx===0?1:0;
+    const n = state.playerNames.length;
+    // For 2p: oppIdx = other player
+    // For 4p: top = across (myIdx+2)%4, left = (myIdx+1)%4, right = (myIdx+3)%4
+    const oppIdx = (myIdx + Math.floor(n/2)) % n;  // player directly across
+    const leftIdx = n === 4 ? (myIdx + 1) % 4 : -1;
+    const rightIdx = n === 4 ? (myIdx + 3) % 4 : -1;
 
     // Determine phase purely from server state
     // committedBy === myIdx → I played a card, now picking captures
@@ -5093,10 +5098,50 @@ function basraRender(state) {
     // Gold border around active player area
     const myArea = document.getElementById('basraPlayerArea');
     const oppArea = document.getElementById('basraOpponentArea');
-    // showMyTurn: my turn to act = server says it's my turn, OR I committed and waiting for capture choice
     const showMyTurn = state.isMyTurn || inCommitPhase;
     if (myArea) { myArea.style.outline = showMyTurn ? '2px solid var(--gold)' : '2px solid transparent'; myArea.style.borderRadius='12px'; }
     if (oppArea) { oppArea.style.outline = !showMyTurn ? '2px solid var(--gold)' : '2px solid transparent'; oppArea.style.borderRadius='12px'; }
+
+    // Side players (4-player mode)
+    const leftArea = document.getElementById('basraLeftArea');
+    const rightArea = document.getElementById('basraRightArea');
+    if (n === 4) {
+        if (leftArea) leftArea.style.display = 'flex';
+        if (rightArea) rightArea.style.display = 'flex';
+        // Left player
+        const leftNameEl = document.getElementById('basraLeftName');
+        const leftHandEl = document.getElementById('basraLeftHand');
+        if (leftNameEl) leftNameEl.textContent = (state.currentPlayer===leftIdx?'▶ ':'')+state.playerNames[leftIdx];
+        if (leftHandEl) {
+            leftHandEl.innerHTML = '';
+            const lCount = (state.handCounts||[])[leftIdx]||0;
+            Array.from({length:lCount}).forEach(()=>{
+                const card = basraRenderCard('',false,false,null);
+                card.style.width='28px'; card.style.height='40px'; card.style.margin='1px 0';
+                leftHandEl.appendChild(card);
+            });
+        }
+        basraRenderPile('basraLeftPile', state.capturedCounts[leftIdx]||0, state.basraCards?state.basraCards[leftIdx]:[]);
+        if (leftArea) leftArea.style.outline = state.currentPlayer===leftIdx ? '2px solid var(--gold)' : '2px solid transparent';
+        // Right player
+        const rightNameEl = document.getElementById('basraRightName');
+        const rightHandEl = document.getElementById('basraRightHand');
+        if (rightNameEl) rightNameEl.textContent = (state.currentPlayer===rightIdx?'▶ ':'')+state.playerNames[rightIdx];
+        if (rightHandEl) {
+            rightHandEl.innerHTML = '';
+            const rCount = (state.handCounts||[])[rightIdx]||0;
+            Array.from({length:rCount}).forEach(()=>{
+                const card = basraRenderCard('',false,false,null);
+                card.style.width='28px'; card.style.height='40px'; card.style.margin='1px 0';
+                rightHandEl.appendChild(card);
+            });
+        }
+        basraRenderPile('basraRightPile', state.capturedCounts[rightIdx]||0, state.basraCards?state.basraCards[rightIdx]:[]);
+        if (rightArea) rightArea.style.outline = state.currentPlayer===rightIdx ? '2px solid var(--gold)' : '2px solid transparent';
+    } else {
+        if (leftArea) leftArea.style.display = 'none';
+        if (rightArea) rightArea.style.display = 'none';
+    }
 
     // Opponent
     document.getElementById('basraOpponentName').textContent = (!state.isMyTurn && !inCommitPhase ?'▶ ':'')+state.playerNames[oppIdx];
@@ -5305,6 +5350,20 @@ function basraCancelSelection() {
             <div id="basraOpponentHand" style="display:flex;gap:-8px;justify-content:center;flex-wrap:wrap;flex:1;"></div>
         </div>
         <div id="basraOpponentInfo" style="font-size:11px;color:rgba(255,200,50,0.6);"></div>
+    </div>
+
+    <!-- Left player (slot varies by myIdx) -->
+    <div id="basraLeftArea" style="display:none;position:fixed;left:4px;top:50%;transform:translateY(-50%);width:60px;z-index:501;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div id="basraLeftName" style="font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.5px;writing-mode:vertical-rl;text-orientation:mixed;max-height:100px;overflow:hidden;"></div>
+        <div id="basraLeftHand" style="display:flex;flex-direction:column;gap:-4px;align-items:center;"></div>
+        <div id="basraLeftPile" style="margin-top:4px;"></div>
+    </div>
+
+    <!-- Right player -->
+    <div id="basraRightArea" style="display:none;position:fixed;right:4px;top:50%;transform:translateY(-50%);width:60px;z-index:501;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div id="basraRightName" style="font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.5px;writing-mode:vertical-rl;text-orientation:mixed;max-height:100px;overflow:hidden;"></div>
+        <div id="basraRightHand" style="display:flex;flex-direction:column;gap:-4px;align-items:center;"></div>
+        <div id="basraRightPile" style="margin-top:4px;"></div>
     </div>
 
     <!-- Deck — fixed top-right corner -->
