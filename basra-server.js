@@ -49,6 +49,11 @@ function findCaptures(playedCard, tableCards) {
         return tableCards.length > 0 ? [tableCards.slice()] : [];
     }
 
+    // 7♦ trap: if table has ONLY 7♦, ANY card can capture it
+    if (tableCards.length === 1 && is7D(tableCards[0])) {
+        return [[tableCards[0]]];
+    }
+
     // Q can only capture Q, K can only capture K
     if (rank === 'Q' || rank === 'K') {
         const matches = tableCards.filter(c => cardRank(c) === rank);
