@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.13</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.14</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -666,9 +666,9 @@
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraTimer(15)" id="basraTimerBtn15" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">15s</button>
-            <button onclick="setBasraTimer(30)" id="basraTimerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">30s</button>
+            <button onclick="setBasraTimer(30)" id="basraTimerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">30s</button>
             <button onclick="setBasraTimer(60)" id="basraTimerBtn60" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">60s</button>
-            <button onclick="setBasraTimer(0)"  id="basraTimerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">♾</button>
+            <button onclick="setBasraTimer(0)"  id="basraTimerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">♾</button>
         </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">ניקוד לניצחון</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
@@ -3790,7 +3790,7 @@ let basraPendingAction = null;
 let selectedBasraCount = 2;
 let selectedBasraRoomType = 'public';
 let selectedBasraBet = 0;
-let selectedBasraTimer = 0;
+let selectedBasraTimer = 30;
 
 // Two-phase play state
 let basraPlayPhase = 'select'; // 'select' = picking card, 'capture' = picking what to capture
@@ -3836,14 +3836,14 @@ function setBasraWinScore(s) {
     selectedBasraWinScore = s;
     [80,120,180,220].forEach(v => {
         const btn = document.getElementById('basraWinBtn'+v);
-        if (btn) btn.style.borderColor = v===s ? 'var(--gold)' : '';
+        if (btn) btn.style.borderColor = v===s ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
     });
 }
 function setBasraTimer(val) {
     selectedBasraTimer = val;
     [15,30,60,0].forEach(v => {
         document.querySelectorAll('#basraTimerBtn'+v).forEach(b => {
-            b.style.borderColor = v===val ? 'var(--gold)' : '';
+            b.style.borderColor = v===val ? 'var(--gold)' : 'rgba(255,255,255,0.15)';
         });
     });
 }
