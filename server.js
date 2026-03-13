@@ -1636,12 +1636,32 @@ function basraAdvanceTurn(room) {
             if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
             const p = room.slots[room.currentPlayer];
             if (!p || p.hand.length === 0) return;
+
+            // Track consecutive timeouts per player
+            if (!room._consecutiveTimeouts) room._consecutiveTimeouts = {};
+            room._consecutiveTimeouts[room.currentPlayer] = (room._consecutiveTimeouts[room.currentPlayer] || 0) + 1;
+
+            if (room._consecutiveTimeouts[room.currentPlayer] >= 2) {
+                // 2 consecutive timeouts — forfeit
+                room.gameOver = true;
+                basraClearBasraTimer(room);
+                basraBroadcast(room, 'toast', `${p.name} פסל עצמו (פג הזמן פעמיים)`);
+                basraBroadcast(room, 'basraGameOver', {
+                    names: room.slots.map(s => s.name),
+                    scores: room.slots.map(s => s.score || 0),
+                    forfeitBy: room.currentPlayer,
+                    forfeitName: p.name,
+                });
+                basraEmitAll(room);
+                return;
+            }
+
             const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
             p.hand.splice(p.hand.indexOf(randomCard), 1);
             room.tableCards.push(randomCard);
             room.committedCard = null;
             room.committedBy = null;
-            basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
+            basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן - אזהרה!)`);
             basraAdvanceTurn(room);
         }, room.turnTimer * 1000);
     }
@@ -1786,6 +1806,9 @@ function registerBasraHandlers(socket) {
             return;
         }
 
+        // Reset consecutive timeouts on successful play
+        if (room._consecutiveTimeouts) room._consecutiveTimeouts[slotIdx] = 0;
+
         room.committedCard = null;
         room.committedBy = null;
 
@@ -1827,7 +1850,21 @@ function registerBasraHandlers(socket) {
             const slotIdx = socket.data.basraSlot;
             const slot = room.slots[slotIdx];
             if (slot) { slot.connected = false; slot.socketId = null; }
-            basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב`);
+            // If game was in progress, declare forfeit
+            if (room.gameStarted && !room.gameOver) {
+                basraClearBasraTimer(room);
+                room.gameOver = true;
+                basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב — הוכרז כמפסיד`);
+                basraBroadcast(room, 'basraGameOver', {
+                    names: room.slots.map(s => s.name),
+                    scores: room.slots.map(s => s.score || 0),
+                    forfeitBy: slotIdx,
+                    forfeitName: slot?.name || 'שחקן',
+                });
+                basraEmitAll(room);
+            } else {
+                basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב`);
+            }
         }
         socket.data.basraRoom = null;
         socket.data.basraSlot = null;
