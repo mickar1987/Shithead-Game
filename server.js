@@ -1683,7 +1683,9 @@ function basraAdvanceTurn(room) {
         room._timerTimeout = setTimeout(() => {
             if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
             const p = room.slots[room.currentPlayer];
-            if (!p || p.hand.length === 0) return;
+            // Allow timeout even if hand is empty — committed card may be waiting
+            if (!p) return;
+            if (p.hand.length === 0 && !room.committedCard) return;
 
             // Track consecutive timeouts per player
             if (!room._consecutiveTimeouts) room._consecutiveTimeouts = {};
