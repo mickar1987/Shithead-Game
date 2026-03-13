@@ -1659,8 +1659,8 @@ function basraAdvanceTurn(room) {
             const winThreshold = room.winScore || 120;
             if (room.teams) {
                 // 4p team mode: use combined team score
-                const teamScores = room.teams.map(team =>
-                    team.reduce((sum, idx) => sum + (room.slots[idx].score || 0), 0));
+                // Both team members have identical scores — just use first member's score
+                const teamScores = room.teams.map(team => room.slots[team[0]].score || 0);
                 const overThreshold = teamScores.filter(ts => ts > winThreshold);
                 if (overThreshold.length > 0) {
                     const maxTeam = Math.max(...teamScores);
