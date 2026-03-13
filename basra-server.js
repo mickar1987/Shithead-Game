@@ -95,18 +95,48 @@ function isBasra(playedCard, capturedCards, tableCards) {
 
     const rank = cardRank(playedCard);
 
-    // Jack: basra only if it clears a single card from the table
-    if (rank === 'J') return tableCards.length === 1;
+    // Jack: basra only if table has ONLY J cards, or ONLY 7♦
+    if (rank === 'J') {
+        if (tableCards.length === 0) return false;
+        const allJacks = tableCards.every(c => cardRank(c) === 'J');
+        const only7d = tableCards.length === 1 && is7D(tableCards[0]);
+        return allJacks || only7d;
+    }
 
-    // 7♦: various basra cases
+    // 7♦: basra if table can be partitioned into groups all summing to same value (1-10)
+    // Also basra if table has only 1 J (jack basra, 20pts)
     if (is7D(playedCard)) {
-        // If table has only 1 J → jack basra (20pts)
+        if (tableCards.length === 0) return false;
+        // Special: single J on table = jack basra
         if (tableCards.length === 1 && cardRank(tableCards[0]) === 'J') return true;
-        // Otherwise: basra only if no face cards and total ≤ 10
-        const hasFace = tableCards.some(c => ['J','Q','K'].includes(cardRank(c)));
-        if (hasFace) return false;
-        const total = tableCards.reduce((s, c) => s + (rankValue(cardRank(c)) || 0), 0);
-        return total <= 10;
+        // Check if all cards are numeric (no face cards except the J case above)
+        const faceRanks = ['J','Q','K'];
+        const rv = r => r==='A' ? 1 : (faceRanks.includes(r) ? null : parseInt(r));
+        const vals = tableCards.map(c => rv(cardRank(c)));
+        if (vals.some(v => v === null)) return false; // face cards present → no basra
+        // Try each value 1-10: can ALL tableCards be partitioned into groups summing to val?
+        for (let val = 1; val <= 10; val++) {
+            // Greedy partition: repeatedly find a subset summing to val
+            const remaining = [...vals];
+            let ok = true;
+            while (remaining.length > 0) {
+                // Find a subset summing to val
+                const n = remaining.length;
+                let found = false;
+                for (let mask = 1; mask < (1<<n); mask++) {
+                    let sum = 0; const idxs = [];
+                    for (let i = 0; i < n; i++) { if (mask & (1<<i)) { sum += remaining[i]; idxs.push(i); } }
+                    if (sum === val) {
+                        // Remove these indices (descending to not shift)
+                        idxs.reverse().forEach(i => remaining.splice(i, 1));
+                        found = true; break;
+                    }
+                }
+                if (!found) { ok = false; break; }
+            }
+            if (ok) return true;
+        }
+        return false;
     }
 
     // If table had only 7♦ (the "trap") and played card captured it → basra
