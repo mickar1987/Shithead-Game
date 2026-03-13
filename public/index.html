@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.29</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.30</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2977,7 +2977,20 @@ if (!onlineMode) return; // already left to menu
         const urgentColor = '#ef4444';
         const normalColor = 'var(--gold)';
         if (myArea && isMyTurn) myArea.style.outline = `2px solid ${remaining <= 5 ? urgentColor : normalColor}`;
-        if (oppArea && !isMyTurn) oppArea.style.outline = `2px solid ${remaining <= 5 ? urgentColor : normalColor}`;
+        if (oppArea && !isMyTurn && basraState && basraState.currentPlayer === (basraMySlot === 0 ? 1 : 0)) oppArea.style.outline = `2px solid ${remaining <= 5 ? urgentColor : normalColor}`;
+        ['Left','Right'].forEach(side => {
+            const el = document.getElementById('basra'+side+'Area');
+            if (el) el.style.outline = '2px solid transparent';
+        });
+        if (!isMyTurn && basraState) {
+            const n4 = basraState.playerNames.length;
+            if (n4 === 4) {
+                const lIdx = (basraMySlot+1)%4, rIdx = (basraMySlot+3)%4;
+                const cp = basraState.currentPlayer;
+                if (cp === lIdx) { const el=document.getElementById('basraLeftArea'); if(el) el.style.outline=`2px solid ${remaining<=5?urgentColor:normalColor}`; }
+                if (cp === rIdx) { const el=document.getElementById('basraRightArea'); if(el) el.style.outline=`2px solid ${remaining<=5?urgentColor:normalColor}`; }
+            }
+        }
     });
     socket.on('basraRoundOver', ({scores, totalScores, pendingMajority}) => {
         const overlay=document.getElementById('basraResultOverlay');
@@ -5099,8 +5112,10 @@ function basraRender(state) {
     const myArea = document.getElementById('basraPlayerArea');
     const oppArea = document.getElementById('basraOpponentArea');
     const showMyTurn = state.isMyTurn || inCommitPhase;
+    const activePlayer = state.currentPlayer;
     if (myArea) { myArea.style.outline = showMyTurn ? '2px solid var(--gold)' : '2px solid transparent'; myArea.style.borderRadius='12px'; }
-    if (oppArea) { oppArea.style.outline = !showMyTurn ? '2px solid var(--gold)' : '2px solid transparent'; oppArea.style.borderRadius='12px'; }
+    // Only highlight oppArea if it's actually the opp's turn (not a side player in 4p)
+    if (oppArea) { oppArea.style.outline = (activePlayer === oppIdx && !showMyTurn) ? '2px solid var(--gold)' : '2px solid transparent'; oppArea.style.borderRadius='12px'; }
 
     // Side players (4-player mode)
     const leftArea = document.getElementById('basraLeftArea');
@@ -5117,7 +5132,9 @@ function basraRender(state) {
             const lCount = (state.handCounts||[])[leftIdx]||0;
             Array.from({length:lCount}).forEach(()=>{
                 const card = basraRenderCard('',false,false,null);
-                card.style.width='28px'; card.style.height='40px'; card.style.margin='1px 0';
+                card.style.width='28px'; card.style.height='40px'; card.style.margin='-6px 0';
+                card.style.transform='rotate(90deg)';
+                card.style.transformOrigin='center center';
                 leftHandEl.appendChild(card);
             });
         }
@@ -5132,7 +5149,9 @@ function basraRender(state) {
             const rCount = (state.handCounts||[])[rightIdx]||0;
             Array.from({length:rCount}).forEach(()=>{
                 const card = basraRenderCard('',false,false,null);
-                card.style.width='28px'; card.style.height='40px'; card.style.margin='1px 0';
+                card.style.width='28px'; card.style.height='40px'; card.style.margin='-6px 0';
+                card.style.transform='rotate(-90deg)';
+                card.style.transformOrigin='center center';
                 rightHandEl.appendChild(card);
             });
         }
