@@ -63,6 +63,7 @@ async function settleCoins(room) {
 
 
 async function settleBasraCoins(room, winnerSlotIdx) {
+    console.log(`[settleBasra] called bet=${room.bet} settled=${room.coinsSettled} winner=${winnerSlotIdx} usernames=${JSON.stringify(room.slots.map(s=>s.username))}`);
     if (room.coinsSettled || !room.bet || room.bet === 0) return;
     room.coinsSettled = true;
     const bet = room.bet;
@@ -1721,7 +1722,7 @@ function registerBasraHandlers(socket) {
         socket.emit('basraAccessVerified', { ok: accessCode === basra.BASRA_ACCESS_CODE });
     });
 
-    socket.on('basraCreate', ({ name, playerCount, isPublic, bet, turnTimer, winScore, accessCode, username, token }) => {
+    socket.on('basraCreate', async ({ name, playerCount, isPublic, bet, turnTimer, winScore, accessCode, username, token }) => {
         if (accessCode !== basra.BASRA_ACCESS_CODE) {
             socket.emit('basraError', 'קוד גישה שגוי'); return;
         }
@@ -1741,12 +1742,11 @@ function registerBasraHandlers(socket) {
         const room = basra.createBasraRoom(code, slots, bet || 0);
         room.winScore = winScore || 120;
         // Validate creator token
+        let creatorUsername = null;
         if (username && token) {
-            getUser(username).then(u => {
-                if (u && u.token === token) room.slots[0].username = username;
-                else room.slots[0].username = null;
-            }).catch(() => { room.slots[0].username = null; });
-        } else { room.slots[0].username = null; }
+            try { const u = await getUser(username); if (u && u.token === token) creatorUsername = username; } catch(e) {}
+        }
+        room.slots[0].username = creatorUsername;
         room.isPublic = !!isPublic;
         room.turnTimer = parseInt(turnTimer) || 0;
         console.log(`[basra] room created, turnTimer=${room.turnTimer}, raw=${turnTimer}`);
@@ -1773,7 +1773,7 @@ function registerBasraHandlers(socket) {
         })));
     });
 
-    socket.on('basraJoin', ({ code, name, accessCode, username, token }) => {
+    socket.on('basraJoin', async ({ code, name, accessCode, username, token }) => {
         if (accessCode !== basra.BASRA_ACCESS_CODE) {
             socket.emit('basraError', 'קוד גישה שגוי'); return;
         }
@@ -1788,11 +1788,11 @@ function registerBasraHandlers(socket) {
         freeSlot.socketId = socket.id;
         freeSlot.connected = true;
         // Validate joiner token
+        let joinerUsername = null;
         if (username && token) {
-            getUser(username).then(u => {
-                freeSlot.username = (u && u.token === token) ? username : null;
-            }).catch(() => { freeSlot.username = null; });
-        } else { freeSlot.username = null; }
+            try { const u = await getUser(username); if (u && u.token === token) joinerUsername = username; } catch(e) {}
+        }
+        freeSlot.username = joinerUsername;
 
         socket.data.basraRoom = code.toUpperCase();
         socket.data.basraSlot = freeSlot.id;
