@@ -1704,13 +1704,23 @@ function basraAdvanceTurn(room) {
                 return;
             }
 
-            const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
-            p.hand.splice(p.hand.indexOf(randomCard), 1);
-            room.tableCards.push(randomCard);
-            room.committedCard = null;
-            room.committedBy = null;
-            basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן - אזהרה!)`);
-            basraAdvanceTurn(room);
+            // If player already committed a card → throw it (no capture)
+            if (room.committedCard && room.committedBy === room.currentPlayer) {
+                const thrownCard = room.committedCard;
+                room.tableCards.push(thrownCard);
+                room.committedCard = null;
+                room.committedBy = null;
+                basraBroadcast(room, 'toast', `${p.name} זרק ${thrownCard} (פג הזמן - אזהרה!)`);
+                basraAdvanceTurn(room);
+            } else {
+                const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+                p.hand.splice(p.hand.indexOf(randomCard), 1);
+                room.tableCards.push(randomCard);
+                room.committedCard = null;
+                room.committedBy = null;
+                basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן - אזהרה!)`);
+                basraAdvanceTurn(room);
+            }
         }, room.turnTimer * 1000);
     }
 }
@@ -1845,7 +1855,7 @@ function registerBasraHandlers(socket) {
         p.hand.splice(p.hand.indexOf(card), 1);
         room.committedCard = card;
         room.committedBy = slotIdx;
-        basraClearBasraTimer(room);
+        // Don't clear timer — let it continue. If it fires, it will throw the committed card.
         basraEmitAll(room);
     });
 
@@ -1919,6 +1929,19 @@ function registerBasraHandlers(socket) {
             const slotIdx = socket.data.basraSlot;
             const slot = room.slots[slotIdx];
             if (slot) { slot.connected = false; slot.socketId = null; }
+
+            // Creator (slot 0) leaving → close room entirely
+            if (slotIdx === 0) {
+                basraClearBasraTimer(room);
+                room.gameOver = true;
+                basraBroadcastExcept(room, socket.id, 'toast', `${slot?.name || 'היוצר'} סגר את החדר`);
+                basraBroadcastExcept(room, socket.id, 'basraRoomClosed', {});
+                delete basraRooms[code];
+                socket.data.basraRoom = null;
+                socket.data.basraSlot = null;
+                return;
+            }
+
             // If game already over, ensure remaining players see the result
             if (room.gameOver) {
                 const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
