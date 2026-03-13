@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.97</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v3.98</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4858,27 +4858,19 @@ function basraRenderPile(containerId, capturedCount, basraCards) {
     el.innerHTML = '';
     if (!capturedCount && (!basraCards || basraCards.length === 0)) return;
 
-    const suitMap = {h:'\u2665\uFE0E', d:'\u2666\uFE0E', c:'\u2663\uFE0E', s:'\u2260\uFE0E'};
-    // fan angles per count: spread evenly around center
-    const fanAngles = {
-        1: [0],
-        2: [-28, 0],
-        3: [-42, -18, 10],
-        4: [-54, -26, -2, 22]
-    };
+    const suitMap = {h:'\u2665\uFE0E', d:'\u2666\uFE0E', c:'\u2663\uFE0E', s:'\u2660\uFE0E'};
+    const fanAngles = { 1:[0], 2:[-28,0], 3:[-42,-18,10], 4:[-54,-26,-2,22] };
 
-    // layers for pile shadow — scale with card count
-    const layers = Math.min(9, Math.floor(capturedCount / 4));
-    let shadowParts = [];
-    for (let i = 1; i <= layers; i++) {
-        shadowParts.push(`0 ${-i*2}px 0 #1a3a8f`);
-    }
+    // number of visible stacked layers behind top card (max 8)
+    const layers = Math.min(8, Math.floor(capturedCount / 3));
+    const hasFan = basraCards && basraCards.length > 0;
+    const fanMargin = hasFan ? 54 : 4;
 
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:relative;width:34px;margin-top:'+(basraCards && basraCards.length ? 50 : 4)+'px;';
+    wrapper.style.cssText = `position:relative;width:34px;margin-top:${fanMargin}px;`;
 
-    // basra fan cards (behind pile)
-    if (basraCards && basraCards.length > 0) {
+    // basra fan cards — positioned above pile (negative top), half hidden behind pile
+    if (hasFan) {
         const angles = fanAngles[Math.min(basraCards.length, 4)] || fanAngles[4];
         basraCards.forEach((card, i) => {
             const rank = card.slice(0,-1);
@@ -4886,22 +4878,29 @@ function basraRenderPile(containerId, capturedCount, basraCards) {
             const isRed = suit === 'h' || suit === 'd';
             const angle = angles[i] || 0;
             const cardEl = document.createElement('div');
-            cardEl.style.cssText = `position:absolute;top:-50px;left:0;width:34px;height:48px;background:#fff;border:2px solid #d4a017;border-radius:4px;z-index:${i+1};transform:rotate(${angle}deg);transform-origin:bottom center;display:flex;align-items:flex-start;justify-content:space-between;padding:3px 4px;box-sizing:border-box;`;
+            // top:-24px means card extends 24px above pile top, half of 48px height — half hidden
+            cardEl.style.cssText = `position:absolute;top:-24px;left:0;width:34px;height:48px;background:#fff;border:2px solid #d4a017;border-radius:4px;z-index:${i+1};transform:rotate(${angle}deg);transform-origin:bottom center;display:flex;align-items:flex-start;justify-content:space-between;padding:3px 4px;box-sizing:border-box;`;
             cardEl.innerHTML = `<span style="font-size:1rem;font-weight:800;color:${isRed?'#cc2200':'#1a1a1a'};line-height:1;">${rank}</span><span style="font-size:0.65rem;color:${isRed?'#cc2200':'#1a1a1a'};line-height:1;">${suitMap[suit]||suit}</span>`;
             wrapper.appendChild(cardEl);
         });
     }
 
-    // pile top card (blue back)
-    if (capturedCount > 0) {
-        const pileEl = document.createElement('div');
-        pileEl.style.cssText = `width:34px;height:48px;background:#1e2a6e;border:1px solid #4a6abf;border-radius:4px;position:relative;z-index:5;box-shadow:${shadowParts.join(',') || 'none'};`;
-        const countEl = document.createElement('div');
-        countEl.style.cssText = 'position:absolute;top:-14px;left:0;width:34px;text-align:center;font-size:10px;color:rgba(255,255,255,0.5);';
-        countEl.textContent = capturedCount;
-        pileEl.appendChild(countEl);
-        wrapper.appendChild(pileEl);
+    // stacked cards behind top (give depth)
+    for (let i = layers; i >= 1; i--) {
+        const stackEl = document.createElement('div');
+        stackEl.style.cssText = `position:absolute;top:${-i*2}px;left:${i%2===0?1:-1}px;width:34px;height:48px;background:#1a3${i%2===0?'8':'6'}f;border:1px solid #3a5abf;border-radius:4px;z-index:4;`;
+        wrapper.appendChild(stackEl);
     }
+
+    // top card of pile
+    const pileEl = document.createElement('div');
+    pileEl.style.cssText = 'width:34px;height:48px;background:#1e2a6e;border:1px solid #4a6abf;border-radius:4px;position:relative;z-index:5;';
+    // count label
+    const countEl = document.createElement('div');
+    countEl.style.cssText = 'position:absolute;top:-14px;left:0;width:34px;text-align:center;font-size:10px;color:rgba(255,255,255,0.5);';
+    countEl.textContent = capturedCount;
+    pileEl.appendChild(countEl);
+    wrapper.appendChild(pileEl);
 
     el.appendChild(wrapper);
 }
@@ -5148,7 +5147,7 @@ function basraCancelSelection() {
     </div>
 
     <!-- Deck — fixed top-right corner -->
-    <div id="basraDeckArea" style="position:fixed;top:calc(env(safe-area-inset-top) + 56px);right:12px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:502;">
+    <div id="basraDeckArea" style="position:fixed;top:calc(env(safe-area-inset-top) + 56px);left:12px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:502;">
         <div id="basraDeckDisplay" style="width:40px;height:56px;border-radius:8px;background:linear-gradient(135deg,#1a3a2a,#0d2016);border:2px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:rgba(255,255,255,0.4);"></div>
         <div style="font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:1px;">קופה</div>
     </div>
