@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.23</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.24</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2929,6 +2929,12 @@ if (!onlineMode) return; // already left to menu
             <span style="font-size:11px;color:rgba(255,200,50,0.7);">${r.players}/${r.total} שחקנים · עד ${r.winScore||120}${r.bet>0?' · '+r.bet+'💰':''}</span>
         </div>`).join('');
     });
+    socket.on('basraRoomClosed', () => {
+        showToast('החדר נסגר על ידי היוצר');
+        document.getElementById('basraGame').style.display = 'none';
+        showMenu('menuBasra');
+    });
+
     socket.on('basraStart', () => {
         document.getElementById('basraGame').style.display='block';
         document.getElementById('setupOverlay').style.display='none';
