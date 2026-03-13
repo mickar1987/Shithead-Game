@@ -146,6 +146,17 @@ function createBasraRoom(code, slots, bet = 0) {
         slots.forEach(s => s.hand.push(deck.shift()));
     }
 
+    // For 4-player: shuffle seating randomly, assign teams (seats 0+2 vs 1+3)
+    let teams = null;
+    if (slots.length === 4) {
+        // Shuffle slot order
+        const order = [0,1,2,3].sort(() => Math.random()-0.5);
+        const shuffled = order.map(i => slots[i]);
+        slots.forEach((s,i) => { Object.assign(slots[i], shuffled[i]); });
+        // Teams: slots 0&2 vs slots 1&3
+        teams = [[0,2],[1,3]];
+    }
+
     return {
         code,
         gameType: 'basra',
@@ -160,8 +171,9 @@ function createBasraRoom(code, slots, bet = 0) {
         coinsSettled: false,
         leaversOrder: [],
         winnersOrder: [],
-        pendingMajorityPoints: 0, // carried over on tie
+        pendingMajorityPoints: 0,
         roundNum: 0,
+        teams, // null for 2p, [[0,2],[1,3]] for 4p
     };
 }
 
@@ -286,27 +298,62 @@ function scoreRound(room) {
         jackBasras: s.jackBasras || 0,
         majorityPoints: 0,
         points: 0,
+        teamIdx: null,
     }));
 
-    const totalCards = scores.reduce((s, p) => s + p.cards, 0);
-    const maxCards = Math.max(...scores.map(p => p.cards));
-    const leaders = scores.filter(p => p.cards === maxCards);
+    if (room.teams) {
+        // 4-player team mode: combine cards and basras per team
+        room.teams.forEach((team, ti) => {
+            const teamCards = team.reduce((sum, idx) => sum + scores[idx].cards, 0);
+            const teamBasras = team.reduce((sum, idx) => sum + scores[idx].basras, 0);
+            const teamJackBasras = team.reduce((sum, idx) => sum + scores[idx].jackBasras, 0);
+            team.forEach(idx => {
+                scores[idx].teamIdx = ti;
+                scores[idx].teamCards = teamCards;
+            });
+        });
 
-    // Majority cards: 30 pts (or pending)
-    if (leaders.length === 1) {
-        const pts = 30 + room.pendingMajorityPoints;
-        leaders[0].points += pts;
-        leaders[0].majorityPoints = pts;
-        room.pendingMajorityPoints = 0;
+        // Majority: compare team totals
+        const teamTotals = room.teams.map(team =>
+            team.reduce((sum, idx) => sum + scores[idx].cards, 0));
+        const maxTeamCards = Math.max(...teamTotals);
+        const winningTeams = room.teams.filter((_, ti) => teamTotals[ti] === maxTeamCards);
+
+        if (winningTeams.length === 1) {
+            const pts = 30 + room.pendingMajorityPoints;
+            winningTeams[0].forEach(idx => {
+                scores[idx].points += pts;
+                scores[idx].majorityPoints = pts;
+            });
+            room.pendingMajorityPoints = 0;
+        } else {
+            room.pendingMajorityPoints += 30;
+        }
+
+        // Basra bonus per player
+        room.teams.forEach(team => {
+            team.forEach(idx => {
+                const s = room.slots[idx];
+                scores[idx].points += ((s.basras||0)-(s.jackBasras||0))*10 + (s.jackBasras||0)*20;
+            });
+        });
+
     } else {
-        room.pendingMajorityPoints += 30;
-    }
-
-    // Basra bonus only: regular=10pts, jack basra=20pts
-    for (const s of room.slots) {
-        const idx = room.slots.indexOf(s);
-        const sc = scores[idx];
-        sc.points += ((s.basras || 0) - (s.jackBasras || 0)) * 10 + (s.jackBasras || 0) * 20;
+        // 2-player mode
+        const maxCards = Math.max(...scores.map(p => p.cards));
+        const leaders = scores.filter(p => p.cards === maxCards);
+        if (leaders.length === 1) {
+            const pts = 30 + room.pendingMajorityPoints;
+            leaders[0].points += pts;
+            leaders[0].majorityPoints = pts;
+            room.pendingMajorityPoints = 0;
+        } else {
+            room.pendingMajorityPoints += 30;
+        }
+        for (const s of room.slots) {
+            const idx = room.slots.indexOf(s);
+            scores[idx].points += ((s.basras||0)-(s.jackBasras||0))*10 + (s.jackBasras||0)*20;
+        }
     }
 
     // Apply to cumulative scores

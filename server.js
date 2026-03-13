@@ -68,9 +68,20 @@ async function settleBasraCoins(room, winnerSlotIdx) {
     room.coinsSettled = true;
     const bet = room.bet;
     const results = [];
+
+    // Determine deltas
+    let deltas;
+    if (room.teams) {
+        // 4p team mode: find winning team
+        const winnerTeam = room.teams.find(t => t.includes(winnerSlotIdx));
+        deltas = room.slots.map((_, i) => winnerTeam && winnerTeam.includes(i) ? bet : -bet);
+    } else {
+        deltas = room.slots.map((_, i) => i === winnerSlotIdx ? bet : -bet);
+    }
+
     for (let i = 0; i < room.slots.length; i++) {
         const slot = room.slots[i];
-        const delta = i === winnerSlotIdx ? bet * (room.slots.length - 1) : -bet;
+        const delta = deltas[i];
         let finalCoins = null;
         if (slot.username) {
             try {
@@ -84,7 +95,6 @@ async function settleBasraCoins(room, winnerSlotIdx) {
         }
         results.push({ name: slot.name, delta, coins: finalCoins, slotIdx: i });
     }
-    // Emit to all players in basra room
     room.slots.forEach(s => {
         if (s.socketId) io.to(s.socketId).emit('coinsResult', results);
     });
@@ -1591,6 +1601,7 @@ function basraStateForPlayer(room, slotIdx) {
         scores: room.slots.map(s => s.score || 0),
         basraCounts: room.slots.map(s => s.basras || 0),
         basraCards: room.slots.map(s => (s.basraCards || []).map(b => typeof b === 'string' ? b : b.card)),
+        teams: room.teams || null,
         roundOver: room.roundOver,
         gameOver: room.gameOver,
         lastCapturer: room.lastCapturer,
@@ -1645,20 +1656,41 @@ function basraAdvanceTurn(room) {
                 pendingMajority: room.pendingMajorityPoints,
             });
             const winThreshold = room.winScore || 120;
-            const overThreshold = room.slots.filter(sl => (sl.score || 0) > winThreshold);
-            if (overThreshold.length > 0) {
-                const maxScore = Math.max(...room.slots.map(s => s.score || 0));
-                const tied = room.slots.filter(s => (s.score || 0) === maxScore);
-                if (tied.length === 1) {
-                    // Clear winner
-                    room.gameOver = true;
-                    const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
-                    const winnerSlotIdx = room.slots.indexOf(sorted[0]);
-                    basraBroadcast(room, 'basraGameOver', { names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0) });
-                    setTimeout(() => settleBasraCoins(room, winnerSlotIdx).catch(e => console.error('[basra coins]', e.message)), 300);
-                } else {
-                    // Tiebreaker: continue playing, broadcast tiebreaker notice
-                    basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
+            if (room.teams) {
+                // 4p team mode: use combined team score
+                const teamScores = room.teams.map(team =>
+                    team.reduce((sum, idx) => sum + (room.slots[idx].score || 0), 0));
+                const overThreshold = teamScores.filter(ts => ts > winThreshold);
+                if (overThreshold.length > 0) {
+                    const maxTeam = Math.max(...teamScores);
+                    if (teamScores[0] !== teamScores[1]) {
+                        room.gameOver = true;
+                        const winTeamIdx = teamScores[0] > teamScores[1] ? 0 : 1;
+                        const sorted = [...room.slots].sort((a,b)=>(b.score||0)-(a.score||0));
+                        basraBroadcast(room, 'basraGameOver', {
+                            names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0),
+                            teams: room.teams, teamScores
+                        });
+                        const winnerSlot = room.teams[winTeamIdx][0];
+                        setTimeout(() => settleBasraCoins(room, winnerSlot).catch(e=>console.error('[basra coins]',e)), 300);
+                    } else {
+                        basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
+                    }
+                }
+            } else {
+                const overThreshold = room.slots.filter(sl => (sl.score || 0) > winThreshold);
+                if (overThreshold.length > 0) {
+                    const maxScore = Math.max(...room.slots.map(s => s.score || 0));
+                    const tied = room.slots.filter(s => (s.score || 0) === maxScore);
+                    if (tied.length === 1) {
+                        room.gameOver = true;
+                        const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                        const winnerSlotIdx = room.slots.indexOf(sorted[0]);
+                        basraBroadcast(room, 'basraGameOver', { names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0) });
+                        setTimeout(() => settleBasraCoins(room, winnerSlotIdx).catch(e => console.error('[basra coins]', e.message)), 300);
+                    } else {
+                        basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
+                    }
                 }
             }
             basraEmitAll(room);
@@ -1820,6 +1852,11 @@ function registerBasraHandlers(socket) {
         if (allConnected) {
             room.gameStarted = true;
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
+            if (room.teams) {
+                const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
+                const t1 = room.teams[1].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
+                setTimeout(() => basraBroadcast(room, 'basraTeamsAnnounce', { teams: [[t0, room.teams[0]], [t1, room.teams[1]]] }), 500);
+            }
             basraEmitAll(room);
             // Start first turn timer via basraAdvanceTurn logic
             if (room.turnTimer > 0) {
