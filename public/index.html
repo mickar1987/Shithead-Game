@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.09</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.10</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4838,6 +4838,8 @@ function basraFindValidCaptures(card, tableCards) {
     const faceRanks = ['J','Q','K'];
     const rankVal = r => r==='A'?1:(faceRanks.includes(r)?null:parseInt(r));
     if (rank==='J' || card==='7d') return tableCards.length>0?[tableCards.map((_,i)=>i)]:[];
+    // 7♦ trap: if only 7♦ on table, any card can capture it
+    if (tableCards.length===1 && tableCards[0]==='7d') return [[0]];
     if (rank==='Q'||rank==='K') {
         const g = tableCards.map((c,i)=>({c,i})).filter(x=>x.c.slice(0,-1)===rank).map(x=>x.i);
         return g.length>0?[g]:[];
