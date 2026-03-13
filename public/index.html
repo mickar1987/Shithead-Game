@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.30</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.31</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2936,6 +2936,24 @@ if (!onlineMode) return; // already left to menu
             <span style="font-size:11px;color:rgba(255,200,50,0.7);">${r.players}/${r.total} שחקנים · עד ${r.winScore||120}${r.bet>0?' · '+r.bet+'💰':''}</span>
         </div>`).join('');
     });
+    socket.on('basraTeamsAnnounce', ({ teams }) => {
+        const overlay = document.getElementById('basraResultOverlay');
+        const scoresEl = document.getElementById('basraRoundScores');
+        const btnsEl = document.getElementById('basraRoundBtns');
+        if (!overlay) return;
+        const colors = ['#fbbf24','#60a5fa'];
+        let html = '<div style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🤝 הזוגות</div>';
+        html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+        teams.forEach(([name, slots], ti) => {
+            html += `<div style="text-align:center;padding:8px;border-radius:8px;border:1px solid ${colors[ti]};color:${colors[ti]};font-size:14px;font-weight:700;">${name}</div>`;
+        });
+        html += '</div>';
+        scoresEl.innerHTML = html;
+        btnsEl.innerHTML = '';
+        overlay.style.display = 'flex';
+        setTimeout(() => { overlay.style.display = 'none'; }, 5000);
+    });
+
     socket.on('basraRoomClosed', () => {
         showToast('החדר נסגר על ידי היוצר');
         document.getElementById('basraGame').style.display = 'none';
@@ -5105,8 +5123,18 @@ function basraRender(state) {
     }
 
     // Score bar
-    document.getElementById('basraScoreBar').textContent =
-        state.playerNames.map((n,i)=>n.split(' ')[0]+': '+(state.scores[i]||0)).join('  |  ');
+    if (state.teams) {
+        // 4p: show team scores
+        const tScores = state.teams.map(team =>
+            team.reduce((sum, idx) => sum + (state.scores[idx]||0), 0));
+        const tNames = state.teams.map((team, ti) =>
+            team.map(idx => state.playerNames[idx].split(' ')[0]).join('+'));
+        document.getElementById('basraScoreBar').textContent =
+            tNames.map((n,ti)=>n+': '+tScores[ti]).join('  |  ');
+    } else {
+        document.getElementById('basraScoreBar').textContent =
+            state.playerNames.map((n,i)=>n.split(' ')[0]+': '+(state.scores[i]||0)).join('  |  ');
+    }
 
     // Gold border around active player area
     const myArea = document.getElementById('basraPlayerArea');
@@ -5140,6 +5168,19 @@ function basraRender(state) {
         }
         basraRenderPile('basraLeftPile', state.capturedCounts[leftIdx]||0, state.basraCards?state.basraCards[leftIdx]:[]);
         if (leftArea) leftArea.style.outline = state.currentPlayer===leftIdx ? '2px solid var(--gold)' : '2px solid transparent';
+        // Show team partner indicator
+        if (state.teams) {
+            const myTeam = state.teams.findIndex(t => t.includes(myIdx));
+            const leftTeam = state.teams.findIndex(t => t.includes(leftIdx));
+            const rightTeam = state.teams.findIndex(t => t.includes(rightIdx));
+            const oppTeam = state.teams.findIndex(t => t.includes(oppIdx));
+            const teamColors = ['rgba(251,191,36,0.15)','rgba(96,165,250,0.15)'];
+            const teamBorders = ['rgba(251,191,36,0.4)','rgba(96,165,250,0.4)'];
+            if (leftArea && state.currentPlayer !== leftIdx) leftArea.style.outline = `1px solid ${teamBorders[leftTeam]}`;
+            if (rightArea && state.currentPlayer !== rightIdx) rightArea.style.outline = `1px solid ${teamBorders[rightTeam]}`;
+            if (oppArea && state.currentPlayer !== oppIdx) oppArea.style.outline = `1px solid ${teamBorders[oppTeam]}`;
+            if (myArea && !showMyTurn) myArea.style.outline = `1px solid ${teamBorders[myTeam]}`;
+        }
         // Right player
         const rightNameEl = document.getElementById('basraRightName');
         const rightHandEl = document.getElementById('basraRightHand');
