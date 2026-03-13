@@ -1681,11 +1681,14 @@ function basraAdvanceTurn(room) {
             if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
         }, 1000);
         room._timerTimeout = setTimeout(() => {
+            room._timerTimeout = null; // clear self-reference immediately
             if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
+            if (room.gameOver || room.roundOver) return;
             const p = room.slots[room.currentPlayer];
             // Allow timeout even if hand is empty — committed card may be waiting
             if (!p) return;
             if (p.hand.length === 0 && !room.committedCard) return;
+            console.log(`[timeout] committedCard=${room.committedCard} committedBy=${room.committedBy} currentPlayer=${room.currentPlayer}`);
 
             // Track consecutive timeouts per player
             if (!room._consecutiveTimeouts) room._consecutiveTimeouts = {};
@@ -1828,16 +1831,28 @@ function registerBasraHandlers(socket) {
                     if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
                 }, 1000);
                 room._timerTimeout = setTimeout(() => {
+                    room._timerTimeout = null;
                     if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
+                    if (room.gameOver || room.roundOver) return;
                     const p = room.slots[room.currentPlayer];
-                    if (!p || p.hand.length === 0) return;
-                    const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
-                    p.hand.splice(p.hand.indexOf(randomCard), 1);
-                    room.tableCards.push(randomCard);
-                    room.committedCard = null;
-                    room.committedBy = null;
-                    basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
-                    basraAdvanceTurn(room);
+                    if (!p) return;
+                    if (p.hand.length === 0 && !room.committedCard) return;
+                    if (room.committedCard && room.committedBy === room.currentPlayer) {
+                        const thrownCard = room.committedCard;
+                        room.tableCards.push(thrownCard);
+                        room.committedCard = null;
+                        room.committedBy = null;
+                        basraBroadcast(room, 'toast', `${p.name} זרק ${thrownCard} (פג הזמן)`);
+                        basraAdvanceTurn(room);
+                    } else {
+                        const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+                        p.hand.splice(p.hand.indexOf(randomCard), 1);
+                        room.tableCards.push(randomCard);
+                        room.committedCard = null;
+                        room.committedBy = null;
+                        basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
+                        basraAdvanceTurn(room);
+                    }
                 }, room.turnTimer * 1000);
             }
         }
