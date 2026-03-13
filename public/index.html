@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.18</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.19</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2850,13 +2850,7 @@ const overlay = document.getElementById('setupOverlay');
         });
     }
 
-    socket.on('coinsResult', (results) => {
-        if (document.getElementById('lb-coins-0')) {
-            applyCoinsResult(results);
-        } else {
-            pendingCoinsResult = results; // gameOver not rendered yet — wait
-        }
-    });
+// coinsResult handled in basraGameOver section
 
     socket.on('playerWantsRestart', ({ readyCount, totalCount }) => {
         document.getElementById('waitingCount').style.display = 'block';
@@ -3059,11 +3053,49 @@ if (!onlineMode) return; // already left to menu
             html += '<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🏆 משחק הסתיים!</div>';
         }
         html += '<div style="display:flex;flex-direction:column;gap:8px;">';
-        html += names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('');
+        html += names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;" id="basra-go-row-${i}"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('');
         html += '</div>';
+        html += '<div id="basraCoinsResult" style="margin-top:10px;"></div>';
         document.getElementById('basraRoundScores').innerHTML = html;
         document.getElementById('basraRoundBtns').innerHTML='<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 צא לתפריט</button>';
         overlay.style.display='flex';
+        // Apply pending coins if already arrived
+        if (pendingBasraCoins) { applyBasraCoins(pendingBasraCoins); pendingBasraCoins = null; }
+    });
+
+    let pendingBasraCoins = null;
+    function applyBasraCoins(results) {
+        const el = document.getElementById('basraCoinsResult');
+        if (!el) { pendingBasraCoins = results; return; }
+        let html = '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;display:flex;flex-direction:column;gap:4px;">';
+        results.forEach(r => {
+            if (r.delta === 0) return;
+            const plus = r.delta > 0;
+            const coinIcon = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe066,#f5a623 60%,#b8760a);border:1px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;">C</span>';
+            html += `<div style="display:flex;justify-content:space-between;font-size:12px;color:${plus?'#4ade80':'#f87171'};">
+                <span>${r.name}</span>
+                <span>${plus?'+':''}${r.delta} ${coinIcon} ${r.coins !== null ? '(יתרה: '+r.coins+')' : ''}</span>
+            </div>`;
+        });
+        html += '</div>';
+        el.innerHTML = html;
+        // Update local coin display
+        const me = results.find(r => r.slotIdx === basraMySlot);
+        if (me && me.coins !== null && authUser) {
+            authUser.coins = me.coins;
+            updateCoinDisplay();
+        }
+    }
+
+    socket.on('coinsResult', (results) => {
+        // Handle both shithead and basra
+        if (document.getElementById('basraCoinsResult') !== null || document.getElementById('basraResultOverlay')?.style.display === 'flex') {
+            applyBasraCoins(results);
+        } else if (document.getElementById('lb-coins-0')) {
+            applyCoinsResult(results);
+        } else {
+            pendingCoinsResult = results;
+        }
     });
     function basraNextRound() {
         document.getElementById('basraResultOverlay').style.display='none';
