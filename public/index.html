@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.10</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.12</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2960,11 +2960,33 @@ if (!onlineMode) return; // already left to menu
         const overlay=document.getElementById('basraResultOverlay');
         const scoresEl=document.getElementById('basraRoundScores');
         const btnsEl=document.getElementById('basraRoundBtns');
-        let html='<div style="display:flex;flex-direction:column;gap:10px;">';
+        let html='<div style="display:flex;flex-direction:column;gap:12px;">';
         scores.forEach(sc=>{
-            html+=`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;"><span>${sc.name}</span><span style="color:var(--gold);">+${sc.points} (סה"כ: ${totalScores[sc.slotIdx]})</span></div>`;
+            const regularBasras = (sc.basras||0) - (sc.jackBasras||0);
+            const jackBasras = sc.jackBasras||0;
+            let breakdown = [];
+            if (sc.majorityPoints > 0) breakdown.push(`רוב קלפים: +${sc.majorityPoints}`);
+            if (regularBasras > 0) breakdown.push(`בסרה ×${regularBasras}: +${regularBasras*10}`);
+            if (jackBasras > 0) breakdown.push(`בסרה J ×${jackBasras}: +${jackBasras*20}`);
+            const breakdownHtml = breakdown.length > 0
+                ? `<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">${breakdown.join(' | ')}</div>`
+                : '';
+            const prevScore = totalScores[sc.slotIdx] - sc.points;
+            html+=`<div style="border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;">
+                    <span>${sc.name}</span>
+                    <span style="display:flex;align-items:center;gap:6px;">
+                        <span style="color:rgba(255,255,255,0.35);font-size:12px;">${prevScore}</span>
+                        <span style="color:rgba(255,255,255,0.35);font-size:11px;">+</span>
+                        <span style="color:var(--gold);font-weight:700;">${sc.points}</span>
+                        <span style="color:rgba(255,255,255,0.35);font-size:11px;">=</span>
+                        <span style="color:#fff;font-weight:700;">${totalScores[sc.slotIdx]}</span>
+                    </span>
+                </div>
+                ${breakdownHtml}
+            </div>`;
         });
-        if (pendingMajority>0) html+=`<div style="font-size:11px;color:rgba(255,200,50,0.5);margin-top:4px;">${pendingMajority} נק' רוב הועברו לסיבוב הבא</div>`;
+        if (pendingMajority>0) html+=`<div style="font-size:11px;color:rgba(255,200,50,0.5);">⏳ ${pendingMajority} נק' רוב עברו לסיבוב הבא</div>`;
         html+='</div>';
         scoresEl.innerHTML=html;
         btnsEl.innerHTML='<button onclick="basraNextRound()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);width:220px;">▶ סיבוב הבא</button>';
