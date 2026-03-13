@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.21</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.23</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2324,7 +2324,7 @@ async function refreshCoins() {
     try {
         const r = await fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: authUser.username, token: authUser.token }) });
         const data = await r.json();
-        if (data.ok && data.coins !== authUser.coins) {
+        if (data.ok) {
             authUser.coins = data.coins;
             saveAuthLocal();
             updateCoinsUI();
@@ -2926,7 +2926,7 @@ if (!onlineMode) return; // already left to menu
         if (!rooms.length) { el.innerHTML='<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px;">אין חדרים פתוחים</div>'; return; }
         el.innerHTML=rooms.map(r=>`<div onclick="basraJoin('${r.code}')" style="cursor:pointer;padding:10px;margin-bottom:6px;border:1px solid rgba(255,255,255,0.15);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
             <span style="font-size:13px;color:#fff;letter-spacing:1px;">${r.code}</span>
-            <span style="font-size:11px;color:rgba(255,200,50,0.7);">${r.players}/${r.total} שחקנים${r.bet>0?' · '+r.bet+'💰':''}</span>
+            <span style="font-size:11px;color:rgba(255,200,50,0.7);">${r.players}/${r.total} שחקנים · עד ${r.winScore||120}${r.bet>0?' · '+r.bet+'💰':''}</span>
         </div>`).join('');
     });
     socket.on('basraStart', () => {
@@ -3078,7 +3078,7 @@ if (!onlineMode) return; // already left to menu
             const coinIcon = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe066,#f5a623 60%,#b8760a);border:1px solid #f5c842;font-size:7px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;">C</span>';
             html += `<div style="display:flex;justify-content:space-between;font-size:12px;color:${plus?'#4ade80':'#f87171'};">
                 <span>${r.name}</span>
-                <span>${plus?'+':''}${r.delta} ${coinIcon} ${r.coins !== null ? '(יתרה: '+r.coins+')' : ''}</span>
+                <span>${plus?'+':''}${r.delta} ${coinIcon}</span>
             </div>`;
         });
         html += '</div>';
