@@ -103,34 +103,27 @@ function isBasra(playedCard, capturedCards, tableCards) {
         return allJacks || only7d;
     }
 
-    // 7♦: basra if table can be partitioned into groups all summing to same value (1-10)
-    // Also basra if table has only 1 J (jack basra, 20pts)
+    // 7♦: acts as any card to make basra
+    // - Single card on table (any rank incl Q/K/J) → basra always (J = 20pts)
+    // - Multiple numeric cards: partition into equal-sum groups → basra
+    // - Multiple cards with face cards mixed → no basra
     if (is7D(playedCard)) {
         if (tableCards.length === 0) return false;
-        // Special: single J on table = jack basra
-        if (tableCards.length === 1 && cardRank(tableCards[0]) === 'J') return true;
-        // Check if all cards are numeric (no face cards except the J case above)
+        if (tableCards.length === 1) return true; // single card → basra always
         const faceRanks = ['J','Q','K'];
         const rv = r => r==='A' ? 1 : (faceRanks.includes(r) ? null : parseInt(r));
         const vals = tableCards.map(c => rv(cardRank(c)));
-        if (vals.some(v => v === null)) return false; // face cards present → no basra
-        // Try each value 1-10: can ALL tableCards be partitioned into groups summing to val?
+        if (vals.some(v => v === null)) return false;
         for (let val = 1; val <= 10; val++) {
-            // Greedy partition: repeatedly find a subset summing to val
             const remaining = [...vals];
             let ok = true;
             while (remaining.length > 0) {
-                // Find a subset summing to val
                 const n = remaining.length;
                 let found = false;
                 for (let mask = 1; mask < (1<<n); mask++) {
                     let sum = 0; const idxs = [];
                     for (let i = 0; i < n; i++) { if (mask & (1<<i)) { sum += remaining[i]; idxs.push(i); } }
-                    if (sum === val) {
-                        // Remove these indices (descending to not shift)
-                        idxs.reverse().forEach(i => remaining.splice(i, 1));
-                        found = true; break;
-                    }
+                    if (sum === val) { idxs.reverse().forEach(i => remaining.splice(i, 1)); found = true; break; }
                 }
                 if (!found) { ok = false; break; }
             }
