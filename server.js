@@ -1879,7 +1879,7 @@ function registerBasraHandlers(socket) {
             if (room.teams) {
                 const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
                 const t1 = room.teams[1].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
-                setTimeout(() => basraBroadcast(room, 'basraTeamsAnnounce', { teams: [[t0, room.teams[0]], [t1, room.teams[1]]] }), 500);
+                setTimeout(() => basraBroadcast(room, 'basraTeamsAnnounce', { teams: [[t0, room.teams[0]], [t1, room.teams[1]]], firstPlayer: room.slots[room.currentPlayer].name }), 500);
             }
             basraEmitAll(room);
             // Start first turn timer via basraAdvanceTurn logic
