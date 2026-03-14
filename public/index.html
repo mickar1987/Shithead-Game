@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.41</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.43</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5191,9 +5191,22 @@ function basraRender(state) {
     const oppArea = document.getElementById('basraOpponentArea');
     const showMyTurn = state.isMyTurn || inCommitPhase;
     const activePlayer = state.currentPlayer;
-    if (myArea) { myArea.style.outline = showMyTurn ? '2px solid var(--gold)' : '2px solid transparent'; myArea.style.borderRadius='12px'; }
-    // Only highlight oppArea if it's actually the opp's turn (not a side player in 4p)
-    if (oppArea) { oppArea.style.outline = (activePlayer === oppIdx && !showMyTurn) ? '2px solid var(--gold)' : '2px solid transparent'; oppArea.style.borderRadius='12px'; }
+    // Set ALL area outlines in one place — only active player gets gold, others get team color or transparent
+    const teamBordersAll = ['rgba(251,191,36,0.35)','rgba(96,165,250,0.35)'];
+    function areaOutline(slotIdx, el) {
+        if (!el) return;
+        el.style.borderRadius = '12px';
+        if (slotIdx === activePlayer) {
+            el.style.outline = '2px solid var(--gold)';
+        } else if (state.teams) {
+            const ti = state.teams.findIndex(t => t.includes(slotIdx));
+            el.style.outline = `1px solid ${teamBordersAll[ti] || 'transparent'}`;
+        } else {
+            el.style.outline = '2px solid transparent';
+        }
+    }
+    areaOutline(myIdx, myArea);
+    areaOutline(oppIdx, oppArea);
 
     // Side players (4-player mode)
     const leftArea = document.getElementById('basraLeftArea');
@@ -5217,20 +5230,9 @@ function basraRender(state) {
             });
         }
         basraRenderPile('basraLeftPile', state.capturedCounts[leftIdx]||0, state.basraCards?state.basraCards[leftIdx]:[]);
-        if (leftArea) leftArea.style.outline = state.currentPlayer===leftIdx ? '2px solid var(--gold)' : '2px solid transparent';
-        // Show team partner indicator
-        if (state.teams) {
-            const myTeam = state.teams.findIndex(t => t.includes(myIdx));
-            const leftTeam = state.teams.findIndex(t => t.includes(leftIdx));
-            const rightTeam = state.teams.findIndex(t => t.includes(rightIdx));
-            const oppTeam = state.teams.findIndex(t => t.includes(oppIdx));
-            const teamColors = ['rgba(251,191,36,0.15)','rgba(96,165,250,0.15)'];
-            const teamBorders = ['rgba(251,191,36,0.4)','rgba(96,165,250,0.4)'];
-            if (leftArea && state.currentPlayer !== leftIdx) leftArea.style.outline = `1px solid ${teamBorders[leftTeam]}`;
-            if (rightArea && state.currentPlayer !== rightIdx) rightArea.style.outline = `1px solid ${teamBorders[rightTeam]}`;
-            if (oppArea && state.currentPlayer !== oppIdx) oppArea.style.outline = `1px solid ${teamBorders[oppTeam]}`;
-            if (myArea && !showMyTurn) myArea.style.outline = `1px solid ${teamBorders[myTeam]}`;
-        }
+        // left outline handled below
+        // Apply outlines for side players
+        areaOutline(leftIdx, leftArea);
         // Right player
         const rightNameEl = document.getElementById('basraRightName');
         const rightHandEl = document.getElementById('basraRightHand');
@@ -5247,7 +5249,7 @@ function basraRender(state) {
             });
         }
         basraRenderPile('basraRightPile', state.capturedCounts[rightIdx]||0, state.basraCards?state.basraCards[rightIdx]:[]);
-        if (rightArea) rightArea.style.outline = state.currentPlayer===rightIdx ? '2px solid var(--gold)' : '2px solid transparent';
+        areaOutline(rightIdx, rightArea);
     } else {
         if (leftArea) leftArea.style.display = 'none';
         if (rightArea) rightArea.style.display = 'none';
