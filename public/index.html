@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.47</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.48</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5493,17 +5493,17 @@ function basraCancelSelection() {
     </div>
 
     <!-- Left player (slot varies by myIdx) -->
-    <div id="basraLeftArea" style="display:none;position:fixed;left:4px;top:50%;transform:translateY(-50%);width:60px;z-index:501;display:flex;flex-direction:column;align-items:center;gap:4px;">
+    <div id="basraLeftArea" style="display:none;position:fixed;left:0;top:50%;transform:translateY(-50%);width:80px;z-index:501;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;">
         <div id="basraLeftName" style="font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.5px;writing-mode:vertical-rl;text-orientation:mixed;max-height:100px;overflow:hidden;"></div>
         <div id="basraLeftHand" style="display:flex;flex-direction:column;gap:-4px;align-items:center;"></div>
-        <div id="basraLeftPile" style="margin-top:4px;"></div>
+        <div id="basraLeftPile" style="margin-top:4px;margin-left:8px;"></div>
     </div>
 
     <!-- Right player -->
-    <div id="basraRightArea" style="display:none;position:fixed;right:4px;top:50%;transform:translateY(-50%);width:60px;z-index:501;display:flex;flex-direction:column;align-items:center;gap:4px;">
+    <div id="basraRightArea" style="display:none;position:fixed;right:0;top:50%;transform:translateY(-50%);width:80px;z-index:501;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;">
         <div id="basraRightName" style="font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.5px;writing-mode:vertical-rl;text-orientation:mixed;max-height:100px;overflow:hidden;"></div>
         <div id="basraRightHand" style="display:flex;flex-direction:column;gap:-4px;align-items:center;"></div>
-        <div id="basraRightPile" style="margin-top:4px;"></div>
+        <div id="basraRightPile" style="margin-top:4px;margin-right:8px;"></div>
     </div>
 
     <!-- Deck — fixed top-right corner -->
