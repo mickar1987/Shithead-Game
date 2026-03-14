@@ -416,9 +416,11 @@ function resetRound(room) {
     room.roundOver = false;
     room.roundNum++;
 
-    // Rotate dealer → rotate who goes first
+    // Rotate: next round starts with player after whoever STARTED the previous round
     const n = room.slots.length;
-    room.currentPlayer = (room.currentPlayer + 1) % n;
+    const prevStarter = room.roundStarter !== undefined ? room.roundStarter : 0;
+    room.currentPlayer = (prevStarter + 1) % n;
+    room.roundStarter = room.currentPlayer;
 
     room.slots.forEach(s => {
         s.hand = [];

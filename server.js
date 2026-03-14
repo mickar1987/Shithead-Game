@@ -1868,11 +1868,13 @@ function registerBasraHandlers(socket) {
                 room.teams = [[0, 2], [1, 3]];
                 // Random starting player
                 room.currentPlayer = Math.floor(Math.random() * 4);
+                room.roundStarter = room.currentPlayer;
             }
             // Random starting player for 2p (4p already handled above)
             if (room.slots.length === 2) {
                 room.currentPlayer = Math.floor(Math.random() * 2);
             }
+            room.roundStarter = room.currentPlayer; // track for rotation
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
             if (room.teams) {
                 const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
