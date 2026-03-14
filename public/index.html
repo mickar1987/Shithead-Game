@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.46</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.47</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2936,22 +2936,35 @@ if (!onlineMode) return; // already left to menu
             <span style="font-size:11px;color:rgba(255,200,50,0.7);">${r.players}/${r.total} שחקנים · עד ${r.winScore||120}${r.bet>0?' · '+r.bet+'💰':''}</span>
         </div>`).join('');
     });
-    socket.on('basraTeamsAnnounce', ({ teams }) => {
+    socket.on('basraTeamsAnnounce', ({ teams, firstPlayer }) => {
         const overlay = document.getElementById('basraResultOverlay');
         const scoresEl = document.getElementById('basraRoundScores');
         const btnsEl = document.getElementById('basraRoundBtns');
         if (!overlay) return;
         const colors = ['#fbbf24','#60a5fa'];
-        let html = '<div style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🤝 הזוגות</div>';
-        html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+        const bgColors = ['rgba(251,191,36,0.12)','rgba(96,165,250,0.12)'];
+        let html = '<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:var(--gold);letter-spacing:4px;text-align:center;margin-bottom:16px;text-shadow:0 0 20px rgba(240,192,64,0.6);">🤝 הזוגות</div>';
+        html += '<div style="display:flex;flex-direction:column;gap:12px;width:100%;">';
         teams.forEach(([name, slots], ti) => {
-            html += `<div style="text-align:center;padding:8px;border-radius:8px;border:1px solid ${colors[ti]};color:${colors[ti]};font-size:14px;font-weight:700;">${name}</div>`;
+            html += `<div style="text-align:center;padding:14px 20px;border-radius:12px;border:2px solid ${colors[ti]};color:${colors[ti]};font-size:1.1rem;font-weight:700;background:${bgColors[ti]};letter-spacing:1px;">${name}</div>`;
         });
         html += '</div>';
+        if (firstPlayer) {
+            html += `<div style="margin-top:16px;text-align:center;font-size:13px;color:rgba(255,255,255,0.7);letter-spacing:1px;">▶ מתחיל: <span style="color:var(--gold);font-weight:700;">${firstPlayer.split(' ')[0]}</span></div>`;
+        }
+        scoresEl.style.background = 'rgba(10,30,20,0.97)';
+        scoresEl.style.border = '1px solid rgba(255,255,255,0.15)';
+        scoresEl.style.borderRadius = '18px';
+        scoresEl.style.padding = '24px 28px';
+        scoresEl.style.minWidth = '260px';
         scoresEl.innerHTML = html;
         btnsEl.innerHTML = '';
         overlay.style.display = 'flex';
-        setTimeout(() => { overlay.style.display = 'none'; }, 5000);
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            scoresEl.style.background = '';
+            scoresEl.style.border = '';
+        }, 5000);
     });
 
     socket.on('basraRoomClosed', () => {
