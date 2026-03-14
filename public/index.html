@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.48</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.49</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2979,6 +2979,21 @@ if (!onlineMode) return; // already left to menu
         const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
         const pa = document.getElementById('playerArea'); if (pa) pa.style.display='none';
         document.querySelectorAll('.log-btn').forEach(el => el.style.display='none');
+        // Reset overlay and state from any previous game
+        const overlay = document.getElementById('basraResultOverlay');
+        if (overlay) overlay.style.display = 'none';
+        if (window._basraRoundTimer) { clearInterval(window._basraRoundTimer); window._basraRoundTimer = null; }
+        const scoresEl = document.getElementById('basraRoundScores');
+        if (scoresEl) { scoresEl.innerHTML = ''; scoresEl.style.background=''; scoresEl.style.border=''; }
+        const btnsEl = document.getElementById('basraRoundBtns');
+        if (btnsEl) btnsEl.innerHTML = '';
+        const logWindow = document.getElementById('logWindow');
+        if (logWindow) logWindow.innerHTML = '';
+        pendingBasraCoins = null;
+        basraState = null;
+        basraSelectedCard = null;
+        basraCommittedCard = null;
+        basraPlayPhase = 'select';
         showToast('המשחק התחיל!');
     });
     socket.on('basraState', state => {
