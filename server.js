@@ -1980,9 +1980,44 @@ function registerBasraHandlers(socket) {
         const code = socket.data.basraRoom;
         const room = basraRooms[code];
         if (!room || !room.roundOver || room.gameOver) return;
+        // Clear any running timer before starting new round
+        basraClearBasraTimer(room);
+        room._consecutiveTimeouts = {};
         basra.resetRound(room);
         basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
         basraEmitAll(room);
+        // Start timer for first player of new round
+        if (room.turnTimer > 0 && !room.gameOver) {
+            room._timerStarted = Date.now();
+            room._timerRemaining = room.turnTimer;
+            room._timerInterval = setInterval(() => {
+                room._timerRemaining--;
+                basraBroadcast(room, 'basraTimerTick', { remaining: room._timerRemaining, currentPlayer: room.currentPlayer });
+                if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
+            }, 1000);
+            room._timerTimeout = setTimeout(() => {
+                room._timerTimeout = null;
+                if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
+                if (room.gameOver || room.roundOver) return;
+                const p = room.slots[room.currentPlayer];
+                if (!p) return;
+                if (p.hand.length === 0 && !room.committedCard) return;
+                if (room.committedCard && room.committedBy === room.currentPlayer) {
+                    const thrown = room.committedCard;
+                    room.tableCards.push(thrown);
+                    room.committedCard = null; room.committedBy = null;
+                    basraBroadcast(room, 'toast', `${p.name} זרק ${thrown} (פג הזמן)`);
+                    basraAdvanceTurn(room);
+                } else {
+                    const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+                    p.hand.splice(p.hand.indexOf(randomCard), 1);
+                    room.tableCards.push(randomCard);
+                    room.committedCard = null; room.committedBy = null;
+                    basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
+                    basraAdvanceTurn(room);
+                }
+            }, room.turnTimer * 1000);
+        }
     });
 
     socket.on('basraReconnect', ({ code, username }) => {
