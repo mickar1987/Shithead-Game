@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.45</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.46</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5103,7 +5103,7 @@ function basraIsCaptureValid(card, tableCards, selectedIndices) {
     return remaining.length === 0;
 }
 
-function basraRenderPile(containerId, capturedCount, basraCards) {
+function basraRenderPile(containerId, capturedCount, basraCards, rotate, showCount) {
     const el = document.getElementById(containerId);
     if (!el) return;
     el.innerHTML = '';
@@ -5128,10 +5128,12 @@ function basraRenderPile(containerId, capturedCount, basraCards) {
     const pileTop = document.createElement('div');
     pileTop.style.cssText = 'width:34px;height:48px;border-radius:5px;border:1px solid #2a4a6c;position:relative;z-index:10;background:linear-gradient(135deg,#1a3a5c 0%,#0d2240 50%,#1a3a5c 100%);';
     pileTop.innerHTML = '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:rgba(255,255,255,0.12);">\u2660</span>';
-    const countEl = document.createElement('div');
-    countEl.style.cssText = 'position:absolute;top:-14px;left:0;width:34px;text-align:center;font-size:10px;color:rgba(255,255,255,0.5);';
-    countEl.textContent = capturedCount;
-    pileTop.appendChild(countEl);
+    if (showCount) {
+        const countEl = document.createElement('div');
+        countEl.style.cssText = 'position:absolute;top:-14px;left:0;width:34px;text-align:center;font-size:10px;color:rgba(255,255,255,0.5);';
+        countEl.textContent = capturedCount;
+        pileTop.appendChild(countEl);
+    }
     wrapper.appendChild(pileTop);
 
     // basra fan — half hidden above pile
@@ -5149,7 +5151,8 @@ function basraRenderPile(containerId, capturedCount, basraCards) {
         });
     }
 
-    el.style.cssText = 'display:flex;justify-content:center;align-items:flex-start;padding-top:'+(hasFan ? '32px' : '14px')+';';
+    const rotStyle = rotate ? 'transform:rotate('+rotate+'deg);transform-origin:center center;' : '';
+    el.style.cssText = 'display:flex;justify-content:center;align-items:flex-start;padding-top:'+(hasFan ? '32px' : '14px')+';'+rotStyle;
     el.appendChild(wrapper);
 }
 
@@ -5241,7 +5244,7 @@ function basraRender(state) {
                 leftHandEl.appendChild(card);
             });
         }
-        basraRenderPile('basraLeftPile', state.capturedCounts[leftIdx]||0, state.basraCards?state.basraCards[leftIdx]:[]);
+        basraRenderPile('basraLeftPile', state.capturedCounts[leftIdx]||0, state.basraCards?state.basraCards[leftIdx]:[], 90, false);
         // left outline handled below
         // Apply outlines for side players
         areaOutline(leftIdx, leftArea);
@@ -5260,7 +5263,7 @@ function basraRender(state) {
                 rightHandEl.appendChild(card);
             });
         }
-        basraRenderPile('basraRightPile', state.capturedCounts[rightIdx]||0, state.basraCards?state.basraCards[rightIdx]:[]);
+        basraRenderPile('basraRightPile', state.capturedCounts[rightIdx]||0, state.basraCards?state.basraCards[rightIdx]:[], -90, false);
         areaOutline(rightIdx, rightArea);
     } else {
         if (leftArea) leftArea.style.display = 'none';
@@ -5337,8 +5340,8 @@ function basraRender(state) {
 
     // My info
     document.getElementById('basraMyInfo').textContent = '';
-    basraRenderPile('basraMyPile', state.capturedCounts[myIdx]||0, state.basraCards ? state.basraCards[myIdx] : []);
-    basraRenderPile('basraOppPile', state.capturedCounts[oppIdx]||0, state.basraCards ? state.basraCards[oppIdx] : []);
+    basraRenderPile('basraMyPile', state.capturedCounts[myIdx]||0, state.basraCards ? state.basraCards[myIdx] : [], 0, true);
+    basraRenderPile('basraOppPile', state.capturedCounts[oppIdx]||0, state.basraCards ? state.basraCards[oppIdx] : [], 0, false);
 
     // Buttons
     const playBtn    = document.getElementById('basraPlayBtn');
