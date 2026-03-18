@@ -353,15 +353,21 @@ app.get('/api/admin/users', async (req, res) => {
         for (const [, sock] of io.sockets.sockets) {
             if (sock.data?.username) connectedUsernames.add(sock.data.username);
         }
-        // Also consider recently seen users as online (within 2 minutes - covers VS AI)
-        const twoMinsAgo = Date.now() - 2 * 60 * 1000;
-        sorted.forEach(u => {
-            if (u.lastSeenTs && u.lastSeenTs > twoMinsAgo) connectedUsernames.add(u.username);
-        });
+
+
+        // Build room map: username -> room code
+        const userRoomMap = {};
+        Object.values(rooms).forEach(r => r.slots && r.slots.forEach(sl => {
+            if (sl.username && sl.connected && !sl.isBot) userRoomMap[sl.username] = 'SH:' + r.code;
+        }));
+        Object.values(basraRooms).forEach(r => r.slots.forEach(sl => {
+            if (sl.username && sl.socketId && io.sockets.sockets.has(sl.socketId)) userRoomMap[sl.username] = 'BS:' + r.code;
+        }));
 
         const rows = sorted.map((u, i) => {
             const isOnline = connectedUsernames.has(u.username);
             const lastSeen = u.lastSeenTs ? new Date(u.lastSeenTs).toLocaleString('he-IL') : '—';
+            const roomInfo = userRoomMap[u.username] || '—';
             return `
             <tr style="border-bottom:1px solid #333">
                 <td style="padding:8px;text-align:center">${i+1}</td>
@@ -371,6 +377,7 @@ app.get('/api/admin/users', async (req, res) => {
                     <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${isOnline?'#22c55e':'#555'};margin-left:6px"></span>
                     ${isOnline ? '<span style="color:#22c55e">מחובר</span>' : '<span style="color:#555">לא מחובר</span>'}
                 </td>
+                <td style="padding:8px;text-align:center;font-family:monospace;font-size:12px;color:${roomInfo!=='—'?'#fbbf24':'#555'}">${roomInfo}</td>
                 <td style="padding:8px;text-align:center">${lastSeen}</td>
                 <td style="padding:8px;text-align:center">
                     <span style="display:flex;align-items:center;gap:4px;justify-content:center">
@@ -423,7 +430,7 @@ async function deleteUser(u) {
   <div class="stat"><span>${sorted.reduce((s,u)=>s+(u.coins||0),0).toLocaleString()} 🪙</span>סה"כ מטבעות</div>
 </div>
 <table>
-<tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>סטטוס</th><th>חיבור אחרון</th><th>מטבעות</th><th>פעולות</th></tr>
+<tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>סטטוס</th><th>חדר</th><th>חיבור אחרון</th><th>מטבעות</th><th>פעולות</th></tr>
 ${rows}
 </table>
 </body></html>`);
@@ -1827,17 +1834,22 @@ function basraAdvanceTurn(room) {
             room._consecutiveTimeouts[room.currentPlayer] = (room._consecutiveTimeouts[room.currentPlayer] || 0) + 1;
 
             if (room._consecutiveTimeouts[room.currentPlayer] >= 2) {
-                // 2 consecutive timeouts — forfeit
+                // 2 consecutive timeouts — forfeit + coin settlement
                 room.gameOver = true;
                 basraClearBasraTimer(room);
+                const forfeitIdx = room.currentPlayer;
                 basraBroadcast(room, 'toast', `${p.name} פסל עצמו (פג הזמן פעמיים)`);
                 basraBroadcast(room, 'basraGameOver', {
                     names: room.slots.map(s => s.name),
                     scores: room.slots.map(s => s.score || 0),
-                    forfeitBy: room.currentPlayer,
+                    forfeitBy: forfeitIdx,
                     forfeitName: p.name,
+                    teams: room.teams || null,
+                    teamScores: room.teams ? room.teams.map(t => room.slots[t[0]].score || 0) : null,
                 });
                 basraEmitAll(room);
+                const winner = room.slots.findIndex((_, i) => i !== forfeitIdx);
+                setTimeout(() => settleBasraCoins(room, winner).catch(e => console.error('[coins]', e)), 300);
                 return;
             }
 
