@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.57</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.58</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -966,15 +966,15 @@ function startGame(count) {
     lastAIPlayerCount = count;
     // Notify server user is active (for admin online status)
     if (authUser?.username && authUser?.token) {
-        fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'},
+        const _doPing = () => fetch('/api/ping', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ username: authUser.username, token: authUser.token }) }).catch(()=>{});
-        // Keep alive ping every 30s while in VS AI game
+        _doPing();
+        // Keep alive ping every 60s while in VS AI game
         if (window._vsAIPing) clearInterval(window._vsAIPing);
         window._vsAIPing = setInterval(() => {
             if (!authUser?.username) { clearInterval(window._vsAIPing); return; }
-            fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ username: authUser.username, token: authUser.token }) }).catch(()=>{});
-        }, 30000);
+            _doPing();
+        }, 60000);
     }
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('actionButtons').classList.remove('hidden');
