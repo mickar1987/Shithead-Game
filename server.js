@@ -353,6 +353,11 @@ app.get('/api/admin/users', async (req, res) => {
         for (const [, sock] of io.sockets.sockets) {
             if (sock.data?.username) connectedUsernames.add(sock.data.username);
         }
+        // Also consider recently seen users as online (within 2 minutes - covers VS AI)
+        const twoMinsAgo = Date.now() - 2 * 60 * 1000;
+        sorted.forEach(u => {
+            if (u.lastSeenTs && u.lastSeenTs > twoMinsAgo) connectedUsernames.add(u.username);
+        });
 
         const rows = sorted.map((u, i) => {
             const isOnline = connectedUsernames.has(u.username);
