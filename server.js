@@ -337,14 +337,21 @@ app.get('/api/admin/users', async (req, res) => {
         const allUsers = await usersCol.find({}, { projection: { pinHash: 0, token: 0 } }).toArray();
         const sorted = allUsers.sort((a, b) => (b.coins || 0) - (a.coins || 0));
 
-        // Build connected users set from active sockets
+        // Build connected users set from active sockets + basra rooms
         const connectedUsernames = new Set();
+        // Shithead: socket.data.username
         for (const [, sock] of io.sockets.sockets) {
             if (sock.data?.username) connectedUsernames.add(sock.data.username);
         }
-        // Also check basra rooms
+        // Basra: check all active room slots with a live socketId
         Object.values(basraRooms).forEach(r => r.slots.forEach(sl => {
-            if (sl.username && sl.socketId) connectedUsernames.add(sl.username);
+            if (sl.username && sl.socketId && io.sockets.sockets.has(sl.socketId)) {
+                connectedUsernames.add(sl.username);
+            }
+        }));
+        // Shithead rooms too
+        Object.values(rooms).forEach(r => r.slots && r.slots.forEach(sl => {
+            if (sl.username && sl.connected) connectedUsernames.add(sl.username);
         }));
 
         const rows = sorted.map((u, i) => {
