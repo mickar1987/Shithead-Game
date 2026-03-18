@@ -250,6 +250,18 @@ app.post('/api/ping', async (req, res) => {
     } catch(e) { res.json({ ok: false }); }
 });
 
+// Ping-stop — explicitly mark user as offline
+app.post('/api/ping-stop', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        delete activePings[name];
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false }); }
+});
+
 app.post('/api/daily', async (req, res) => {
     try {
         const { username, token } = req.body;
@@ -366,7 +378,7 @@ app.get('/api/admin/users', async (req, res) => {
             if (sock.data?.username) connectedUsernames.add(sock.data.username);
         }
         // VS AI pings (active within last 90 seconds)
-        const pingCutoff = Date.now() - 90000;
+        const pingCutoff = Date.now() - 70000;
         Object.entries(activePings).forEach(([uname, ts]) => {
             if (ts > pingCutoff) connectedUsernames.add(uname);
             else delete activePings[uname];
