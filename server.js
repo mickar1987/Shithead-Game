@@ -232,6 +232,7 @@ app.post('/api/verify', async (req, res) => {
         const u = await getUser(name);
         console.log(`[verify] user=${name} found=${!!u} tokenMatch=${u?.token === token} dbToken=${u?.token?.slice(0,8)} reqToken=${token?.slice(0,8)}`);
         if (!u || u.token !== token) return res.json({ ok: false });
+        await saveUser(name, { lastSeenTs: Date.now() });
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
         res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
     } catch(e) { console.error('[verify error]', e); res.json({ ok: false }); }
@@ -318,6 +319,16 @@ app.get('/api/admin/set-coins', async (req, res) => {
     } catch(e) { res.json({ error: e.message }); }
 });
 
+// Admin: delete user
+app.get('/api/admin/delete-user', async (req, res) => {
+    try {
+        const { key, u } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const result = await usersCol.deleteOne({ username: u });
+        res.json({ ok: result.deletedCount > 0, username: u });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
 // Admin: view all users (protected by secret key)
 app.get('/api/admin/users', async (req, res) => {
     try {
@@ -325,25 +336,82 @@ app.get('/api/admin/users', async (req, res) => {
         if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
         const allUsers = await usersCol.find({}, { projection: { pinHash: 0, token: 0 } }).toArray();
         const sorted = allUsers.sort((a, b) => (b.coins || 0) - (a.coins || 0));
-        // Return as nice HTML table
-        const rows = sorted.map((u, i) => `
+
+        // Build connected users set from active sockets
+        const connectedUsernames = new Set();
+        for (const [, sock] of io.sockets.sockets) {
+            if (sock.data?.username) connectedUsernames.add(sock.data.username);
+        }
+        // Also check basra rooms
+        Object.values(basraRooms).forEach(r => r.slots.forEach(sl => {
+            if (sl.username && sl.socketId) connectedUsernames.add(sl.username);
+        }));
+
+        const rows = sorted.map((u, i) => {
+            const isOnline = connectedUsernames.has(u.username);
+            const lastSeen = u.lastSeenTs ? new Date(u.lastSeenTs).toLocaleString('he-IL') : '—';
+            return `
             <tr style="border-bottom:1px solid #333">
-                <td style="padding:8px">${i+1}</td>
+                <td style="padding:8px;text-align:center">${i+1}</td>
                 <td style="padding:8px"><b>${u.username}</b></td>
                 <td style="padding:8px">${u.firstName || ''} ${u.lastName || ''}</td>
-                <td style="padding:8px">🪙 ${(u.coins||0).toLocaleString()}</td>
-                <td style="padding:8px">${u.lastDailyTs ? new Date(u.lastDailyTs).toLocaleString('he-IL') : '—'}</td>
-            </tr>`).join('');
+                <td style="padding:8px;text-align:center">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${isOnline?'#22c55e':'#555'};margin-left:6px"></span>
+                    ${isOnline ? '<span style="color:#22c55e">מחובר</span>' : '<span style="color:#555">לא מחובר</span>'}
+                </td>
+                <td style="padding:8px;text-align:center">${lastSeen}</td>
+                <td style="padding:8px;text-align:center">
+                    <span style="display:flex;align-items:center;gap:4px;justify-content:center">
+                        <input id="coins_${u.username}" type="number" value="${u.coins||0}" style="width:80px;padding:4px;background:#1a3a2a;border:1px solid #444;color:#fff;border-radius:4px;text-align:center">
+                        <button onclick="setCoins('${u.username}')" style="padding:4px 10px;background:#16a34a;border:none;color:#fff;border-radius:4px;cursor:pointer">✓</button>
+                    </span>
+                </td>
+                <td style="padding:8px;text-align:center">
+                    <button onclick="deleteUser('${u.username}')" style="padding:4px 10px;background:#dc2626;border:none;color:#fff;border-radius:4px;cursor:pointer">🗑 מחק</button>
+                </td>
+            </tr>`;
+        }).join('');
+
         res.send(`<!DOCTYPE html>
 <html dir="rtl">
-<head><meta charset="utf-8"><title>משתמשים</title>
-<style>body{font-family:sans-serif;background:#0d1f0f;color:#fff;padding:20px}
-table{border-collapse:collapse;width:100%}th{background:#1a4a2a;padding:10px;text-align:right}
-tr:hover{background:rgba(255,255,255,0.05)}</style></head>
+<head><meta charset="utf-8"><title>Admin — משתמשים</title>
+<style>
+  body{font-family:sans-serif;background:#0a1a0d;color:#fff;padding:20px;margin:0}
+  h2{color:gold;margin-bottom:16px}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th{background:#1a4a2a;padding:10px;text-align:right;position:sticky;top:0}
+  tr:hover{background:rgba(255,255,255,0.05)}
+  .stats{display:flex;gap:20px;margin-bottom:16px}
+  .stat{background:#1a3a2a;padding:10px 16px;border-radius:8px;font-size:13px}
+  .stat span{color:gold;font-size:18px;font-weight:700;display:block}
+</style>
+<script>
+const KEY = '${key}';
+async function setCoins(u) {
+    const coins = document.getElementById('coins_' + u).value;
+    const r = await fetch('/api/admin/set-coins?key=' + KEY + '&u=' + u + '&coins=' + coins);
+    const d = await r.json();
+    if (d.ok) { alert('✅ עודכן ל-' + coins + ' מטבעות'); }
+    else alert('❌ ' + JSON.stringify(d));
+}
+async function deleteUser(u) {
+    if (!confirm('למחוק את המשתמש ' + u + '?')) return;
+    const r = await fetch('/api/admin/delete-user?key=' + KEY + '&u=' + u);
+    const d = await r.json();
+    if (d.ok) { location.reload(); }
+    else alert('❌ ' + JSON.stringify(d));
+}
+</script>
+</head>
 <body>
-<h2 style="color:gold">🃏 SHITHEAD — משתמשים (${sorted.length})</h2>
+<h2>🃏 SHITHEAD — ניהול משתמשים</h2>
+<div class="stats">
+  <div class="stat"><span>${sorted.length}</span>סה"כ משתמשים</div>
+  <div class="stat"><span style="color:#22c55e">${connectedUsernames.size}</span>מחוברים כעת</div>
+  <div class="stat"><span>${sorted.reduce((s,u)=>s+(u.coins||0),0).toLocaleString()} 🪙</span>סה"כ מטבעות</div>
+</div>
 <table>
-<tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>מטבעות</th><th>מתנה אחרונה</th></tr>
+<tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>סטטוס</th><th>חיבור אחרון</th><th>מטבעות</th><th>פעולות</th></tr>
 ${rows}
 </table>
 </body></html>`);
@@ -1402,8 +1470,27 @@ io.on('connection', (socket) => {
     registerBasraHandlers(socket);
 
     socket.on('disconnect', () => {
-        // Also handle unexpected disconnect same way
+        // Handle shithead disconnect
         if (socket.data?.roomCode) handlePlayerLeave(socket.data);
+
+        // Handle basra disconnect — mark slot as disconnected after grace period
+        const basraCode = socket.data?.basraRoom;
+        if (basraCode && basraRooms[basraCode]) {
+            const room = basraRooms[basraCode];
+            const slotIdx = socket.data.basraSlot;
+            const slot = room.slots?.[slotIdx];
+            if (slot && slot.socketId === socket.id) {
+                // Grace period: 15s to reconnect before marking disconnected
+                setTimeout(() => {
+                    if (slot.socketId === socket.id) {
+                        slot.connected = false;
+                        // Don't clear username — needed for reconnect
+                        // But clear socketId so duplicate check won't block reconnect
+                        slot.socketId = null;
+                    }
+                }, 15000);
+            }
+        }
     });
 
     socket.on('getOnlineStats', () => {
@@ -1780,7 +1867,7 @@ function registerBasraHandlers(socket) {
                 const u = await getUser(username);
                 if (u && u.token === token) {
                     const alreadyIn = Object.values(basraRooms).some(r =>
-                        r.slots.some(sl => sl.username === username && sl.connected && sl.socketId !== socket.id)
+                        r.slots.some(sl => sl.username === username && sl.socketId && sl.socketId !== socket.id)
                     );
                     if (alreadyIn) {
                         socket.emit('basraError', 'כבר מחובר ממקום אחר — התנתק קודם');
@@ -1847,7 +1934,7 @@ function registerBasraHandlers(socket) {
                 if (u && u.token === token) {
                     const alreadyIn = Object.values(basraRooms).some(r =>
                         r.code !== code?.toUpperCase() &&
-                        r.slots.some(sl => sl.username === username && sl.connected && sl.socketId !== socket.id)
+                        r.slots.some(sl => sl.username === username && sl.socketId && sl.socketId !== socket.id)
                     );
                     if (alreadyIn) { socket.emit('basraError', 'כבר מחובר ממקום אחר — התנתק קודם'); return; }
                 }
