@@ -337,22 +337,22 @@ app.get('/api/admin/users', async (req, res) => {
         const allUsers = await usersCol.find({}, { projection: { pinHash: 0, token: 0 } }).toArray();
         const sorted = allUsers.sort((a, b) => (b.coins || 0) - (a.coins || 0));
 
-        // Build connected users set from active sockets + basra rooms
+        // Build connected users set from all sources
         const connectedUsernames = new Set();
-        // Shithead: socket.data.username
-        for (const [, sock] of io.sockets.sockets) {
-            if (sock.data?.username) connectedUsernames.add(sock.data.username);
-        }
-        // Basra: check all active room slots with a live socketId
+        // Shithead rooms: connected human slots
+        Object.values(rooms).forEach(r => r.slots && r.slots.forEach(sl => {
+            if (sl.username && sl.connected && !sl.isBot) connectedUsernames.add(sl.username);
+        }));
+        // Basra rooms: slots with live socketId
         Object.values(basraRooms).forEach(r => r.slots.forEach(sl => {
             if (sl.username && sl.socketId && io.sockets.sockets.has(sl.socketId)) {
                 connectedUsernames.add(sl.username);
             }
         }));
-        // Shithead rooms too
-        Object.values(rooms).forEach(r => r.slots && r.slots.forEach(sl => {
-            if (sl.username && sl.connected) connectedUsernames.add(sl.username);
-        }));
+        // Any socket with explicit username
+        for (const [, sock] of io.sockets.sockets) {
+            if (sock.data?.username) connectedUsernames.add(sock.data.username);
+        }
 
         const rows = sorted.map((u, i) => {
             const isOnline = connectedUsernames.has(u.username);
