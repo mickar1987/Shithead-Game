@@ -238,6 +238,18 @@ app.post('/api/verify', async (req, res) => {
     } catch(e) { console.error('[verify error]', e); res.json({ ok: false }); }
 });
 
+// Ping endpoint — keeps user marked as online (used by VS AI local games)
+app.post('/api/ping', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        activePings[name] = Date.now();
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false }); }
+});
+
 app.post('/api/daily', async (req, res) => {
     try {
         const { username, token } = req.body;
@@ -353,6 +365,12 @@ app.get('/api/admin/users', async (req, res) => {
         for (const [, sock] of io.sockets.sockets) {
             if (sock.data?.username) connectedUsernames.add(sock.data.username);
         }
+        // VS AI pings (active within last 90 seconds)
+        const pingCutoff = Date.now() - 90000;
+        Object.entries(activePings).forEach(([uname, ts]) => {
+            if (ts > pingCutoff) connectedUsernames.add(uname);
+            else delete activePings[uname];
+        });
 
 
         // Build room map: username -> room code
@@ -441,6 +459,7 @@ ${rows}
 // ══════════════════════════════════════════════
 const rooms = {};
 const disconnectTimers = {}; // roomCode → room object
+const activePings = {}; // username -> last ping timestamp (for VS AI)
 const roomTimers = {}; // roomCode → interval
 
 function clearRoomTimer(code) {
