@@ -49,7 +49,7 @@ function findCaptures(playedCard, tableCards) {
         return tableCards.length > 0 ? [tableCards.slice()] : [];
     }
 
-    // 7♦ trap: if table has ONLY 7♦, ANY card can capture it
+    // 7♦ trap: if table has ONLY 7♦, ANY card can capture it (even Q/K)
     if (tableCards.length === 1 && is7D(tableCards[0])) {
         return [[tableCards[0]]];
     }

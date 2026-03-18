@@ -1774,6 +1774,22 @@ function registerBasraHandlers(socket) {
         const count = parseInt(playerCount) || 2;
         if (![2, 4].includes(count)) { socket.emit('basraError', 'שחקנים: 2 או 4'); return; }
 
+        // Prevent same user from creating if already in a room
+        if (username && token) {
+            try {
+                const u = await getUser(username);
+                if (u && u.token === token) {
+                    const alreadyIn = Object.values(basraRooms).some(r =>
+                        r.slots.some(sl => sl.username === username && sl.connected && sl.socketId !== socket.id)
+                    );
+                    if (alreadyIn) {
+                        socket.emit('basraError', 'כבר מחובר ממקום אחר — התנתק קודם');
+                        return;
+                    }
+                }
+            } catch(e) {}
+        }
+
         const code = basraMakeCode();
         const slots = Array.from({ length: count }, (_, i) => ({
             id: i, name: i === 0 ? name : `שחקן ${i+1}`,
@@ -1823,6 +1839,20 @@ function registerBasraHandlers(socket) {
         const room = basraRooms[code?.toUpperCase()];
         if (!room) { socket.emit('basraError', 'חדר לא נמצא'); return; }
         if (room.gameStarted) { socket.emit('basraError', 'המשחק כבר התחיל'); return; }
+
+        // Prevent same user from joining if already in another room
+        if (username && token) {
+            try {
+                const u = await getUser(username);
+                if (u && u.token === token) {
+                    const alreadyIn = Object.values(basraRooms).some(r =>
+                        r.code !== code?.toUpperCase() &&
+                        r.slots.some(sl => sl.username === username && sl.connected && sl.socketId !== socket.id)
+                    );
+                    if (alreadyIn) { socket.emit('basraError', 'כבר מחובר ממקום אחר — התנתק קודם'); return; }
+                }
+            } catch(e) {}
+        }
 
         const freeSlot = room.slots.find(s => !s.connected);
         if (!freeSlot) { socket.emit('basraError', 'החדר מלא'); return; }
