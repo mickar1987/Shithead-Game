@@ -1812,18 +1812,19 @@ function basraAdvanceTurn(room) {
     const allHandsEmpty = room.slots.every(sl => sl.hand.length === 0);
     if (allHandsEmpty) {
         if (room.deck.length > 0) {
-            basra.dealNewHands(room);
-            const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
-            basraClearBasraTimer(room); // stop timer during deal
-            // Send card counts summary before deal
+            basraClearBasraTimer(room); // stop timer during summary+deal
+            // Show card counts summary for 2 seconds before dealing
             basraBroadcast(room, 'basraCardSummary', {
                 names: room.slots.map(s => s.name),
                 captured: room.slots.map(s => s.captured.length),
                 teams: room.teams || null
             });
             setTimeout(() => {
+                basra.dealNewHands(room); // deal AFTER summary shown
+                const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
                 basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
                 basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
+                setTimeout(() => basraEmitAll(room), 80);
             }, 2000);
         } else {
             if (room.tableCards.length > 0 && room.lastCapturer !== null) {
@@ -1837,7 +1838,8 @@ function basraAdvanceTurn(room) {
                 totalScores: room.slots.map(s => s.score || 0),
                 pendingMajority: room.pendingMajorityPoints,
                 teams: room.teams || null,
-        roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+                roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+                cardCounts: room.slots.map(s => s.captured.length),
             });
             const winThreshold = room.winScore || 120;
             if (room.teams) {
