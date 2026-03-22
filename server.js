@@ -2000,13 +2000,23 @@ function basraBotMove(room) {
     bot.hand.forEach(card => {
         const caps = basraBotFindCaptures(card, room.tableCards);
         if (caps.length > 0) {
-            caps.forEach(grp => {
-                const isBasra = grp.length === room.tableCards.length;
-                const isJack = card.slice(0,-1)==='J' || card==='7d';
-                let score = grp.length * 10 + (isBasra ? 500 : 0) + (isJack && isBasra ? 300 : 0);
-                if ((card.slice(0,-1)==='J'||card==='7d') && !isBasra) score -= 100;
-                if (score > bestScore) { bestScore = score; bestCard = card; bestCapture = grp; }
-            });
+            // Greedily combine non-overlapping groups to maximize capture
+            const allIndices = new Set(room.tableCards.map((_,i)=>i));
+            const used = new Set();
+            const combined = [];
+            // Sort groups: prefer larger groups first
+            const sorted = [...caps].sort((a,b)=>b.length-a.length);
+            for (const grp of sorted) {
+                if (grp.every(i=>!used.has(i))) {
+                    grp.forEach(i=>used.add(i));
+                    combined.push(...grp);
+                }
+            }
+            const isBasra = combined.length === room.tableCards.length;
+            const isJack = card.slice(0,-1)==='J' || card==='7d';
+            let score = combined.length * 10 + (isBasra ? 500 : 0) + (isJack && isBasra ? 300 : 0);
+            if ((card.slice(0,-1)==='J'||card==='7d') && !isBasra) score -= 100;
+            if (score > bestScore) { bestScore = score; bestCard = card; bestCapture = combined; }
         }
     });
     if (!bestCard) {
@@ -2238,13 +2248,20 @@ function registerBasraHandlers(socket) {
         const room = basraRooms[code];
         if (!room || room.gameOver || room.roundOver) return;
         if (room.currentPlayer !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
+        // If bot is mid-move (committedCard by bot), clear it — human reclaimed turn
+        if (room.committedCard && room.committedBy !== slotIdx) {
+            room.committedCard = null;
+            room.committedBy = null;
+        }
+        // If already committed this card, don't double-remove from hand
+        if (room.committedCard === card && room.committedBy === slotIdx) {
+            basraEmitAll(room); return;
+        }
         const p = room.slots[slotIdx];
         if (!p.hand.includes(card)) { socket.emit('basraError', 'קלף לא ביד'); return; }
-        // Remove from hand, place on table as "committed"
         p.hand.splice(p.hand.indexOf(card), 1);
         room.committedCard = card;
         room.committedBy = slotIdx;
-        // Don't clear timer — let it continue. If it fires, it will throw the committed card.
         basraEmitAll(room);
     });
 
