@@ -2052,16 +2052,17 @@ function registerBasraHandlers(socket) {
                 room.currentPlayer = Math.floor(Math.random() * 2);
             }
             room.roundStarter = room.currentPlayer; // track for rotation
-            basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
-            // Dealer is player before the starter
+            // Send basraDeal FIRST so client sets block flag before state arrives
             const dealerIdx = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
-            setTimeout(() => basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length }), 600);
+            basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
+            basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
+            // Send state slightly after so client has time to set the block flag
+            setTimeout(() => basraEmitAll(room), 80);
             if (room.teams) {
                 const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
                 const t1 = room.teams[1].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
                 setTimeout(() => basraBroadcast(room, 'basraTeamsAnnounce', { teams: [[t0, room.teams[0]], [t1, room.teams[1]]], firstPlayer: room.slots[room.currentPlayer].name }), 500);
             }
-            basraEmitAll(room);
             // Start first turn timer via basraAdvanceTurn logic
             if (room.turnTimer > 0) {
                 basraClearBasraTimer(room);
@@ -2168,8 +2169,8 @@ function registerBasraHandlers(socket) {
         basra.resetRound(room);
         basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
         const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
-        setTimeout(() => basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length }), 200);
-        basraEmitAll(room);
+        basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length });
+        setTimeout(() => basraEmitAll(room), 80);
         // Start timer for first player of new round
         if (room.turnTimer > 0 && !room.gameOver) {
             room._timerStarted = Date.now();
