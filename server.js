@@ -2247,7 +2247,11 @@ function registerBasraHandlers(socket) {
         const slotIdx = socket.data.basraSlot;
         const room = basraRooms[code];
         if (!room || room.gameOver || room.roundOver) return;
-        if (room.currentPlayer !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
+        console.log(`[COMMIT] slotIdx=${slotIdx} currentPlayer=${room.currentPlayer} committedBy=${room.committedBy} committedCard=${room.committedCard} hand=${room.slots[slotIdx]?.hand}`);
+        if (room.currentPlayer !== slotIdx) { 
+            console.log(`[COMMIT] BLOCKED: currentPlayer=${room.currentPlayer} !== slotIdx=${slotIdx}`);
+            socket.emit('basraError', 'לא התורך'); return; 
+        }
         // If bot is mid-move (committedCard by bot), clear it — human reclaimed turn
         if (room.committedCard && room.committedBy !== slotIdx) {
             room.committedCard = null;
@@ -2279,6 +2283,7 @@ function registerBasraHandlers(socket) {
         const slotIdx = socket.data.basraSlot;
         const room = basraRooms[code];
         if (!room || room.gameOver || room.roundOver) return;
+        console.log(`[PLAY] slotIdx=${slotIdx} currentPlayer=${room.currentPlayer} committedBy=${room.committedBy} committedCard=${room.committedCard}`);
         // If bot has stale commit but it's human's turn, clear it
         if (room.isBot && room.committedBy !== slotIdx && room.currentPlayer === slotIdx) {
             room.committedCard = null;
@@ -2480,9 +2485,11 @@ function registerBasraHandlers(socket) {
         socket.data.basraRoom = code.toUpperCase();
         socket.data.basraSlot = slot.id;
         socket.join('basra_' + code.toUpperCase());
+        console.log(`[RECONNECT] user=${username} slot=${slot.id} currentPlayer=${room.currentPlayer} committedBy=${room.committedBy} committedCard=${room.committedCard}`);
         // If bot is in a stale committed state and it's the human's turn, clear it
         if (room.isBot && room.currentPlayer === slot.id &&
             room.committedCard && room.committedBy !== slot.id) {
+            console.log(`[RECONNECT] clearing stale bot commit`);
             room.committedCard = null;
             room.committedBy = null;
         }
