@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.83</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.84</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3179,6 +3179,41 @@ if (!onlineMode) return; // already left to menu
         },600);
     });
 
+    socket.on('basraCardSummary', ({ names, captured, teams }) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'+
+            'background:rgba(0,0,0,0.88);border:1.5px solid rgba(255,255,255,0.15);border-radius:14px;'+
+            'padding:14px 20px;z-index:9999;min-width:200px;pointer-events:none;';
+
+        let html = '<div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-align:center;margin-bottom:10px;">קלפים שנאספו</div>';
+
+        if (teams) {
+            teams.forEach((team, ti) => {
+                const teamCaptured = team.reduce((s, idx) => s + (captured[idx]||0), 0);
+                const teamNames = team.map(idx => (names[idx]||'').split(' ')[0]).join(' + ');
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;padding:5px 0;border-bottom:0.5px solid rgba(255,255,255,0.08);">
+                    <span style="font-size:13px;color:rgba(255,255,255,0.75);">${teamNames}</span>
+                    <span style="font-size:18px;font-weight:600;color:#fbbf24;">${teamCaptured}</span>
+                </div>`;
+            });
+        } else {
+            names.forEach((name, i) => {
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:24px;padding:5px 0;${i<names.length-1?'border-bottom:0.5px solid rgba(255,255,255,0.08);':''}">
+                    <span style="font-size:13px;color:rgba(255,255,255,0.75);">${(name||'').split(' ')[0]}</span>
+                    <span style="font-size:18px;font-weight:600;color:#fbbf24;">${captured[i]||0}</span>
+                </div>`;
+            });
+        }
+
+        overlay.innerHTML = html;
+        document.body.appendChild(overlay);
+        setTimeout(() => {
+            overlay.style.transition = 'opacity 0.4s';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 400);
+        }, 1800);
+    });
+
     socket.on('basraRoomClosed', () => {
         showToast('החדר נסגר על ידי היוצר');
         document.getElementById('basraGame').style.display = 'none';
@@ -5557,12 +5592,7 @@ function basraRenderPile(containerId, capturedCount, basraCards, rotate, showCou
     const pileTop = document.createElement('div');
     pileTop.style.cssText = 'width:34px;height:48px;border-radius:5px;border:1px solid #2a4a6c;position:relative;z-index:10;background:linear-gradient(135deg,#1a3a5c 0%,#0d2240 50%,#1a3a5c 100%);';
     pileTop.innerHTML = '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:rgba(255,255,255,0.12);">\u2660</span>';
-    if (showCount) {
-        const countEl = document.createElement('div');
-        countEl.style.cssText = 'position:absolute;top:-14px;left:0;width:34px;text-align:center;font-size:10px;color:rgba(255,255,255,0.5);';
-        countEl.textContent = capturedCount;
-        pileTop.appendChild(countEl);
-    }
+    // Count removed from pile display — shown in summary overlay instead
     wrapper.appendChild(pileTop);
 
     // basra fan — half hidden above pile
