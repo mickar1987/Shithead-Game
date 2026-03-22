@@ -2224,8 +2224,8 @@ function registerBasraHandlers(socket) {
 
     function processNextSpecial(room) {
         if (room.specialReplacements.length === 0) {
+            basraStartTimer(room); // start timer immediately
             basraEmitAll(room);
-            basraStartTimer(room);
             return;
         }
         const specialCard = room.specialReplacements.shift();
@@ -2276,7 +2276,7 @@ function registerBasraHandlers(socket) {
         if (!room) return;
         if (room._specialFallback) { clearTimeout(room._specialFallback); room._specialFallback = null; }
         basraEmitAll(room);
-        setTimeout(() => processNextSpecial(room), 200);
+        processNextSpecial(room);
     });
 
     socket.on('basraReconnect', ({ code, username }) => {
