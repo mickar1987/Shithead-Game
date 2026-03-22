@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.65</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.66</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5209,92 +5209,77 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         return { x: r.left + r.width/2, y: r.top + r.height/2 };
     }
 
-    // Hide player hand and opponent hand during animation
-    const myHandEl = document.getElementById('basraMyHand');
-    const oppHandEl = document.getElementById('basraOpponentHand');
-    const leftHandEl = document.getElementById('basraLeftHand');
-    const rightHandEl = document.getElementById('basraRightHand');
-    const tableEl = document.getElementById('basraTableCards');
-    if (myHandEl) myHandEl.style.visibility = 'hidden';
-    if (oppHandEl) oppHandEl.style.visibility = 'hidden';
-    if (leftHandEl) leftHandEl.style.visibility = 'hidden';
-    if (rightHandEl) rightHandEl.style.visibility = 'hidden';
-    if (tableEl) tableEl.style.visibility = 'hidden';
+    // Hide hands and table during animation
+    const hideEls = ['basraMyHand','basraOpponentHand','basraLeftHand','basraRightHand','basraTableCards'];
+    hideEls.forEach(id => { const el = document.getElementById(id); if (el) el.style.visibility = 'hidden'; });
 
     const dealerPos = getAreaCenter(dealerIdx);
-    const tableCenter = { x: window.innerWidth/2, y: window.innerHeight/2 };
-    const animLayer = document.getElementById('animLayer') || document.body;
+    const tableAreaEl = document.getElementById('basraTableArea') || document.getElementById('basraTableCards');
+    const tableRect = tableAreaEl ? tableAreaEl.getBoundingClientRect() : null;
+    const tableCenter = tableRect
+        ? { x: tableRect.left + tableRect.width/2, y: tableRect.top + tableRect.height/2 }
+        : { x: window.innerWidth/2, y: window.innerHeight/2 };
+
     const CARD_W = 34, CARD_H = 48;
-    const CARD_SPEED = 220; // ms per card flight
-    const CARD_GAP = 130;  // ms between cards
+    const SPEED = 240;
+    const GAP = 160;
 
-    let cardIdx = 0;
     const events = [];
+    let t = 0;
 
-    // 1. Deal to table first (tableCount cards)
-    for (let t = 0; t < tableCount; t++) {
-        events.push({ target: tableCenter, delay: cardIdx * CARD_GAP, isTable: true });
-        cardIdx++;
-    }
-
-    // 2. Deal to players (cardCount rounds, starting from player after dealer)
-    for (let round = 0; round < cardCount; round++) {
-        for (let i = 1; i <= n; i++) {
-            const targetSlot = (dealerIdx + i) % n;
-            events.push({ target: getAreaCenter(targetSlot), delay: cardIdx * CARD_GAP });
-            cardIdx++;
+    // Deal all 4 cards to each player in order (player after dealer first)
+    for (let i = 1; i <= n; i++) {
+        const slot = (dealerIdx + i) % n;
+        for (let c = 0; c < cardCount; c++) {
+            events.push({ target: getAreaCenter(slot), time: t });
+            t += GAP;
         }
+        t += GAP * 0.4; // small pause between players
     }
 
-    const totalDuration = (cardIdx - 1) * CARD_GAP + CARD_SPEED + 200;
+    t += GAP * 0.6; // pause before table
 
-    events.forEach(({ target, delay }) => {
+    // Then deal table cards
+    for (let i = 0; i < tableCount; i++) {
+        events.push({ target: tableCenter, time: t });
+        t += GAP;
+    }
+
+    const totalDuration = t + SPEED + 300;
+
+    events.forEach(({ target, time }) => {
         setTimeout(() => {
             const el = document.createElement('div');
-            el.style.cssText = [
-                'position:fixed',
-                `width:${CARD_W}px`,
-                `height:${CARD_H}px`,
-                'background:linear-gradient(135deg,#1a3a5c 0%,#0d2240 50%,#1a3a5c 100%)',
-                'border:1px solid #2a4a6c',
-                'border-radius:5px',
-                `left:${dealerPos.x - CARD_W/2}px`,
-                `top:${dealerPos.y - CARD_H/2}px`,
-                'z-index:8000',
-                'pointer-events:none',
-                'box-shadow:0 4px 12px rgba(0,0,0,0.6)',
-                'display:flex;align-items:center;justify-content:center',
-                'font-size:1.2rem;color:rgba(255,255,255,0.1)',
-                'transition:none',
-            ].join(';');
+            el.style.cssText = `position:fixed;width:${CARD_W}px;height:${CARD_H}px;`+
+                `background:linear-gradient(135deg,#1a3a5c 0%,#0d2240 50%,#1a3a5c 100%);`+
+                `border:1.5px solid #4a7a9c;border-radius:5px;`+
+                `left:${dealerPos.x - CARD_W/2}px;top:${dealerPos.y - CARD_H/2}px;`+
+                `z-index:8000;pointer-events:none;`+
+                `box-shadow:0 6px 16px rgba(0,0,0,0.65);`+
+                `display:flex;align-items:center;justify-content:center;`+
+                `font-size:1.1rem;color:rgba(255,255,255,0.15);transition:none;`;
             el.textContent = '♠';
-            animLayer.appendChild(el);
+            document.body.appendChild(el);
 
             requestAnimationFrame(() => requestAnimationFrame(() => {
-                el.style.transition = [
-                    `left ${CARD_SPEED}ms cubic-bezier(0.3,0,0.2,1)`,
-                    `top ${CARD_SPEED}ms cubic-bezier(0.3,0,0.2,1)`,
-                    `transform ${CARD_SPEED}ms ease`,
-                ].join(',');
+                el.style.transition = `left ${SPEED}ms cubic-bezier(0.25,0.05,0.15,1),`+
+                    `top ${SPEED}ms cubic-bezier(0.25,0.05,0.15,1),`+
+                    `transform ${SPEED}ms ease`;
                 el.style.left = (target.x - CARD_W/2) + 'px';
                 el.style.top = (target.y - CARD_H/2) + 'px';
-                el.style.transform = `rotate(${(Math.random()*10-5).toFixed(1)}deg)`;
+                el.style.transform = `rotate(${(Math.random()*12-6).toFixed(1)}deg)`;
                 setTimeout(() => {
-                    el.style.transition += ',opacity 0.15s';
+                    el.style.transition += ',opacity 0.12s';
                     el.style.opacity = '0';
-                    setTimeout(() => el.remove(), 150);
-                }, CARD_SPEED);
+                    setTimeout(() => el.remove(), 120);
+                }, SPEED);
             }));
-        }, delay);
+        }, time);
     });
 
     // Reveal actual cards after animation completes
     setTimeout(() => {
-        if (myHandEl) myHandEl.style.visibility = '';
-        if (oppHandEl) oppHandEl.style.visibility = '';
-        if (leftHandEl) leftHandEl.style.visibility = '';
-        if (rightHandEl) rightHandEl.style.visibility = '';
-        if (tableEl) tableEl.style.visibility = '';
+        hideEls.forEach(id => { const el = document.getElementById(id); if (el) el.style.visibility = ''; });
     }, totalDuration);
 }
 
