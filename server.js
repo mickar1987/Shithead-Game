@@ -2058,17 +2058,7 @@ function registerBasraHandlers(socket) {
             basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
             // Send state slightly after so client has time to set the block flag
             setTimeout(() => basraEmitAll(room), 80);
-            // Notify about special card replacements
-            if (room.specialReplacements && room.specialReplacements.length > 0) {
-                setTimeout(() => {
-                    room.specialReplacements.forEach(card => {
-                        const rank = card.slice(0,-1);
-                        const suit = card.slice(-1);
-                        const name = rank === 'J' ? 'J' : '7♦';
-                        basraBroadcast(room, 'basraSpecialCard', { card, name });
-                    });
-                }, 800);
-            }
+
             if (room.teams) {
                 const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
                 const t1 = room.teams[1].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
@@ -2182,14 +2172,7 @@ function registerBasraHandlers(socket) {
         const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
         basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length });
         setTimeout(() => basraEmitAll(room), 80);
-        if (room.specialReplacements && room.specialReplacements.length > 0) {
-            setTimeout(() => {
-                room.specialReplacements.forEach(card => {
-                    const name = card.slice(0,-1) === 'J' ? 'J' : '7♦';
-                    basraBroadcast(room, 'basraSpecialCard', { card, name });
-                });
-            }, 800);
-        }
+
         // Start timer for first player of new round
         if (room.turnTimer > 0 && !room.gameOver) {
             room._timerStarted = Date.now();
@@ -2222,6 +2205,50 @@ function registerBasraHandlers(socket) {
                 }
             }, room.turnTimer * 1000);
         }
+    });
+
+    // Client signals deal animation is done — now replace special table cards
+    socket.on('basraDealDone', () => {
+        const code = socket.data.basraRoom;
+        const room = basraRooms[code];
+        if (!room || !room.specialReplacements || room.specialReplacements.length === 0) return;
+
+        async function replaceNext() {
+            if (room.specialReplacements.length === 0) {
+                basraEmitAll(room);
+                return;
+            }
+            const specialCard = room.specialReplacements.shift();
+            // Remove from table, send to end of deck, draw replacement
+            const idx = room.tableCards.indexOf(specialCard);
+            if (idx !== -1) room.tableCards.splice(idx, 1);
+            room.deck.push(specialCard);
+            // Notify all players
+            const sym = {h:'♥',d:'♦',c:'♣',s:'♠'};
+            const suit = specialCard.slice(-1);
+            const rank = specialCard.slice(0,-1);
+            const displayName = rank + (sym[suit]||suit);
+            basraBroadcast(room, 'basraSpecialCard', {
+                card: specialCard,
+                display: displayName,
+                isJack: rank === 'J'
+            });
+            // After 3.5s — draw replacement card, check if also special
+            setTimeout(() => {
+                if (room.deck.length > 0) {
+                    const replacement = room.deck.shift();
+                    room.tableCards.push(replacement);
+                    const replRank = require('./basra-server').cardRank(replacement);
+                    const replIs7d = replacement === '7d';
+                    if (replRank === 'J' || replIs7d) {
+                        room.specialReplacements.push(replacement);
+                    }
+                }
+                basraEmitAll(room);
+                setTimeout(replaceNext, 100);
+            }, 3500);
+        }
+        replaceNext();
     });
 
     socket.on('basraReconnect', ({ code, username }) => {

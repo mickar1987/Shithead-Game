@@ -142,21 +142,14 @@ function isBasra(playedCard, capturedCards, tableCards) {
 function createBasraRoom(code, slots, bet = 0) {
     const deck = shuffle(makeDeck());
 
-    // Deal 4 to table — J and 7♦ are allowed but get sent to end of deck and replaced
+    // Deal 4 to table — include J and 7♦ (shown during deal, then replaced after)
     let tableCards = [];
-    const specialReplacements = []; // {card, replacedBy} for client notification
-    while (tableCards.length < 4) {
-        const card = deck.shift();
-        const rank = cardRank(card);
-        if (rank === 'J' || is7D(card)) {
-            // Special card: send to end of deck, draw next card instead
-            deck.push(card);
-            specialReplacements.push(card);
-            // Continue loop — next card will be drawn
-        } else {
-            tableCards.push(card);
-        }
+    for (let i = 0; i < 4; i++) {
+        tableCards.push(deck.shift());
     }
+    // Track which positions have special cards (replaced after animation)
+    const specialReplacements = tableCards
+        .filter(c => cardRank(c) === 'J' || is7D(c));
 
     // Deal 4 to each player
     slots.forEach(s => {
@@ -401,19 +394,12 @@ function scoreRound(room) {
 function resetRound(room) {
     const deck = shuffle(makeDeck());
 
-    // New table — J/7♦ go to end of deck and get replaced
+    // Deal 4 table cards including J/7♦ (replaced after animation)
     let tableCards = [];
-    room.specialReplacements = [];
-    while (tableCards.length < 4) {
-        const card = deck.shift();
-        const rank = cardRank(card);
-        if (rank === 'J' || is7D(card)) {
-            deck.push(card);
-            room.specialReplacements.push(card);
-        } else {
-            tableCards.push(card);
-        }
+    for (let i = 0; i < 4; i++) {
+        tableCards.push(deck.shift());
     }
+    room.specialReplacements = tableCards.filter(c => cardRank(c) === 'J' || is7D(c));
 
     room.deck = deck;
     room.tableCards = tableCards;
