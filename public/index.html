@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.63</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.64</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3012,6 +3012,10 @@ if (!onlineMode) return; // already left to menu
         }, 5000);
     });
 
+    socket.on('basraDeal', ({ dealerIdx, cardCount }) => {
+        basraDealAnimation(dealerIdx, cardCount);
+    });
+
     socket.on('basraRoomClosed', () => {
         showToast('החדר נסגר על ידי היוצר');
         document.getElementById('basraGame').style.display = 'none';
@@ -5180,6 +5184,66 @@ function basraIsCaptureValid(card, tableCards, selectedIndices) {
         if (canUse) group.forEach(i => { const pos = remaining.indexOf(i); if(pos>-1) remaining.splice(pos,1); });
     }
     return remaining.length === 0;
+}
+
+function basraDealAnimation(dealerIdx, cardCount) {
+    if (!basraMySlot === null) return;
+    const n = (basraState?.playerNames?.length) || 2;
+    const myIdx = basraMySlot;
+
+    // Get dealer screen position
+    function getAreaCenter(slotIdx) {
+        const oppIdx = (myIdx + Math.floor(n/2)) % n;
+        const leftIdx = n === 4 ? (myIdx+1)%4 : -1;
+        const rightIdx = n === 4 ? (myIdx+3)%4 : -1;
+        let elId;
+        if (slotIdx === myIdx) elId = 'basraPlayerArea';
+        else if (slotIdx === oppIdx) elId = 'basraOpponentArea';
+        else if (slotIdx === leftIdx) elId = 'basraLeftArea';
+        else if (slotIdx === rightIdx) elId = 'basraRightArea';
+        else elId = 'basraOpponentArea';
+        const el = document.getElementById(elId);
+        if (!el) return { x: window.innerWidth/2, y: window.innerHeight/2 };
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width/2, y: r.top + r.height/2 };
+    }
+
+    const dealerPos = getAreaCenter(dealerIdx);
+    const animLayer = document.getElementById('animLayer') || document.body;
+    const totalCards = cardCount * n;
+    let cardIdx = 0;
+
+    // Deal cards one by one in order starting from player after dealer
+    for (let round = 0; round < cardCount; round++) {
+        for (let i = 1; i <= n; i++) {
+            const targetSlot = (dealerIdx + i) % n;
+            const targetPos = getAreaCenter(targetSlot);
+            const delay = cardIdx * 120;
+            cardIdx++;
+
+            setTimeout(() => {
+                const el = document.createElement('div');
+                el.style.cssText = `position:fixed;width:28px;height:40px;
+                    background:linear-gradient(135deg,#1a3a5c,#0d2240);
+                    border:1px solid #2a4a6c;border-radius:4px;
+                    left:${dealerPos.x - 14}px;top:${dealerPos.y - 20}px;
+                    z-index:8000;pointer-events:none;
+                    box-shadow:0 3px 8px rgba(0,0,0,0.5);
+                    transition:none;`;
+                animLayer.appendChild(el);
+
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    el.style.transition = 'left 0.28s cubic-bezier(0.25,0.1,0.25,1), top 0.28s cubic-bezier(0.25,0.1,0.25,1), opacity 0.15s 0.25s';
+                    el.style.left = (targetPos.x - 14) + 'px';
+                    el.style.top = (targetPos.y - 20) + 'px';
+                    setTimeout(() => {
+                        el.style.opacity = '0';
+                        setTimeout(() => el.remove(), 150);
+                    }, 280);
+                }));
+            }, delay);
+        }
+    }
 }
 
 function basraRenderPile(containerId, capturedCount, basraCards, rotate, showCount) {
