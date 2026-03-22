@@ -1781,7 +1781,7 @@ function basraAdvanceTurn(room) {
         if (room.deck.length > 0) {
             basra.dealNewHands(room);
             const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
-            basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4 });
+            basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
             basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
         } else {
             if (room.tableCards.length > 0 && room.lastCapturer !== null) {
@@ -2055,7 +2055,7 @@ function registerBasraHandlers(socket) {
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
             // Dealer is player before the starter
             const dealerIdx = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
-            setTimeout(() => basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4 }), 600);
+            setTimeout(() => basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length }), 600);
             if (room.teams) {
                 const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
                 const t1 = room.teams[1].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
@@ -2168,7 +2168,7 @@ function registerBasraHandlers(socket) {
         basra.resetRound(room);
         basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
         const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
-        setTimeout(() => basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4 }), 200);
+        setTimeout(() => basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length }), 200);
         basraEmitAll(room);
         // Start timer for first player of new round
         if (room.turnTimer > 0 && !room.gameOver) {
