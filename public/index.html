@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.82</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.83</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3013,6 +3013,9 @@ if (!onlineMode) return; // already left to menu
     });
 
     socket.on('basraDeal', ({ dealerIdx, cardCount, tableCount }) => {
+        // Hide timer immediately — no timer during deal
+        const timerEl = document.getElementById('basraTurnTimer');
+        if (timerEl) { timerEl.textContent = ''; timerEl.style.display = 'none'; }
         // Store deal params — wait for state to arrive before animating
         window._pendingDeal = { dealerIdx, cardCount, tableCount };
     });
@@ -3240,6 +3243,7 @@ if (!onlineMode) return; // already left to menu
         if (type==='basra') showToast('\u26A1 BASRA! '+name);
     });
     socket.on('basraTimerTick', ({ remaining, currentPlayer }) => {
+        if (window._basraDealInProgress || window._pendingDeal) return; // no timer during deal
         const el = document.getElementById('basraTurnTimer');
         if (!el) return;
         if (remaining <= 0) { el.style.display = 'none'; return; }
