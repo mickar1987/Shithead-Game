@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.72</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.73</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3013,13 +3013,8 @@ if (!onlineMode) return; // already left to menu
     });
 
     socket.on('basraDeal', ({ dealerIdx, cardCount, tableCount }) => {
-        // Render state first (cards exist in DOM) then animate
-        if (basraState) {
-            window._basraDealInProgress = false; // allow render
-            basraRender(basraState);
-            window._basraDealInProgress = true; // re-block during animation
-        }
-        basraDealAnimation(dealerIdx, cardCount, tableCount);
+        // Store deal params — wait for state to arrive before animating
+        window._pendingDeal = { dealerIdx, cardCount, tableCount };
     });
 
     socket.on('basraRoomClosed', () => {
@@ -3059,7 +3054,16 @@ if (!onlineMode) return; // already left to menu
         const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
         const pa = document.getElementById('playerArea'); if (pa) pa.style.display='none';
         document.querySelectorAll('.log-btn').forEach(el => el.style.display='none');
-        // If deal animation pending, store state but don't render yet
+        // If deal animation is pending, render state then start animation
+        if (window._pendingDeal) {
+            const deal = window._pendingDeal;
+            window._pendingDeal = null;
+            window._basraDealInProgress = false;
+            basraRender(state); // render so cards exist in DOM
+            window._basraDealInProgress = true;
+            basraDealAnimation(deal.dealerIdx, deal.cardCount, deal.tableCount);
+            return;
+        }
         if (window._basraDealInProgress) { basraState = state; return; }
         basraRender(state);
     });
