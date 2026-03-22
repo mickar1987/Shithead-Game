@@ -2453,8 +2453,8 @@ function registerBasraHandlers(socket) {
             try { const u = await getUser(username); if (u && u.token === token) uname = username; } catch(e) {} 
         }
         const room = basra.createBasraRoom(code, [
-            { name: name || 'שחקן', socketId: socket.id, connected: true, username: uname },
-            { name: 'מחשב', socketId: null, connected: true, username: null, isBot: true }
+            { id: 0, name: name || 'שחקן', socketId: socket.id, connected: true, username: uname },
+            { id: 1, name: 'מחשב', socketId: null, connected: true, username: null, isBot: true }
         ], 0);
         room.winScore = winScore || 120;
         room.isBot = true;
