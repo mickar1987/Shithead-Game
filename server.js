@@ -2211,44 +2211,72 @@ function registerBasraHandlers(socket) {
     socket.on('basraDealDone', () => {
         const code = socket.data.basraRoom;
         const room = basraRooms[code];
-        if (!room || !room.specialReplacements || room.specialReplacements.length === 0) return;
-
-        async function replaceNext() {
-            if (room.specialReplacements.length === 0) {
-                basraEmitAll(room);
-                return;
-            }
-            const specialCard = room.specialReplacements.shift();
-            // Remove from table, send to end of deck, draw replacement
-            const idx = room.tableCards.indexOf(specialCard);
-            if (idx !== -1) room.tableCards.splice(idx, 1);
-            room.deck.push(specialCard);
-            // Notify all players
-            const sym = {h:'♥',d:'♦',c:'♣',s:'♠'};
-            const suit = specialCard.slice(-1);
-            const rank = specialCard.slice(0,-1);
-            const displayName = rank + (sym[suit]||suit);
-            basraBroadcast(room, 'basraSpecialCard', {
-                card: specialCard,
-                display: displayName,
-                isJack: rank === 'J'
-            });
-            // After 3.5s — draw replacement card, check if also special
-            setTimeout(() => {
-                if (room.deck.length > 0) {
-                    const replacement = room.deck.shift();
-                    room.tableCards.push(replacement);
-                    const replRank = require('./basra-server').cardRank(replacement);
-                    const replIs7d = replacement === '7d';
-                    if (replRank === 'J' || replIs7d) {
-                        room.specialReplacements.push(replacement);
-                    }
-                }
-                basraEmitAll(room);
-                setTimeout(replaceNext, 100);
-            }, 3500);
+        if (!room) return;
+        if (!room.specialReplacements || room.specialReplacements.length === 0) {
+            // No special cards — reset timer for first player
+            basraBroadcast(room, 'basraTimerReset', {});
+            return;
         }
-        replaceNext();
+        processNextSpecial(room);
+    });
+
+    function processNextSpecial(room) {
+        if (room.specialReplacements.length === 0) {
+            basraEmitAll(room);
+            // Reset timer after all replacements done
+            basraBroadcast(room, 'basraTimerReset', {});
+            return;
+        }
+        const specialCard = room.specialReplacements.shift();
+        const sym = {h:'♥',d:'♦',c:'♣',s:'♠'};
+        const suit = specialCard.slice(-1);
+        const rank = specialCard.slice(0,-1);
+        const displayName = rank + (sym[suit]||suit);
+        const tableIdx = room.tableCards.indexOf(specialCard);
+
+        // Draw replacement now (so we can tell client what it is)
+        let replacement = null;
+        if (room.deck.length > 0) {
+            replacement = room.deck.shift();
+        }
+
+        // Remove special from table, send to end of deck
+        if (tableIdx !== -1) room.tableCards.splice(tableIdx, 1);
+        room.deck.push(specialCard);
+
+        // Add replacement to table
+        if (replacement) {
+            room.tableCards.push(replacement);
+            const replRank = basra.cardRank(replacement);
+            if (replRank === 'J' || replacement === '7d') {
+                room.specialReplacements.push(replacement);
+            }
+        }
+
+        // Send animation event to all clients
+        basraBroadcast(room, 'basraSpecialCard', {
+            card: specialCard,
+            display: displayName,
+            tableIdx,
+            replacement,
+            isJack: rank === 'J'
+        });
+
+        // After animation completes (client-driven via basraSpecialDone)
+        // but also have server fallback after 6s
+        room._specialFallback = setTimeout(() => {
+            basraEmitAll(room);
+            processNextSpecial(room);
+        }, 6000);
+    }
+
+    socket.on('basraSpecialDone', () => {
+        const code = socket.data.basraRoom;
+        const room = basraRooms[code];
+        if (!room) return;
+        if (room._specialFallback) { clearTimeout(room._specialFallback); room._specialFallback = null; }
+        basraEmitAll(room);
+        setTimeout(() => processNextSpecial(room), 200);
     });
 
     socket.on('basraReconnect', ({ code, username }) => {
