@@ -1819,6 +1819,7 @@ function basraAdvanceTurn(room) {
                 captured: room.slots.map(s => s.captured.length),
                 teams: room.teams || null
             });
+            room._dealInProgress = true;
             setTimeout(() => {
                 basra.dealNewHands(room); // deal AFTER summary shown
                 const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
@@ -1990,8 +1991,9 @@ function basraBotMove(room) {
     const bot = room.slots[1];
     if (!bot) return;
     // If hand empty, basraAdvanceTurn will handle (deal new hands or end round)
+    // But don't call it if we're already in a deal sequence
     if (!bot.hand || bot.hand.length === 0) {
-        basraAdvanceTurn(room);
+        if (!room._dealInProgress) basraAdvanceTurn(room);
         return;
     }
 
@@ -2338,6 +2340,7 @@ function registerBasraHandlers(socket) {
         if (!room) return;
         // Immediately reset timer display on all clients
         basraBroadcast(room, 'basraTimerReset', {});
+        room._dealInProgress = false;
         // Re-emit state so current player highlight updates
         basraEmitAll(room);
         if (!room.specialReplacements || room.specialReplacements.length === 0) {
