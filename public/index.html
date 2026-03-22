@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.89</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.90</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -667,7 +667,7 @@
         <button onclick="basraVerifyAccess()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">✅ אמת</button>
     </div>
     <div id="menuBasraCreate" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuBasraOnline')">← חזור</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraRoomType('public')" id="basraRoomTypePublic" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">🌐 ציבורי</button>
@@ -706,7 +706,7 @@
         <button onclick="basraCreate()" id="basraCreateBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">▶ צור חדר</button>
     </div>
     <div id="menuBasraJoin" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuBasraOnline')">← חזור</div>
         <button onclick="showMenu('menuBasraJoinPublic')" class="setup-btn">🌐 הצטרף לחדר ציבורי</button>
         <button onclick="showMenu('menuBasraJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
     </div>
@@ -4385,13 +4385,6 @@ function refreshBasraPublicRooms() {
     socket.emit('basraGetPublicRooms');
 }
 function basraLeave() {
-    if (basraAI) {
-        basraAI = null;
-        document.getElementById('basraGame').style.display = 'none';
-        document.getElementById('setupOverlay').style.display = 'flex';
-        showMenu('menuBasra');
-        return;
-    }
     if (socket) socket.emit('basraLeave');
     document.getElementById('basraGame').style.display = 'none';
     document.getElementById('basraResultOverlay').style.display = 'none';
@@ -4464,7 +4457,6 @@ function basraRenderCard(cardStr, faceUp, selected, clickFn) {
 // Phase 2: player selects which table cards to capture → clicks "אסוף" → server validates + collects
 // basraCommitCard merged into basraPlaySelected
 function basraConfirmCapture() {
-    if (basraAI) { basraAIConfirmCapture(); return; }
     if (basraSelectedCaptures.length === 0) { showToast('בחר קלפים לאיסוף'); return; }
     const captureIndices = basraSelectedCaptures.slice();
     const tableCards = basraState ? basraState.tableCards : [];
@@ -4545,7 +4537,6 @@ function basraConfirmCapture() {
     animateStep();
 }
 function basraThrowCard() {
-    if (basraAI) { basraAIThrow(); return; }
     // Throw committed card to table (no capture)
     socket.emit('basraPlay', { captureIndices: [] });
     basraCommittedCard = null;
@@ -5426,446 +5417,26 @@ function basraFindValidCaptures(card, tableCards) {
     return result;
 }
 
-// ══════════════════════════════════════════
-//  BASRA VS AI — Local Game Engine
-// ══════════════════════════════════════════
-
-let basraAI = null; // holds local AI game state
+// ══ BASRA VS AI (server-side bot) ══
+let basraAIWinScore = 120;
 
 function setBasraAIWinScore(score) {
-    window.basraAIWinScore = score;
+    basraAIWinScore = score;
     document.querySelectorAll('[id^="basraAIWinBtn"]').forEach(b => {
         b.style.borderColor = b.id === 'basraAIWinBtn'+score ? 'var(--gold)' : '';
     });
 }
 
 function startBasraVsAI() {
-    const winScore = window.basraAIWinScore || 120;
-    basraAI = basraAINewGame(winScore);
-    document.getElementById('setupOverlay').style.display = 'none';
-    document.getElementById('basraGame').style.display = 'block';
-    const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display = 'none';
-    const pa = document.getElementById('playerArea'); if (pa) pa.style.display = 'none';
-    document.querySelectorAll('.log-btn').forEach(el => el.style.display = 'none');
-    basraMySlot = 0;
-    basraAIRender();
-    basraAIDealAnimation(() => {
-        basraAIRender();
-        if (basraAI.currentPlayer === 1) setTimeout(basraAIDoMove, 800);
+    if (!socket) initSocket();
+    const name = authUser?.username || localStorage.getItem('guestName') || 'שחקן';
+    socket.emit('basraCreateVsAI', {
+        name,
+        winScore: basraAIWinScore,
+        username: authUser?.username || null,
+        token: authUser?.token || null
     });
-}
-
-function basraAINewGame(winScore) {
-    const deck = basraAIShuffle(basraAIMakeDeck());
-    const game = {
-        winScore: winScore || 120,
-        currentPlayer: Math.random() < 0.5 ? 0 : 1,
-        roundNum: 1,
-        players: [
-            { name: authUser?.username || 'אני', hand: [], captured: [], basras: 0, score: 0 },
-            { name: 'מחשב', hand: [], captured: [], basras: 0, score: 0 }
-        ],
-        tableCards: [],
-        deck: deck,
-        lastCapturer: null,
-        committedCard: null,
-        gameOver: false,
-        roundOver: false,
-    };
-    basraAIDealRound(game);
-    return game;
-}
-
-function basraAIMakeDeck() {
-    const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-    const suits = ['h','d','c','s'];
-    const d = [];
-    suits.forEach(s => ranks.forEach(r => d.push(r+s)));
-    return d;
-}
-
-function basraAIShuffle(d) {
-    for (let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];}
-    return d;
-}
-
-function basraAIDealRound(game) {
-    game.deck = basraAIShuffle(basraAIMakeDeck());
-    game.tableCards = [];
-    game.lastCapturer = null;
-    game.roundOver = false;
-    game.players.forEach(p => { p.hand=[]; p.captured=[]; p.basras=0; });
-    // Deal 4 to table (replace J/7d)
-    while (game.tableCards.length < 4) {
-        const card = game.deck.shift();
-        if (card.slice(0,-1)==='J' || card==='7d') { game.deck.push(card); }
-        else game.tableCards.push(card);
-    }
-    // Deal 4 to each player
-    for (let i=0;i<4;i++) game.players.forEach(p => p.hand.push(game.deck.shift()));
-}
-
-function basraAIDealNewHands(game) {
-    for (let i=0;i<4;i++) game.players.forEach(p => { if(game.deck.length>0) p.hand.push(game.deck.shift()); });
-}
-
-// ── AI card value (lower = cheaper to play) ──
-function basraAICardValue(card) {
-    const rank = card.slice(0,-1);
-    const vals = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'A':11,'J':15,'Q':12,'K':13};
-    return vals[rank] || 7;
-}
-
-// ── Find best capture for AI ──
-function basraAIFindBestCapture(hand, tableCards) {
-    let best = null;
-    let bestScore = -1;
-
-    hand.forEach(card => {
-        const captures = basraFindValidCaptures(card, tableCards);
-        if (!captures.length) return;
-        captures.forEach(group => {
-            // Score: basra = 1000, more cards = better, J/7d bonus
-            const capturedCards = group.map(i => tableCards[i]);
-            const isBasra2 = capturedCards.length === tableCards.length;
-            const isJack = card.slice(0,-1)==='J' || card==='7d';
-            let score = capturedCards.length * 10;
-            if (isBasra2) score += 500;
-            if (isJack && isBasra2) score += 300;
-            // Prefer saving strong cards — penalize using J/7d unless basra
-            if ((card.slice(0,-1)==='J'||card==='7d') && !isBasra2) score -= 100;
-            if (score > bestScore) { bestScore = score; best = { card, group }; }
-        });
-    });
-    return best;
-}
-
-// ── Find best card to throw (no capture) ──
-function basraAIBestThrow(hand, tableCards) {
-    // Prefer low-value numeric cards, avoid J/7d/A
-    const sorted = [...hand].sort((a,b) => basraAICardValue(a) - basraAICardValue(b));
-    // Never throw J or 7d if table is not empty (wasteful)
-    const safe = sorted.filter(c => !(c.slice(0,-1)==='J'||c==='7d') || tableCards.length===0);
-    return safe[0] || sorted[0];
-}
-
-// ── Execute AI move ──
-function basraAIDoMove() {
-    if (!basraAI || basraAI.gameOver || basraAI.roundOver) return;
-    const game = basraAI;
-    if (game.currentPlayer !== 1) return; // not AI turn
-    const ai = game.players[1];
-
-    const capture = basraAIFindBestCapture(ai.hand, game.tableCards);
-    let playedCard, capturedGroup;
-
-    if (capture) {
-        playedCard = capture.card;
-        capturedGroup = capture.group;
-    } else {
-        playedCard = basraAIBestThrow(ai.hand, game.tableCards);
-        capturedGroup = [];
-    }
-
-    // Remove from hand
-    ai.hand.splice(ai.hand.indexOf(playedCard), 1);
-    basraAIRender();
-
-    // Show AI's committed card first (like online), then capture after delay
-    game.committedCard = playedCard;
-    basraAIRender();
-    setTimeout(() => {
-        game.committedCard = null;
-        basraAIPlayCard(game, 1, playedCard, capturedGroup);
-    }, 1200);
-}
-
-function basraAIPlayCard(game, playerIdx, card, captureGroup) {
-    const player = game.players[playerIdx];
-    const tableCards = game.tableCards;
-    const capturedCards = captureGroup.map(i => tableCards[i]);
-
-    if (capturedCards.length > 0) {
-        // Check basra
-        const isBasra2 = capturedCards.length === tableCards.length;
-        const isJackCard = card.slice(0,-1)==='J';
-        if (isBasra2) {
-            player.basras += isJackCard ? 20 : 10;
-            showToast(isJackCard ? '⚡ JACK BASRA! +20' : '⚡ BASRA! +10');
-        }
-        // Remove captured from table
-        const sortedIdxs = [...captureGroup].sort((a,b)=>b-a);
-        sortedIdxs.forEach(i => tableCards.splice(i,1));
-        player.captured.push(...capturedCards, card);
-        game.lastCapturer = playerIdx;
-    } else {
-        tableCards.push(card);
-    }
-
-    basraAIAdvanceTurn(game);
-}
-
-function basraAIAdvanceTurn(game) {
-    // Next player
-    game.currentPlayer = 1 - game.currentPlayer;
-
-    // Check if hands empty
-    if (game.players.every(p => p.hand.length === 0)) {
-        if (game.deck.length > 0) {
-            // Show summary then deal
-            const summary = { names: game.players.map(p=>p.name), captured: game.players.map(p=>p.captured.length), teams: null };
-            // Show summary overlay
-            const ov = document.createElement('div');
-            ov.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);border:1.5px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px 20px;z-index:9999;min-width:200px;pointer-events:none;';
-            ov.innerHTML='<div style="font-size:11px;color:rgba(255,255,255,0.4);text-align:center;margin-bottom:10px;">קלפים שנאספו</div>'+
-                game.players.map(p=>`<div style="display:flex;justify-content:space-between;gap:24px;padding:5px 0;"><span style="font-size:13px;color:rgba(255,255,255,0.75);">${p.name}</span><span style="font-size:18px;font-weight:600;color:#fbbf24;">${p.captured.length}</span></div>`).join('');
-            document.body.appendChild(ov);
-            setTimeout(()=>{ ov.style.transition='opacity 0.4s'; ov.style.opacity='0'; setTimeout(()=>ov.remove(),400); }, 1800);
-            setTimeout(() => {
-                basraAIDealNewHands(game);
-                basraAIRender();
-                basraAIDealAnimation(() => {
-                    basraAIRender();
-                    if (game.currentPlayer === 1) setTimeout(basraAIDoMove, 800);
-                });
-            }, 2000);
-            return;
-        } else {
-            // End of round — give remaining table to lastCapturer
-            if (game.tableCards.length > 0 && game.lastCapturer !== null) {
-                game.players[game.lastCapturer].captured.push(...game.tableCards);
-                game.tableCards = [];
-            }
-            basraAIScoreRound(game);
-            return;
-        }
-    }
-
-    basraAIRender();
-    if (game.currentPlayer === 1) setTimeout(basraAIDoMove, 900);
-}
-
-function basraAIScoreRound(game) {
-    const p0 = game.players[0], p1 = game.players[1];
-    // Majority (52 cards)
-    let maj0=0, maj1=0;
-    if (p0.captured.length > p1.captured.length) { p0.score+=30; maj0=30; }
-    else if (p1.captured.length > p0.captured.length) { p1.score+=30; maj1=30; }
-    // Basras
-    p0.score += p0.basras;
-    p1.score += p1.basras;
-
-    game.roundOver = true;
-    basraAIRender();
-
-    // Show round result
-    const ov = document.createElement('div');
-    ov.id = 'basraAIRoundOverlay';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9998;';
-    const winScore = game.winScore;
-    let html = `<div style="background:#0d2a14;border:1.5px solid rgba(255,255,255,0.15);border-radius:16px;padding:20px 28px;min-width:240px;text-align:center;">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:2px;margin-bottom:12px;">סיכום סיבוב ${game.roundNum}</div>`;
-    game.players.forEach((p,i) => {
-        const pts = (i===0?maj0:maj1) + p.basras;
-        const prev = p.score - pts;
-        html += `<div style="display:flex;justify-content:space-between;gap:20px;padding:6px 0;border-bottom:0.5px solid rgba(255,255,255,0.1);">
-            <span style="color:rgba(255,255,255,0.8);">${p.name}</span>
-            <span style="display:flex;gap:6px;align-items:center;">
-                <span style="color:rgba(255,255,255,0.35);font-size:12px;">${prev}</span>
-                <span style="color:rgba(255,255,255,0.4);font-size:10px;">+</span>
-                <span style="color:var(--gold);font-weight:700;">${pts}</span>
-                <span style="color:rgba(255,255,255,0.4);font-size:10px;">=</span>
-                <span style="color:#fff;font-weight:700;">${p.score}</span>
-            </span>
-        </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:6px;">קלפים: ${p.captured.length}${(i===0?maj0:maj1)>0?' | רוב: +30':''}${p.basras>0?' | בסרה: +'+p.basras:''}</div>`;
-    });
-
-    // Check win
-    const winner = game.players.find(p => p.score > winScore);
-    if (winner) {
-        game.gameOver = true;
-        html += `<div style="font-size:1.1rem;color:${winner.name===game.players[0].name?'#22c55e':'#ef4444'};font-weight:700;margin:12px 0;">${winner.name===game.players[0].name?'🏆 ניצחת!':'💀 המחשב ניצח'}</div>`;
-        html += `<button onclick="basraAIBackToMenu()" style="padding:10px 24px;background:linear-gradient(135deg,#16a34a,#14532d);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:14px;margin-top:4px;">חזור לתפריט</button>
-                 <button onclick="startBasraVsAI()" style="padding:10px 24px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;cursor:pointer;font-size:14px;margin-top:4px;margin-right:8px;">שחק שוב</button>`;
-    } else {
-        let cd = 5;
-        html += `<div id="basraAICountdown" style="font-size:13px;color:rgba(255,255,255,0.5);margin-top:10px;">סיבוב הבא בעוד ${cd}...</div>`;
-        html += `<button onclick="basraAINextRound()" style="padding:8px 20px;background:linear-gradient(135deg,#16a34a,#14532d);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;margin-top:6px;">סיבוב הבא ▶</button>`;
-        setTimeout(() => {
-            const iv = setInterval(() => {
-                cd--;
-                const el = document.getElementById('basraAICountdown');
-                if (!el || cd <= 0) { clearInterval(iv); if(cd<=0) basraAINextRound(); }
-                else el.textContent = `סיבוב הבא בעוד ${cd}...`;
-            }, 1000);
-        }, 100);
-    }
-    html += '</div>';
-    ov.innerHTML = html;
-    document.body.appendChild(ov);
-}
-
-function basraAINextRound() {
-    const ov = document.getElementById('basraAIRoundOverlay');
-    if (ov) ov.remove();
-    const game = basraAI;
-    game.roundNum++;
-    game.currentPlayer = 1 - (game.roundNum % 2); // alternate starter
-    basraAIDealRound(game);
-    basraAIRender();
-    basraAIDealAnimation(() => {
-        basraAIRender();
-        if (game.currentPlayer === 1) setTimeout(basraAIDoMove, 800);
-    });
-}
-
-function basraAIBackToMenu() {
-    const ov = document.getElementById('basraAIRoundOverlay');
-    if (ov) ov.remove();
-    basraAI = null;
-    document.getElementById('basraGame').style.display = 'none';
-    document.getElementById('setupOverlay').style.display = 'flex';
-    showMenu('menuBasra');
-}
-
-// ── Render AI game ──
-function basraAIRender() {
-    if (!basraAI) return;
-    const game = basraAI;
-    const myIdx = 0, aiIdx = 1;
-    const me = game.players[myIdx], ai = game.players[aiIdx];
-
-    // Convert to fake basraState for basraRender
-    const fakeState = {
-        gameType: 'basra',
-        mySlotIdx: 0,
-        myHand: me.hand,
-        tableCards: game.tableCards,
-        deckCount: game.deck.length,
-        currentPlayer: game.currentPlayer,
-        isMyTurn: game.currentPlayer === myIdx && !game.roundOver,
-        playerNames: [me.name, ai.name],
-        capturedCounts: [me.captured.length, ai.captured.length],
-        handCounts: [me.hand.length, ai.hand.length],
-        scores: [me.score, ai.score],
-        basraCounts: [me.basras, ai.basras],
-        basraCards: [[], []],
-        teams: null,
-        roundOver: game.roundOver,
-        gameOver: game.gameOver,
-        lastCapturer: game.lastCapturer,
-        committedCard: game.committedCard || null,
-        committedBy: game.committedCard ? 0 : null,
-        turnTimer: 0,
-        timerStarted: false,
-        timerRemaining: 0,
-        roundStarter: 0,
-    };
-    basraMySlot = 0;
-    basraState = fakeState;
-    basraRender(fakeState);
-}
-
-// ── Deal animation for AI game ──
-function basraAIDealAnimation(callback) {
-    if (!basraAI) { callback(); return; }
-    const game = basraAI;
-    const dealerIdx = 1 - game.currentPlayer; // dealer is player before starter
-
-    // Hide all cards first
-    ['basraMyHand','basraOpponentHand','basraTableCards'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) Array.from(el.children).forEach(ch => { ch.style.opacity='0'; ch.style.transition='none'; });
-    });
-
-    const CARD_W=34, CARD_H=48, SPEED=500, GAP=380;
-    const deckEl = document.getElementById('basraDeckArea');
-    function fc(id) {
-        const el = document.getElementById(id);
-        if (!el) return {x:window.innerWidth/2, y:window.innerHeight/2};
-        const r = el.getBoundingClientRect();
-        return {x:r.left+r.width/2, y:r.top+r.height/2};
-    }
-    const srcPos = fc('basraDeckArea');
-    // player after dealer gets cards first (slot 0=human, slot 1=AI)
-    const order = [1-dealerIdx, dealerIdx]; // first recipient, then dealer
-    const areaMap = ['basraPlayerArea','basraOpponentArea'];
-    const handMap = ['basraMyHand','basraOpponentHand'];
-
-    const events = [];
-    let t = 0;
-    order.forEach((slot, pass) => {
-        for (let ci=0;ci<4;ci++) {
-            events.push({target:fc(areaMap[slot]),time:t,handId:handMap[slot],cardIdx:ci});
-            t+=GAP;
-        }
-        t+=GAP*0.3;
-    });
-    t+=GAP*0.8;
-    // Table cards
-    const tablePos = fc('basraTableCards');
-    for (let c=0;c<game.tableCards.length;c++) { events.push({target:tablePos,time:t,handId:'basraTableCards',cardIdx:c}); t+=GAP; }
-
-    events.forEach(({target,time,handId,cardIdx}) => {
-        setTimeout(()=>{
-            const el = document.createElement('div');
-            el.style.cssText=`position:fixed;width:${CARD_W}px;height:${CARD_H}px;background:linear-gradient(135deg,#1a3a5c,#0d2240);border:1.5px solid #4a7a9c;border-radius:5px;left:${srcPos.x-CARD_W/2}px;top:${srcPos.y-CARD_H/2}px;z-index:9000;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;font-size:1rem;color:rgba(255,255,255,0.18);transition:none;`;
-            el.textContent='♠';
-            document.body.appendChild(el);
-            requestAnimationFrame(()=>requestAnimationFrame(()=>{
-                el.style.transition=`left ${SPEED}ms cubic-bezier(0.22,0.05,0.12,1),top ${SPEED}ms cubic-bezier(0.22,0.05,0.12,1),transform ${SPEED}ms ease`;
-                el.style.left=(target.x-CARD_W/2)+'px';
-                el.style.top=(target.y-CARD_H/2)+'px';
-                el.style.transform=`rotate(${(Math.random()*10-5).toFixed(1)}deg)`;
-                setTimeout(()=>{
-                    el.remove();
-                    const container = document.getElementById(handId);
-                    if(container && container.children[cardIdx]) {
-                        container.children[cardIdx].style.opacity='';
-                        container.children[cardIdx].style.transition='opacity 0.15s';
-                    }
-                }, SPEED);
-            }));
-        }, time);
-    });
-
-    setTimeout(callback, t + SPEED + 300);
-}
-
-// ── Human play in AI game ──
-function basraAIHumanPlay(card, captureIndices) {
-    if (!basraAI || basraAI.currentPlayer !== 0) return;
-    const game = basraAI;
-    const me = game.players[0];
-    if (!me.hand.includes(card)) return;
-    me.hand.splice(me.hand.indexOf(card), 1);
-    basraSelectedCard = null;
-    basraSelectedCaptures = [];
-    basraPlayPhase = 'select';
-    basraAIPlayCard(game, 0, card, captureIndices || []);
-}
-
-function basraAIConfirmCapture() {
-    if (!basraAI) return;
-    if (basraSelectedCaptures.length === 0) { showToast('בחר קלפים לאיסוף'); return; }
-    const card = basraCommittedCard;
-    const captureIndices = basraSelectedCaptures.slice();
-    basraCommittedCard = null;
-    basraAI.committedCard = null;
-    basraPlayPhase = 'select';
-    basraSelectedCaptures = [];
-    basraAIPlayCard(basraAI, 0, card, captureIndices);
-}
-
-function basraAIThrow() {
-    if (!basraAI) return;
-    const card = basraCommittedCard;
-    basraCommittedCard = null;
-    basraAI.committedCard = null;
-    basraPlayPhase = 'select';
-    basraSelectedCaptures = [];
-    basraAIPlayCard(basraAI, 0, card, []);
+    // Response handled by existing basraJoined + basraStart + basraState events
 }
 
 function basraAutoSelectCaptures(card, tableCards) {
@@ -6339,40 +5910,6 @@ function basraPlaySelected() {
     if (!basraSelectedCard) { showToast('בחר קלף מהיד'); return; }
     const card = basraSelectedCard;
     const tableCards = basraState ? basraState.tableCards : [];
-
-    // VS AI mode
-    if (basraAI) {
-        // Remove card from hand immediately
-        basraAI.players[0].hand.splice(basraAI.players[0].hand.indexOf(card), 1);
-        basraCommittedCard = card;
-        basraSelectedCard = null;
-        basraPlayPhase = 'capture';
-        // Auto-select captures
-        basraSelectedCaptures = [];
-        basraAutoSelectCaptures(card, tableCards);
-        basraAI.committedCard = card; // show in committed area
-        basraAIRender();
-        // Auto-capture for J/7d
-        if (basraIsAutoCapture(card) && tableCards.length > 0) {
-            const allIdx = tableCards.map((_,i)=>i);
-            setTimeout(() => {
-                basraCommittedCard = null;
-                basraPlayPhase = 'select';
-                basraSelectedCaptures = [];
-                basraAI.committedCard = null;
-                basraAIPlayCard(basraAI, 0, card, allIdx);
-            }, 900);
-        } else if (basraIsAutoCapture(card) && tableCards.length === 0) {
-            setTimeout(() => {
-                basraCommittedCard = null;
-                basraPlayPhase = 'select';
-                basraSelectedCaptures = [];
-                basraAI.committedCard = null;
-                basraAIPlayCard(basraAI, 0, card, []);
-            }, 600);
-        }
-        return;
-    }
 
     socket.emit('basraCommitCard', { card });
     basraCommittedCard = card;
