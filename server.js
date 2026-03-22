@@ -2215,6 +2215,8 @@ function registerBasraHandlers(socket) {
         const code = socket.data.basraRoom;
         const room = basraRooms[code];
         if (!room) return;
+        // Immediately reset timer display on all clients
+        basraBroadcast(room, 'basraTimerReset', {});
         if (!room.specialReplacements || room.specialReplacements.length === 0) {
             basraStartTimer(room);
             return;
