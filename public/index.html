@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.67</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.68</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5212,39 +5212,67 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         return fc('basraOpponentArea');
     }
 
-    // Hide hands and table cards during animation
-    const hideIds = ['basraMyHand','basraOpponentHand','basraLeftHand','basraRightHand','basraTableCards'];
-    hideIds.forEach(id => { const el=document.getElementById(id); if(el) el.style.visibility='hidden'; });
-
-    // Source = deck position (top-left)
+    // Track how many cards each slot has received (to reveal one at a time)
+    const slotCardCount = {};
     const srcPos = fc('basraDeckArea');
     const tablePos = fc('basraTableCards');
 
-    const CARD_W=34, CARD_H=48, SPEED=280, GAP=170;
+    // Snapshot current hand counts (to know starting offset)
+    const startCounts = {};
+    ['basraMyHand','basraOpponentHand','basraLeftHand','basraRightHand'].forEach(id => {
+        const el = document.getElementById(id);
+        startCounts[id] = el ? el.children.length : 0;
+    });
+
+    // Hide all hands completely first - we'll reveal card by card
+    const handIds = {
+        0: 'basraMyHand', 1: 'basraOpponentHand', 2: 'basraLeftHand', 3: 'basraRightHand'
+    };
+    const oppIdx2 = (myIdx + Math.floor(n/2)) % n;
+    const leftIdx2 = n === 4 ? (myIdx+1)%4 : -1;
+    const rightIdx2 = n === 4 ? (myIdx+3)%4 : -1;
+    function slotHandId(s) {
+        if (s===myIdx) return 'basraMyHand';
+        if (s===oppIdx2) return 'basraOpponentHand';
+        if (s===leftIdx2) return 'basraLeftHand';
+        if (s===rightIdx2) return 'basraRightHand';
+        return 'basraOpponentHand';
+    }
+    // Hide all hand cards
+    Object.values(handIds).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) Array.from(el.children).forEach(ch => ch.style.opacity = '0');
+    });
+    const tableEl2 = document.getElementById('basraTableCards');
+    if (tableEl2) Array.from(tableEl2.children).forEach(ch => ch.style.opacity = '0');
+
+    const CARD_W=34, CARD_H=48, SPEED=420, GAP=280;
     const events=[];
     let t=0;
 
-    // All 4 cards to each player (starting from player after dealer)
+    // All 4 cards to each player in order
     for (let i=1; i<=n; i++) {
         const slot=(dealerIdx+i)%n;
-        for (let c=0; c<cardCount; c++) {
-            events.push({ target: getSlotCenter(slot), time: t });
+        if (!slotCardCount[slot]) slotCardCount[slot]=0;
+        for (let ci=0; ci<cardCount; ci++) {
+            events.push({ slot, isTable:false, time:t, cardIdx:slotCardCount[slot] });
+            slotCardCount[slot]++;
             t += GAP;
         }
-        t += Math.round(GAP*0.5);
+        t += Math.round(GAP*0.3);
     }
-    t += GAP;
+    t += GAP*0.8;
 
-    // Then 4 table cards
+    // Table cards
+    let tableCardIdx = 0;
     for (let i=0; i<tableCount; i++) {
-        events.push({ target: tablePos, time: t });
+        events.push({ isTable:true, time:t, cardIdx:tableCardIdx++ });
         t += GAP;
     }
 
-    const totalDuration = t + SPEED + 400;
-
-    events.forEach(({ target, time }) => {
+    events.forEach(({ slot, isTable, time, cardIdx }) => {
         setTimeout(() => {
+            const target = isTable ? tablePos : getSlotCenter(slot);
             const el = document.createElement('div');
             el.style.cssText =
                 'position:fixed;'+
@@ -5265,19 +5293,28 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
                     `transform ${SPEED}ms ease`;
                 el.style.left=(target.x-CARD_W/2)+'px';
                 el.style.top=(target.y-CARD_H/2)+'px';
-                el.style.transform=`rotate(${(Math.random()*14-7).toFixed(1)}deg)`;
+                el.style.transform=`rotate(${(Math.random()*10-5).toFixed(1)}deg)`;
+                // When card lands — reveal the corresponding real card
                 setTimeout(()=>{
-                    el.style.transition+=',opacity 0.15s';
-                    el.style.opacity='0';
-                    setTimeout(()=>el.remove(),150);
+                    el.remove();
+                    if (isTable) {
+                        const tbl = document.getElementById('basraTableCards');
+                        if (tbl && tbl.children[cardIdx]) {
+                            tbl.children[cardIdx].style.opacity = '';
+                            tbl.children[cardIdx].style.transition = 'opacity 0.15s';
+                        }
+                    } else {
+                        const hid = slotHandId(slot);
+                        const hel = document.getElementById(hid);
+                        if (hel && hel.children[cardIdx]) {
+                            hel.children[cardIdx].style.opacity = '';
+                            hel.children[cardIdx].style.transition = 'opacity 0.15s';
+                        }
+                    }
                 }, SPEED);
             }));
         }, time);
     });
-
-    setTimeout(()=>{
-        hideIds.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.visibility=''; });
-    }, totalDuration);
 }
 
 function basraRenderPile(containerId, capturedCount, basraCards, rotate, showCount) {
