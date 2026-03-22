@@ -1887,9 +1887,7 @@ function basraAdvanceTurn(room) {
     // Advance turn
     room.currentPlayer = (room.currentPlayer + 1) % room.slots.length;
     // Trigger bot move AFTER currentPlayer advances
-    if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver) {
-        setTimeout(() => basraBotMove(room), 900);
-    }
+    basraMaybeTriggerBot(room);
     basraEmitAll(room);
     // Start turn timer
     if (room.turnTimer > 0 && !room.gameOver && !room.roundOver) {
@@ -2063,6 +2061,12 @@ function basraBotMove(room) {
             }
         }, 1000);
     }, 1000);
+}
+
+function basraMaybeTriggerBot(room) {
+    if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver && !room._dealInProgress) {
+        setTimeout(() => basraBotMove(room), 800);
+    }
 }
 
 function registerBasraHandlers(socket) {
@@ -2298,6 +2302,7 @@ function registerBasraHandlers(socket) {
         basraClearBasraTimer(room); // stop timer during deal animation
         basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length });
         setTimeout(() => basraEmitAll(room), 80);
+        // Bot games: timer started via basraDealDone, but also trigger bot there
 
         // Start timer for first player of new round
         if (room.turnTimer > 0 && !room.gameOver) {
@@ -2346,7 +2351,7 @@ function registerBasraHandlers(socket) {
         if (!room.specialReplacements || room.specialReplacements.length === 0) {
             basraStartTimer(room);
             // Trigger bot if it's bot's turn after deal
-            if (room.isBot && room.currentPlayer === 1) setTimeout(() => basraBotMove(room), 800);
+            basraMaybeTriggerBot(room);
             return;
         }
         processNextSpecial(room);
@@ -2356,6 +2361,7 @@ function registerBasraHandlers(socket) {
         if (room.specialReplacements.length === 0) {
             basraStartTimer(room); // start timer immediately
             basraEmitAll(room);
+            basraMaybeTriggerBot(room);
             return;
         }
         const specialCard = room.specialReplacements.shift();
@@ -2435,7 +2441,7 @@ function registerBasraHandlers(socket) {
         setTimeout(() => {
             basraEmitAll(room);
             // If bot goes first
-            if (room.currentPlayer === 1) setTimeout(() => basraBotMove(room), 1000);
+            basraMaybeTriggerBot(room);
         }, 80);
     });
 
