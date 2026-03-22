@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.60</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.61</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1690,12 +1690,23 @@ function animateCardToPile(played, callback) {
     });
 }
 
+let _execMoveToken = 0;
 function executeMove(played) {
     animating = true;
+    _execMoveToken++;
+    const myToken = _execMoveToken;
     render(); // cards already removed from hand/faceUp — update display before animation
     animateCardToPile(played, () => {
         animating = false;
-        _doExecuteMove(played);
+        // Only execute if no pile-clearing interrupt happened during animation
+        if (myToken === _execMoveToken) {
+            _doExecuteMove(played);
+        } else {
+            // Animation was superseded — pile state already handled by interrupt
+            render();
+            if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
+                setTimeout(aiMove, 200);
+        }
     });
 }
 
@@ -1712,6 +1723,7 @@ function _doExecuteMove(played) {
         showToast('🔥 שריפה!');
         log(`🔥 שריפה! תור נוסף ל-${players[currentPlayer].name}`);
         animating = true;
+        _execMoveToken++; // invalidate any pending animation
         const pileEl = document.getElementById('pile');
         pileEl.classList.add('burn-effect');
         setTimeout(() => {
@@ -2010,19 +2022,25 @@ function aiMove() {
 
     // Loop detection: if pile hasn't changed in 20 AI moves, force a take
     aiMoveCount++;
-    if (pile.length === aiLastPileSize) {
+    // Track both pile size AND player state to detect loops
+    const aiStateKey = `${pile.length}_${p.hand.length}_${p.faceUp.filter(Boolean).length}`;
+    if (aiStateKey === (window._aiLastStateKey || '')) {
         aiStaleCount++;
     } else {
         aiStaleCount = 0;
-        aiLastPileSize = pile.length;
+        window._aiLastStateKey = aiStateKey;
     }
-    if (aiStaleCount >= 20 && p.hand.length > 0) {
-        // Force take pile to break loop
+    if (aiStaleCount >= 6) {
+        // Force break loop
         aiStaleCount = 0;
-        showToast(`${p.name} לוקח את הערימה`);
-        playSound('take');
-        p.hand.push(...pile);
-        pile = [];
+        window._aiLastStateKey = '';
+        if (pile.length > 0) {
+            showToast(`${p.name} לוקח את הערימה`);
+            playSound('take');
+            p.hand.push(...pile);
+            pile = [];
+        }
+        render();
         nextTurn();
         return;
     }
@@ -2049,20 +2067,11 @@ function aiMove() {
                 p.faceUp.forEach((c, i) => { if (toPlay.includes(c)) p.faceUp[i] = null; });
             }
         } else {
-            // Can't play from faceUp - take pile + best faceUp group
+            // Can't play from faceUp - take pile
             log(`${p.name} לא יכול לשחק - לוקח`);
-            // Pick up best available faceUp group into hand
-            const faceUpCards = p.faceUp.filter(c => c);
-            if (faceUpCards.length > 0) {
-                const best = aiGetBestPlay(faceUpCards);
-                if (best) {
-                    const [, bestCards] = best;
-                    p.faceUp.forEach((c, i) => { if (bestCards.includes(c)) p.faceUp[i] = null; });
-                    p.hand.push(...bestCards);
-                }
-            }
             p.hand.push(...pile);
             pile = [];
+            render();
             nextTurn();
             return;
         }
@@ -2088,11 +2097,16 @@ function aiMove() {
         playSound('play');
         executeMove(toPlay);
     } else {
-        // No valid play
-        log(`${p.name} לוקח את הערימה`);
-        playSound('take');
-        p.hand.push(...pile);
-        pile = [];
+        // No valid play — take pile (even if empty, just advance turn to prevent loop)
+        if (pile.length > 0) {
+            log(`${p.name} לוקח את הערימה`);
+            playSound('take');
+            p.hand.push(...pile);
+            pile = [];
+        } else {
+            log(`${p.name} אין מהלך - דולג`);
+        }
+        render();
         nextTurn();
     }
 }
@@ -2220,6 +2234,7 @@ function nextTurn(skips = 1) {
                     const pileEl = document.getElementById('pile');
                     pileEl.classList.add('burn-effect');
                     animating = true;
+                    _execMoveToken++; // invalidate any pending animation callback
                     setTimeout(() => {
                         pile = [];
                         pileEl.classList.remove('burn-effect');
