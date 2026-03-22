@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.77</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.78</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3017,23 +3017,160 @@ if (!onlineMode) return; // already left to menu
         window._pendingDeal = { dealerIdx, cardCount, tableCount };
     });
 
-    socket.on('basraSpecialCard', ({ card, display, isJack }) => {
-        const isRed = card.slice(-1)==='h'||card.slice(-1)==='d';
-        const color = isRed ? '#ef4444' : (isJack ? '#fbbf24' : '#fff');
-        // Big overlay for 3 seconds
+    socket.on('basraSpecialCard', ({ card, display, tableIdx, replacement, isJack }) => {
+        const isRed = s => s==='h'||s==='d';
+        const suitMap = {h:'♥',d:'♦',c:'♣',s:'♠'};
+        const deckEl = document.getElementById('basraDeckArea');
+        const tableEl = document.getElementById('basraTableCards');
+
+        // Get positions
+        function elCenter(el) {
+            if (!el) return {x:window.innerWidth/2,y:window.innerHeight/2};
+            const r=el.getBoundingClientRect();
+            return {x:r.left+r.width/2,y:r.top+r.height/2};
+        }
+
+        const deckPos = elCenter(deckEl);
+        const tableCards = tableEl ? tableEl.children : [];
+        const specialCardEl = tableCards[tableIdx] || null;
+        const specialPos = specialCardEl ? elCenter(specialCardEl) : elCenter(tableEl);
+        const CARD_W=34,CARD_H=48;
+
+        // Show overlay message
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'+
+        overlay.style.cssText = 'position:fixed;top:42%;left:50%;transform:translate(-50%,-50%);'+
             'background:rgba(0,0,0,0.92);border:2px solid #d4a017;border-radius:16px;'+
-            'padding:20px 32px;z-index:9999;text-align:center;pointer-events:none;min-width:220px;';
+            'padding:18px 28px;z-index:9999;text-align:center;pointer-events:none;min-width:220px;';
+        const color = (isJack||!isRed(card.slice(-1))) ? '#fbbf24' : '#ef4444';
         overlay.innerHTML =
-            `<div style="font-family:Bebas Neue,sans-serif;font-size:2.2rem;color:${color};letter-spacing:3px;">${display}</div>`+
-            `<div style="font-size:13px;color:rgba(255,255,255,0.7);margin-top:6px;letter-spacing:1px;">עבר לסוף החבילה</div>`;
+            `<div style="font-family:Bebas Neue,sans-serif;font-size:2rem;color:${color};letter-spacing:3px;">${display}</div>`+
+            `<div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:5px;letter-spacing:1px;">עובר לסוף החבילה</div>`;
         document.body.appendChild(overlay);
+
+        function makeCardDiv(cardStr, faceUp) {
+            const el=document.createElement('div');
+            el.style.cssText=`position:fixed;width:${CARD_W}px;height:${CARD_H}px;border-radius:5px;z-index:9500;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;transition:none;`;
+            if (!faceUp) {
+                el.style.background='linear-gradient(135deg,#1a3a5c,#0d2240)';
+                el.style.border='1.5px solid #4a7a9c';
+                el.textContent='♠';
+                el.style.color='rgba(255,255,255,0.18)';
+                el.style.fontSize='1rem';
+            } else {
+                const r=cardStr.slice(0,-1),su=cardStr.slice(-1);
+                const red=isRed(su);
+                el.style.background='white';
+                el.style.border='1px solid #ccc';
+                el.style.flexDirection='column';
+                el.style.alignItems='flex-start';
+                el.style.justifyContent='flex-start';
+                el.style.padding='3px 4px';
+                el.style.boxSizing='border-box';
+                el.style.direction='ltr';
+                el.innerHTML=`<span style="font-size:0.9rem;font-weight:700;color:${red?'#cc2200':'#111'};line-height:1">${r}</span>`+
+                    `<span style="font-size:0.75rem;color:${red?'#cc2200':'#111'};line-height:1">${suitMap[su]||su}</span>`;
+            }
+            return el;
+        }
+
+        // Step 1 (after 0.5s): flip special card face-down (hide it)
+        // Step 2 (after 1.2s): fly to deck
+        // Step 3 (after 2.5s): replacement flies from deck face-down to table
+        // Step 4 (after 3.5s): flip replacement face-up
+        // Total ~4.5s then emit basraSpecialDone
+
+        if (specialCardEl) specialCardEl.style.visibility='hidden';
+
+        // Step 1: create face-up card at table position, flip to back
         setTimeout(() => {
-            overlay.style.transition='opacity 0.5s';
-            overlay.style.opacity='0';
-            setTimeout(()=>overlay.remove(),500);
-        }, 3000);
+            const flyCard = makeCardDiv(card, true);
+            flyCard.style.left=(specialPos.x-CARD_W/2)+'px';
+            flyCard.style.top=(specialPos.y-CARD_H/2)+'px';
+            document.body.appendChild(flyCard);
+
+            // Flip animation (scale X to 0 then back as back)
+            setTimeout(()=>{
+                flyCard.style.transition='transform 0.25s ease';
+                flyCard.style.transform='scaleX(0)';
+                setTimeout(()=>{
+                    // Switch to card back
+                    flyCard.style.background='linear-gradient(135deg,#1a3a5c,#0d2240)';
+                    flyCard.style.border='1.5px solid #4a7a9c';
+                    flyCard.innerHTML='';
+                    flyCard.style.flexDirection='';
+                    flyCard.style.alignItems='center';
+                    flyCard.style.justifyContent='center';
+                    flyCard.style.color='rgba(255,255,255,0.18)';
+                    flyCard.style.fontSize='1rem';
+                    flyCard.style.padding='';
+                    flyCard.textContent='♠';
+                    flyCard.style.transition='transform 0.25s ease';
+                    flyCard.style.transform='scaleX(1)';
+
+                    // Step 2: fly to deck
+                    setTimeout(()=>{
+                        flyCard.style.transition='left 0.7s cubic-bezier(0.3,0,0.1,1),top 0.7s cubic-bezier(0.3,0,0.1,1)';
+                        flyCard.style.left=(deckPos.x-CARD_W/2)+'px';
+                        flyCard.style.top=(deckPos.y-CARD_H/2)+'px';
+                        setTimeout(()=>{
+                            flyCard.remove();
+
+                            // Step 3: replacement flies from deck face-down to table
+                            if (replacement) {
+                                const newPos = specialPos; // same spot
+                                const repCard = makeCardDiv(replacement, false);
+                                repCard.style.left=(deckPos.x-CARD_W/2)+'px';
+                                repCard.style.top=(deckPos.y-CARD_H/2)+'px';
+                                document.body.appendChild(repCard);
+
+                                requestAnimationFrame(()=>requestAnimationFrame(()=>{
+                                    repCard.style.transition='left 0.7s cubic-bezier(0.3,0,0.1,1),top 0.7s cubic-bezier(0.3,0,0.1,1)';
+                                    repCard.style.left=(newPos.x-CARD_W/2)+'px';
+                                    repCard.style.top=(newPos.y-CARD_H/2)+'px';
+                                    setTimeout(()=>{
+                                        // Step 4: flip face-up
+                                        repCard.style.transition='transform 0.25s ease';
+                                        repCard.style.transform='scaleX(0)';
+                                        setTimeout(()=>{
+                                            // Switch to face-up
+                                            const r2=replacement.slice(0,-1),su2=replacement.slice(-1);
+                                            const red2=isRed(su2);
+                                            repCard.style.background='white';
+                                            repCard.style.border='1px solid #ccc';
+                                            repCard.style.flexDirection='column';
+                                            repCard.style.alignItems='flex-start';
+                                            repCard.style.justifyContent='flex-start';
+                                            repCard.style.padding='3px 4px';
+                                            repCard.style.boxSizing='border-box';
+                                            repCard.style.direction='ltr';
+                                            repCard.style.color='';
+                                            repCard.style.fontSize='';
+                                            repCard.innerHTML=`<span style="font-size:0.9rem;font-weight:700;color:${red2?'#cc2200':'#111'};line-height:1">${r2}</span>`+
+                                                `<span style="font-size:0.75rem;color:${red2?'#cc2200':'#111'};line-height:1">${suitMap[su2]||su2}</span>`;
+                                            repCard.style.transition='transform 0.25s ease';
+                                            repCard.style.transform='scaleX(1)';
+                                            setTimeout(()=>{
+                                                repCard.remove();
+                                                // Done — dismiss overlay, notify server
+                                                overlay.style.transition='opacity 0.4s';
+                                                overlay.style.opacity='0';
+                                                setTimeout(()=>overlay.remove(),400);
+                                                socket.emit('basraSpecialDone');
+                                            },350);
+                                        },260);
+                                    },750);
+                                }));
+                            } else {
+                                overlay.style.transition='opacity 0.4s';
+                                overlay.style.opacity='0';
+                                setTimeout(()=>overlay.remove(),400);
+                                socket.emit('basraSpecialDone');
+                            }
+                        },750);
+                    },300);
+                },260);
+            },100);
+        },600);
     });
 
     socket.on('basraRoomClosed', () => {
@@ -3086,6 +3223,16 @@ if (!onlineMode) return; // already left to menu
         if (window._basraDealInProgress) { basraState = state; return; }
         basraRender(state);
     });
+    socket.on('basraTimerReset', () => {
+        const timerEl = document.getElementById('basraTurnTimer');
+        if (timerEl) { timerEl.textContent = ''; timerEl.style.display = 'none'; }
+        // Reset all area outlines
+        ['basraPlayerArea','basraOpponentArea','basraLeftArea','basraRightArea'].forEach(id=>{
+            const el=document.getElementById(id);
+            if(el) el.style.outline='2px solid transparent';
+        });
+    });
+
     socket.on('basraEvent', ({type, name}) => {
         if (type==='basra') showToast('\u26A1 BASRA! '+name);
     });
