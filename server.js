@@ -1988,7 +1988,12 @@ function basraBotMove(room) {
     if (!room || room.gameOver || room.roundOver || !room.isBot) return;
     if (room.currentPlayer !== 1) return;
     const bot = room.slots[1];
-    if (!bot || !bot.hand || bot.hand.length === 0) return;
+    if (!bot) return;
+    // If hand empty, basraAdvanceTurn will handle (deal new hands or end round)
+    if (!bot.hand || bot.hand.length === 0) {
+        basraAdvanceTurn(room);
+        return;
+    }
 
     // Find best play
     let bestCard = null, bestCapture = [], bestScore = -1;
@@ -2015,23 +2020,47 @@ function basraBotMove(room) {
         bestCapture = [];
     }
 
-    // Phase 1: commit card (show it)
+    // Phase 1: commit card (show it to human player)
     bot.hand.splice(bot.hand.indexOf(bestCard), 1);
     room.committedCard = bestCard;
     room.committedBy = 1;
     basraEmitAll(room);
 
-    // Phase 2: after delay, play it
+    // Phase 2: after 1.8s, show capture selection highlight, then play
     setTimeout(() => {
         if (room.gameOver || room.roundOver) return;
-        const result = basra.playCard(room, 1, bestCard, bestCapture, true);
-        if (result.ok) {
-            room.committedCard = null;
-            room.committedBy = null;
-            basraClearBasraTimer(room);
-            basraAdvanceTurn(room);
+        // Broadcast capture preview so human sees what bot is about to capture
+        if (bestCapture.length > 0) {
+            basraBroadcast(room, 'basraCapturePreview', {
+                captureIndices: bestCapture,
+                groups: [bestCapture]
+            });
         }
-    }, 1200);
+        // Phase 3: after another 1s, execute the play
+        setTimeout(() => {
+            if (room.gameOver || room.roundOver) return;
+            const result = basra.playCard(room, 1, bestCard, bestCapture, true);
+            if (result.ok) {
+                room.committedCard = null;
+                room.committedBy = null;
+                const p = room.slots[1];
+                if (result.capturedCards.length > 0) {
+                    basraBroadcast(room, 'toast', result.basra
+                        ? `⚡ BASRA! ${p.name}` : `${p.name} תפס ${result.capturedCards.length} קלפים`);
+                    if (result.basra) basraBroadcast(room, 'basraEvent', { type: 'basra', player: 1, name: p.name });
+                }
+                basraEmitAll(room);
+                setTimeout(() => basraAdvanceTurn(room), 300);
+            } else {
+                // playCard failed — force throw to table
+                room.tableCards.push(bestCard);
+                room.committedCard = null;
+                room.committedBy = null;
+                basraEmitAll(room);
+                setTimeout(() => basraAdvanceTurn(room), 300);
+            }
+        }, 1000);
+    }, 1000);
 }
 
 function registerBasraHandlers(socket) {
@@ -2309,8 +2338,12 @@ function registerBasraHandlers(socket) {
         if (!room) return;
         // Immediately reset timer display on all clients
         basraBroadcast(room, 'basraTimerReset', {});
+        // Re-emit state so current player highlight updates
+        basraEmitAll(room);
         if (!room.specialReplacements || room.specialReplacements.length === 0) {
             basraStartTimer(room);
+            // Trigger bot if it's bot's turn after deal
+            if (room.isBot && room.currentPlayer === 1) setTimeout(() => basraBotMove(room), 800);
             return;
         }
         processNextSpecial(room);
