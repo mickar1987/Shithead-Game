@@ -1808,10 +1808,6 @@ function basraStartTimer(room) {
 }
 
 function basraAdvanceTurn(room) {
-    // Trigger bot move if it's bot's turn
-    if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver) {
-        setTimeout(() => basraBotMove(room), 900);
-    }
     // Check if all hands empty
     const allHandsEmpty = room.slots.every(sl => sl.hand.length === 0);
     if (allHandsEmpty) {
@@ -1889,6 +1885,10 @@ function basraAdvanceTurn(room) {
     }
     // Advance turn
     room.currentPlayer = (room.currentPlayer + 1) % room.slots.length;
+    // Trigger bot move AFTER currentPlayer advances
+    if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver) {
+        setTimeout(() => basraBotMove(room), 900);
+    }
     basraEmitAll(room);
     // Start turn timer
     if (room.turnTimer > 0 && !room.gameOver && !room.roundOver) {
