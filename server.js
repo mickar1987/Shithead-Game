@@ -2279,6 +2279,14 @@ function registerBasraHandlers(socket) {
         const slotIdx = socket.data.basraSlot;
         const room = basraRooms[code];
         if (!room || room.gameOver || room.roundOver) return;
+        // If bot has stale commit but it's human's turn, clear it
+        if (room.isBot && room.committedBy !== slotIdx && room.currentPlayer === slotIdx) {
+            room.committedCard = null;
+            room.committedBy = null;
+            // Can't proceed with play — human needs to re-commit
+            basraEmitAll(room);
+            return;
+        }
         if (room.committedBy !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
 
         const card = room.committedCard;
@@ -2472,7 +2480,17 @@ function registerBasraHandlers(socket) {
         socket.data.basraRoom = code.toUpperCase();
         socket.data.basraSlot = slot.id;
         socket.join('basra_' + code.toUpperCase());
+        // If bot is in a stale committed state and it's the human's turn, clear it
+        if (room.isBot && room.currentPlayer === slot.id &&
+            room.committedCard && room.committedBy !== slot.id) {
+            room.committedCard = null;
+            room.committedBy = null;
+        }
         if (room.gameStarted) basraEmitAll(room);
+        // Trigger bot if it's bot's turn (in case bot got stuck)
+        if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver) {
+            setTimeout(() => basraMaybeTriggerBot(room), 500);
+        }
     });
 
     socket.on('basraLeave', () => {
