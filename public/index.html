@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.62</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.63</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1495,9 +1495,15 @@ function _humanPlayAI() {
                 pile = [];
                 drawUpToThree(0);
                 checkWin(0);
-                currentPlayer = 0;
-                render();
-                if (!gameOver && players[0].isAI) aiMove();
+                if (gameOver) { render(); return; }
+                if (players[0].finished) {
+                    // Player finished via burn — advance to next player
+                    nextTurn();
+                } else {
+                    currentPlayer = 0;
+                    render();
+                    if (players[0].isAI) aiMove();
+                }
             }, 600);
         } else {
             showToast('⚡ התפרצת!');
@@ -2076,10 +2082,23 @@ function aiMove() {
                 p.faceUp.forEach((c, i) => { if (toPlay.includes(c)) p.faceUp[i] = null; });
             }
         } else {
-            // Can't play from faceUp - take pile
+            // Can't play from faceUp — must take pile AND pick up a faceUp card/group
             log(`${p.name} לא יכול לשחק - לוקח`);
             p.hand.push(...pile);
             pile = [];
+            // Must also pick up one faceUp card/group into hand
+            const faceUpCards = p.faceUp.filter(Boolean);
+            if (faceUpCards.length > 0) {
+                // Pick best group (all same rank) from faceUp
+                const groups = {};
+                faceUpCards.forEach(fc => { const r = fc.slice(0,-1); if (!groups[r]) groups[r]=[]; groups[r].push(fc); });
+                const bestGroup = Object.values(groups).sort((a,b) => b.length - a.length)[0];
+                bestGroup.forEach(fc => {
+                    const i = p.faceUp.indexOf(fc);
+                    if (i !== -1) { p.faceUp[i] = null; p.hand.push(fc); }
+                });
+                log(`${p.name} אסף קלפים לידו: ${bestGroup.join(',')}`);
+            }
             render();
             nextTurn();
             return;
