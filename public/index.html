@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.73</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.74</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5260,19 +5260,18 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         if (s===rightIdx2) return 'basraRightHand';
         return 'basraOpponentHand';
     }
-    // Get target position for Nth card in a hand/table
-    function getCardTarget(id, cardIdx, isVertical) {
-        const el = document.getElementById(id);
-        if (!el) return fc(id);
-        const r = el.getBoundingClientRect();
-        const gap = 3, cw = isVertical ? 28 : 34, ch = isVertical ? 40 : 48;
-        if (isVertical) {
-            // Cards stack top to bottom in side areas
-            return { x: r.left + r.width/2, y: r.top + cardIdx*(ch+gap) + ch/2 };
-        } else {
-            // Cards flow left to right
-            return { x: r.left + cardIdx*(cw+gap) + cw/2, y: r.top + r.height/2 };
+    // Get target position: use actual card element's bounding rect
+    function getCardTarget(id, cardIdx) {
+        const container = document.getElementById(id);
+        if (!container) return fc(id);
+        const child = container.children[cardIdx];
+        if (child) {
+            const r = child.getBoundingClientRect();
+            return { x: r.left + r.width/2, y: r.top + r.height/2 };
         }
+        // Fallback: estimate from container
+        const r = container.getBoundingClientRect();
+        return { x: r.left + r.width/2, y: r.top + r.height/2 };
     }
     // Cards already hidden above
 
@@ -5284,9 +5283,8 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
     for (let i=1; i<=n; i++) {
         const slot=(dealerIdx+i)%n;
         if (!slotCardCount[slot]) slotCardCount[slot]=0;
-        const isVert = slot===leftIdx2||slot===rightIdx2;
         for (let ci=0; ci<cardCount; ci++) {
-            events.push({ slot, isTable:false, time:t, cardIdx:slotCardCount[slot], isVert });
+            events.push({ slot, isTable:false, time:t, cardIdx:slotCardCount[slot] });
             slotCardCount[slot]++;
             t += GAP;
         }
@@ -5301,12 +5299,12 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         t += GAP;
     }
 
-    events.forEach(({ slot, isTable, time, cardIdx, isVert }) => {
+    events.forEach(({ slot, isTable, time, cardIdx }) => {
         setTimeout(() => {
             const hid2 = isTable ? null : slotHandId(slot);
             const target = isTable
-                ? getCardTarget('basraTableCards', cardIdx, false)
-                : getCardTarget(hid2, cardIdx, isVert);
+                ? getCardTarget('basraTableCards', cardIdx)
+                : getCardTarget(hid2, cardIdx);
             const el = document.createElement('div');
             el.style.cssText =
                 'position:fixed;'+
