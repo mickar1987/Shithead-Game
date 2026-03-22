@@ -1808,6 +1808,10 @@ function basraStartTimer(room) {
 }
 
 function basraAdvanceTurn(room) {
+    // Trigger bot move if it's bot's turn
+    if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver) {
+        setTimeout(() => basraBotMove(room), 900);
+    }
     // Check if all hands empty
     const allHandsEmpty = room.slots.every(sl => sl.hand.length === 0);
     if (allHandsEmpty) {
@@ -1954,6 +1958,81 @@ function basraAdvanceTurn(room) {
     }
 }
 
+
+// ══ BASRA BOT ══
+function basraBotFindCaptures(card, tableCards) {
+    const rank = card.slice(0,-1);
+    const is7d = card === '7d';
+    if (rank === 'J' || is7d) return tableCards.length > 0 ? [tableCards.map((_,i)=>i)] : [];
+    if (tableCards.length === 1 && tableCards[0] === '7d') return [[0]];
+    if (rank === 'Q' || rank === 'K') {
+        const g = tableCards.map((c,i)=>c.slice(0,-1)===rank?i:-1).filter(i=>i>=0);
+        return g.length > 0 ? [g] : [];
+    }
+    const vals = {'A':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10};
+    const val = vals[rank];
+    if (!val) return [];
+    const n = tableCards.length, result = [];
+    for (let mask=1;mask<(1<<n);mask++) {
+        let sum=0, grp=[], ok=true;
+        for (let i=0;i<n;i++) if (mask&(1<<i)) {
+            const v = vals[tableCards[i].slice(0,-1)];
+            if (!v){ok=false;break;} sum+=v; grp.push(i);
+        }
+        if (ok && sum===val) result.push(grp);
+    }
+    return result;
+}
+
+function basraBotMove(room) {
+    if (!room || room.gameOver || room.roundOver || !room.isBot) return;
+    if (room.currentPlayer !== 1) return;
+    const bot = room.slots[1];
+    if (!bot || !bot.hand || bot.hand.length === 0) return;
+
+    // Find best play
+    let bestCard = null, bestCapture = [], bestScore = -1;
+    bot.hand.forEach(card => {
+        const caps = basraBotFindCaptures(card, room.tableCards);
+        if (caps.length > 0) {
+            caps.forEach(grp => {
+                const isBasra = grp.length === room.tableCards.length;
+                const isJack = card.slice(0,-1)==='J' || card==='7d';
+                let score = grp.length * 10 + (isBasra ? 500 : 0) + (isJack && isBasra ? 300 : 0);
+                if ((card.slice(0,-1)==='J'||card==='7d') && !isBasra) score -= 100;
+                if (score > bestScore) { bestScore = score; bestCard = card; bestCapture = grp; }
+            });
+        }
+    });
+    if (!bestCard) {
+        // No capture — throw cheapest card (avoid J/7d)
+        const sorted = [...bot.hand].sort((a,b) => {
+            const v = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'A':11,'Q':12,'K':13,'J':15};
+            return (v[a.slice(0,-1)]||7) - (v[b.slice(0,-1)]||7);
+        });
+        const safe = sorted.filter(c => !(c.slice(0,-1)==='J'||c==='7d') || room.tableCards.length===0);
+        bestCard = safe[0] || sorted[0];
+        bestCapture = [];
+    }
+
+    // Phase 1: commit card (show it)
+    bot.hand.splice(bot.hand.indexOf(bestCard), 1);
+    room.committedCard = bestCard;
+    room.committedBy = 1;
+    basraEmitAll(room);
+
+    // Phase 2: after delay, play it
+    setTimeout(() => {
+        if (room.gameOver || room.roundOver) return;
+        const result = basra.playCard(room, 1, bestCard, bestCapture, true);
+        if (result.ok) {
+            room.committedCard = null;
+            room.committedBy = null;
+            basraClearBasraTimer(room);
+            basraAdvanceTurn(room);
+        }
+    }, 1200);
+}
 
 function registerBasraHandlers(socket) {
 
@@ -2292,6 +2371,36 @@ function registerBasraHandlers(socket) {
         if (room._specialFallback) { clearTimeout(room._specialFallback); room._specialFallback = null; }
         basraEmitAll(room);
         processNextSpecial(room);
+    });
+
+    // VS AI: create a room and fill second slot with a bot
+    socket.on('basraCreateVsAI', async ({ name, winScore, username, token }) => {
+        const code = basraMakeCode();
+        let uname = null;
+        if (username && token) {
+            try { const u = await getUser(username); if (u && u.token === token) uname = username; } catch(e) {} 
+        }
+        const room = basra.createBasraRoom(code, [
+            { name: name || 'שחקן', socketId: socket.id, connected: true, username: uname },
+            { name: 'מחשב', socketId: null, connected: true, username: null, isBot: true }
+        ], 0);
+        room.winScore = winScore || 120;
+        room.isBot = true;
+        room.gameStarted = true;
+        basraRooms[code] = room;
+        socket.data.basraRoom = code;
+        socket.data.basraSlot = 0;
+        socket.join('basra_' + code);
+        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: 2, bet: 0 });
+        // Start game
+        const dealerIdx = (room.currentPlayer - 1 + 2) % 2;
+        basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
+        basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
+        setTimeout(() => {
+            basraEmitAll(room);
+            // If bot goes first
+            if (room.currentPlayer === 1) setTimeout(() => basraBotMove(room), 1000);
+        }, 80);
     });
 
     socket.on('basraReconnect', ({ code, username }) => {
