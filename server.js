@@ -1814,6 +1814,7 @@ function basraAdvanceTurn(room) {
         if (room.deck.length > 0) {
             basra.dealNewHands(room);
             const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+            basraClearBasraTimer(room); // stop timer during deal
             basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
             basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
         } else {
@@ -2087,6 +2088,7 @@ function registerBasraHandlers(socket) {
             room.roundStarter = room.currentPlayer; // track for rotation
             // Send basraDeal FIRST so client sets block flag before state arrives
             const dealerIdx = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+            basraClearBasraTimer(room); // stop timer during deal animation
             basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
             basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
             // Send state slightly after so client has time to set the block flag
@@ -2173,6 +2175,7 @@ function registerBasraHandlers(socket) {
         basra.resetRound(room);
         basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
         const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+        basraClearBasraTimer(room); // stop timer during deal animation
         basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length });
         setTimeout(() => basraEmitAll(room), 80);
 
