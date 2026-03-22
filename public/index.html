@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.88</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.89</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5468,6 +5468,7 @@ function basraAINewGame(winScore) {
         tableCards: [],
         deck: deck,
         lastCapturer: null,
+        committedCard: null,
         gameOver: false,
         roundOver: false,
     };
@@ -5570,10 +5571,13 @@ function basraAIDoMove() {
     ai.hand.splice(ai.hand.indexOf(playedCard), 1);
     basraAIRender();
 
-    // Animate AI playing
+    // Show AI's committed card first (like online), then capture after delay
+    game.committedCard = playedCard;
+    basraAIRender();
     setTimeout(() => {
+        game.committedCard = null;
         basraAIPlayCard(game, 1, playedCard, capturedGroup);
-    }, 600);
+    }, 1200);
 }
 
 function basraAIPlayCard(game, playerIdx, card, captureGroup) {
@@ -5751,8 +5755,8 @@ function basraAIRender() {
         roundOver: game.roundOver,
         gameOver: game.gameOver,
         lastCapturer: game.lastCapturer,
-        committedCard: null,
-        committedBy: null,
+        committedCard: game.committedCard || null,
+        committedBy: game.committedCard ? 0 : null,
         turnTimer: 0,
         timerStarted: false,
         timerRemaining: 0,
@@ -5784,18 +5788,20 @@ function basraAIDealAnimation(callback) {
         return {x:r.left+r.width/2, y:r.top+r.height/2};
     }
     const srcPos = fc('basraDeckArea');
-    // player after dealer gets cards first
-    const firstSlot = 1 - dealerIdx; // index of first recipient
-    const firstAreaId = firstSlot===0 ? 'basraPlayerArea' : 'basraOpponentArea';
-    const firstHandId = firstSlot===0 ? 'basraMyHand' : 'basraOpponentHand';
-    const dealerAreaId2 = dealerIdx===0 ? 'basraPlayerArea' : 'basraOpponentArea';
-    const dealerHandId2 = dealerIdx===0 ? 'basraMyHand' : 'basraOpponentHand';
+    // player after dealer gets cards first (slot 0=human, slot 1=AI)
+    const order = [1-dealerIdx, dealerIdx]; // first recipient, then dealer
+    const areaMap = ['basraPlayerArea','basraOpponentArea'];
+    const handMap = ['basraMyHand','basraOpponentHand'];
 
     const events = [];
     let t = 0;
-    for (let ci=0;ci<4;ci++) { events.push({target:fc(firstAreaId),time:t,handId:firstHandId,cardIdx:ci}); t+=GAP; }
-    t+=GAP*0.3;
-    for (let ci=0;ci<4;ci++) { events.push({target:fc(dealerAreaId2),time:t,handId:dealerHandId2,cardIdx:ci}); t+=GAP; }
+    order.forEach((slot, pass) => {
+        for (let ci=0;ci<4;ci++) {
+            events.push({target:fc(areaMap[slot]),time:t,handId:handMap[slot],cardIdx:ci});
+            t+=GAP;
+        }
+        t+=GAP*0.3;
+    });
     t+=GAP*0.8;
     // Table cards
     const tablePos = fc('basraTableCards');
@@ -5846,6 +5852,7 @@ function basraAIConfirmCapture() {
     const card = basraCommittedCard;
     const captureIndices = basraSelectedCaptures.slice();
     basraCommittedCard = null;
+    basraAI.committedCard = null;
     basraPlayPhase = 'select';
     basraSelectedCaptures = [];
     basraAIPlayCard(basraAI, 0, card, captureIndices);
@@ -5855,6 +5862,7 @@ function basraAIThrow() {
     if (!basraAI) return;
     const card = basraCommittedCard;
     basraCommittedCard = null;
+    basraAI.committedCard = null;
     basraPlayPhase = 'select';
     basraSelectedCaptures = [];
     basraAIPlayCard(basraAI, 0, card, []);
@@ -6334,15 +6342,34 @@ function basraPlaySelected() {
 
     // VS AI mode
     if (basraAI) {
+        // Remove card from hand immediately
+        basraAI.players[0].hand.splice(basraAI.players[0].hand.indexOf(card), 1);
         basraCommittedCard = card;
         basraSelectedCard = null;
-        basraSelectedCaptures = [];
         basraPlayPhase = 'capture';
+        // Auto-select captures
+        basraSelectedCaptures = [];
         basraAutoSelectCaptures(card, tableCards);
+        basraAI.committedCard = card; // show in committed area
         basraAIRender();
-        if (basraIsAutoCapture(card)) {
+        // Auto-capture for J/7d
+        if (basraIsAutoCapture(card) && tableCards.length > 0) {
             const allIdx = tableCards.map((_,i)=>i);
-            setTimeout(() => basraAIHumanPlay(card, allIdx), 800);
+            setTimeout(() => {
+                basraCommittedCard = null;
+                basraPlayPhase = 'select';
+                basraSelectedCaptures = [];
+                basraAI.committedCard = null;
+                basraAIPlayCard(basraAI, 0, card, allIdx);
+            }, 900);
+        } else if (basraIsAutoCapture(card) && tableCards.length === 0) {
+            setTimeout(() => {
+                basraCommittedCard = null;
+                basraPlayPhase = 'select';
+                basraSelectedCaptures = [];
+                basraAI.committedCard = null;
+                basraAIPlayCard(basraAI, 0, card, []);
+            }, 600);
         }
         return;
     }
