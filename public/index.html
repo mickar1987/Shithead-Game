@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.61</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.62</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2020,25 +2020,34 @@ function aiMove() {
     if (animating) { setTimeout(aiMove, fastMode ? 80 : 400); return; }
     const p = players[currentPlayer];
 
-    // Loop detection: if pile hasn't changed in 20 AI moves, force a take
+    // Loop detection: track GLOBAL game state across all AI players
     aiMoveCount++;
-    // Track both pile size AND player state to detect loops
-    const aiStateKey = `${pile.length}_${p.hand.length}_${p.faceUp.filter(Boolean).length}`;
-    if (aiStateKey === (window._aiLastStateKey || '')) {
-        aiStaleCount++;
-    } else {
+    // Include currentPlayer in key so we track round-robin loops
+    const totalCards = players.reduce((s,p2)=>s+p2.hand.length+p2.faceUp.filter(Boolean).length+p2.faceDown.filter(Boolean).length,0);
+    const aiStateKey = `${pile.length}_${totalCards}_${currentPlayer}`;
+    if (!window._aiStateHistory) window._aiStateHistory = [];
+    window._aiStateHistory.push(aiStateKey);
+    if (window._aiStateHistory.length > 20) window._aiStateHistory.shift();
+    // Detect loop: same state appeared 3+ times in last 20 moves
+    const keyCount = window._aiStateHistory.filter(k => k === aiStateKey).length;
+    if (keyCount >= 3) {
+        // Force break loop — take pile or force next player
+        window._aiStateHistory = [];
         aiStaleCount = 0;
-        window._aiLastStateKey = aiStateKey;
-    }
-    if (aiStaleCount >= 6) {
-        // Force break loop
-        aiStaleCount = 0;
-        window._aiLastStateKey = '';
         if (pile.length > 0) {
             showToast(`${p.name} לוקח את הערימה`);
             playSound('take');
             p.hand.push(...pile);
             pile = [];
+        } else {
+            // Pile empty but stuck — force play lowest card or skip
+            const anyCard = p.hand[0] || p.faceUp.find(Boolean);
+            if (anyCard) {
+                showToast(`${p.name} מוכרח לשחק`);
+                if (p.hand.includes(anyCard)) p.hand.splice(p.hand.indexOf(anyCard), 1);
+                else p.faceUp.forEach((fc,i)=>{ if(fc===anyCard) p.faceUp[i]=null; });
+                pile.push(anyCard);
+            }
         }
         render();
         nextTurn();
