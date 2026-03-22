@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.68</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.69</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5212,6 +5212,7 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         return fc('basraOpponentArea');
     }
 
+    window._basraDealInProgress = true; // block basraRender during animation
     // Track how many cards each slot has received (to reveal one at a time)
     const slotCardCount = {};
     const srcPos = fc('basraDeckArea');
@@ -5238,6 +5239,22 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         if (s===rightIdx2) return 'basraRightHand';
         return 'basraOpponentHand';
     }
+    // Get target position for Nth card in a hand/table
+    function getCardTarget(id, cardIdx, isVertical) {
+        const el = document.getElementById(id);
+        if (!el) return fc(id);
+        const r = el.getBoundingClientRect();
+        const gap = 3, cw = isVertical ? 28 : 34, ch = isVertical ? 40 : 48;
+        if (isVertical) {
+            // vertical stack (left/right players)
+            const totalH = cardIdx * (ch + gap);
+            return { x: r.left + r.width/2, y: r.top + totalH + ch/2 };
+        } else {
+            // horizontal row
+            const totalW = cardIdx * (cw + gap);
+            return { x: r.left + totalW + cw/2, y: r.top + r.height/2 };
+        }
+    }
     // Hide all hand cards
     Object.values(handIds).forEach(id => {
         const el = document.getElementById(id);
@@ -5246,7 +5263,7 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
     const tableEl2 = document.getElementById('basraTableCards');
     if (tableEl2) Array.from(tableEl2.children).forEach(ch => ch.style.opacity = '0');
 
-    const CARD_W=34, CARD_H=48, SPEED=420, GAP=280;
+    const CARD_W=34, CARD_H=48, SPEED=500, GAP=380;
     const events=[];
     let t=0;
 
@@ -5254,8 +5271,9 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
     for (let i=1; i<=n; i++) {
         const slot=(dealerIdx+i)%n;
         if (!slotCardCount[slot]) slotCardCount[slot]=0;
+        const isVert = slot===leftIdx2||slot===rightIdx2;
         for (let ci=0; ci<cardCount; ci++) {
-            events.push({ slot, isTable:false, time:t, cardIdx:slotCardCount[slot] });
+            events.push({ slot, isTable:false, time:t, cardIdx:slotCardCount[slot], isVert });
             slotCardCount[slot]++;
             t += GAP;
         }
@@ -5270,9 +5288,12 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         t += GAP;
     }
 
-    events.forEach(({ slot, isTable, time, cardIdx }) => {
+    events.forEach(({ slot, isTable, time, cardIdx, isVert }) => {
         setTimeout(() => {
-            const target = isTable ? tablePos : getSlotCenter(slot);
+            const hid2 = isTable ? null : slotHandId(slot);
+            const target = isTable
+                ? getCardTarget('basraTableCards', cardIdx, false)
+                : getCardTarget(hid2, cardIdx, isVert);
             const el = document.createElement('div');
             el.style.cssText =
                 'position:fixed;'+
@@ -5315,6 +5336,11 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
             }));
         }, time);
     });
+    // Clear flag after all animations complete + small buffer
+    setTimeout(() => {
+        window._basraDealInProgress = false;
+        if (basraState) basraRender(basraState);
+    }, t + SPEED + 500);
 }
 
 function basraRenderPile(containerId, capturedCount, basraCards, rotate, showCount) {
@@ -5374,6 +5400,7 @@ function basraRenderPile(containerId, capturedCount, basraCards, rotate, showCou
 function basraRender(state) {
     if (!state) return;
     basraState = state;
+    if (window._basraDealInProgress) return; // don't render during deal animation
     const myIdx = state.mySlotIdx;
     const n = state.playerNames.length;
     // For 2p: oppIdx = other player
