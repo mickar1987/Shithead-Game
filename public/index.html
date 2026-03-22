@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.71</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.72</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3013,6 +3013,12 @@ if (!onlineMode) return; // already left to menu
     });
 
     socket.on('basraDeal', ({ dealerIdx, cardCount, tableCount }) => {
+        // Render state first (cards exist in DOM) then animate
+        if (basraState) {
+            window._basraDealInProgress = false; // allow render
+            basraRender(basraState);
+            window._basraDealInProgress = true; // re-block during animation
+        }
         basraDealAnimation(dealerIdx, cardCount, tableCount);
     });
 
@@ -5229,7 +5235,14 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         startCounts[id] = el ? el.children.length : 0;
     });
 
-    // Hide all hands completely first - we'll reveal card by card
+    // Hide all existing cards immediately — reveal one by one during animation
+    ['basraMyHand','basraOpponentHand','basraLeftHand','basraRightHand'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) Array.from(el.children).forEach(ch => { ch.style.opacity='0'; ch.style.transition='none'; });
+    });
+    const tableEl0 = document.getElementById('basraTableCards');
+    if (tableEl0) Array.from(tableEl0.children).forEach(ch => { ch.style.opacity='0'; ch.style.transition='none'; });
+
     const handIds = {
         0: 'basraMyHand', 1: 'basraOpponentHand', 2: 'basraLeftHand', 3: 'basraRightHand'
     };
@@ -5257,13 +5270,7 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
             return { x: r.left + cardIdx*(cw+gap) + cw/2, y: r.top + r.height/2 };
         }
     }
-    // Hide all hand cards
-    Object.values(handIds).forEach(id => {
-        const el = document.getElementById(id);
-        if (el) Array.from(el.children).forEach(ch => ch.style.opacity = '0');
-    });
-    const tableEl2 = document.getElementById('basraTableCards');
-    if (tableEl2) Array.from(tableEl2.children).forEach(ch => ch.style.opacity = '0');
+    // Cards already hidden above
 
     const CARD_W=34, CARD_H=48, SPEED=500, GAP=380;
     const events=[];
