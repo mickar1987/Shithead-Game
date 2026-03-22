@@ -1815,8 +1815,16 @@ function basraAdvanceTurn(room) {
             basra.dealNewHands(room);
             const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
             basraClearBasraTimer(room); // stop timer during deal
-            basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
-            basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
+            // Send card counts summary before deal
+            basraBroadcast(room, 'basraCardSummary', {
+                names: room.slots.map(s => s.name),
+                captured: room.slots.map(s => s.captured.length),
+                teams: room.teams || null
+            });
+            setTimeout(() => {
+                basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
+                basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
+            }, 2000);
         } else {
             if (room.tableCards.length > 0 && room.lastCapturer !== null) {
                 room.slots[room.lastCapturer].captured.push(...room.tableCards);
