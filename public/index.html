@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.69</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.70</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3023,6 +3023,7 @@ if (!onlineMode) return; // already left to menu
     });
 
     socket.on('basraStart', () => {
+        window._basraDealInProgress = true; // block renders until deal animation plays
         document.getElementById('basraGame').style.display='block';
         document.getElementById('setupOverlay').style.display='none';
         const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
@@ -3052,6 +3053,8 @@ if (!onlineMode) return; // already left to menu
         const pw = document.getElementById('pile-wrapper'); if (pw) pw.style.display='none';
         const pa = document.getElementById('playerArea'); if (pa) pa.style.display='none';
         document.querySelectorAll('.log-btn').forEach(el => el.style.display='none');
+        // If deal animation pending, store state but don't render yet
+        if (window._basraDealInProgress) { basraState = state; return; }
         basraRender(state);
     });
     socket.on('basraEvent', ({type, name}) => {
@@ -3290,6 +3293,7 @@ if (!onlineMode) return; // already left to menu
         // Reset timer display
         const timerEl = document.getElementById('basraTurnTimer');
         if (timerEl) { timerEl.textContent = ''; timerEl.style.display = 'none'; }
+        window._basraDealInProgress = true; // block renders until deal animation
         socket.emit('basraNextRound');
     }
 }
@@ -5246,13 +5250,11 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         const r = el.getBoundingClientRect();
         const gap = 3, cw = isVertical ? 28 : 34, ch = isVertical ? 40 : 48;
         if (isVertical) {
-            // vertical stack (left/right players)
-            const totalH = cardIdx * (ch + gap);
-            return { x: r.left + r.width/2, y: r.top + totalH + ch/2 };
+            // Cards stack top to bottom in side areas
+            return { x: r.left + r.width/2, y: r.top + cardIdx*(ch+gap) + ch/2 };
         } else {
-            // horizontal row
-            const totalW = cardIdx * (cw + gap);
-            return { x: r.left + totalW + cw/2, y: r.top + r.height/2 };
+            // Cards flow left to right
+            return { x: r.left + cardIdx*(cw+gap) + cw/2, y: r.top + r.height/2 };
         }
     }
     // Hide all hand cards
