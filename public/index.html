@@ -548,7 +548,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.87</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.88</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4464,6 +4464,7 @@ function basraRenderCard(cardStr, faceUp, selected, clickFn) {
 // Phase 2: player selects which table cards to capture → clicks "אסוף" → server validates + collects
 // basraCommitCard merged into basraPlaySelected
 function basraConfirmCapture() {
+    if (basraAI) { basraAIConfirmCapture(); return; }
     if (basraSelectedCaptures.length === 0) { showToast('בחר קלפים לאיסוף'); return; }
     const captureIndices = basraSelectedCaptures.slice();
     const tableCards = basraState ? basraState.tableCards : [];
@@ -4544,6 +4545,7 @@ function basraConfirmCapture() {
     animateStep();
 }
 function basraThrowCard() {
+    if (basraAI) { basraAIThrow(); return; }
     // Throw committed card to table (no capture)
     socket.emit('basraPlay', { captureIndices: [] });
     basraCommittedCard = null;
@@ -5782,15 +5784,18 @@ function basraAIDealAnimation(callback) {
         return {x:r.left+r.width/2, y:r.top+r.height/2};
     }
     const srcPos = fc('basraDeckArea');
-    const slotIds = dealerIdx===0 ? ['basraPlayerArea','basraOpponentArea'] : ['basraOpponentArea','basraPlayerArea'];
+    // player after dealer gets cards first
+    const firstSlot = 1 - dealerIdx; // index of first recipient
+    const firstAreaId = firstSlot===0 ? 'basraPlayerArea' : 'basraOpponentArea';
+    const firstHandId = firstSlot===0 ? 'basraMyHand' : 'basraOpponentHand';
+    const dealerAreaId2 = dealerIdx===0 ? 'basraPlayerArea' : 'basraOpponentArea';
+    const dealerHandId2 = dealerIdx===0 ? 'basraMyHand' : 'basraOpponentHand';
 
     const events = [];
     let t = 0;
-    // All 4 to player after dealer
-    for (let c=0;c<4;c++) { events.push({target:fc(slotIds[0]),time:t,handId:dealerIdx===0?'basraOpponentHand':'basraMyHand',cardIdx:c}); t+=GAP; }
+    for (let ci=0;ci<4;ci++) { events.push({target:fc(firstAreaId),time:t,handId:firstHandId,cardIdx:ci}); t+=GAP; }
     t+=GAP*0.3;
-    // All 4 to dealer
-    for (let c=0;c<4;c++) { events.push({target:fc(slotIds[1]),time:t,handId:dealerIdx===0?'basraMyHand':'basraOpponentHand',cardIdx:c}); t+=GAP; }
+    for (let ci=0;ci<4;ci++) { events.push({target:fc(dealerAreaId2),time:t,handId:dealerHandId2,cardIdx:ci}); t+=GAP; }
     t+=GAP*0.8;
     // Table cards
     const tablePos = fc('basraTableCards');
@@ -5837,6 +5842,7 @@ function basraAIHumanPlay(card, captureIndices) {
 
 function basraAIConfirmCapture() {
     if (!basraAI) return;
+    if (basraSelectedCaptures.length === 0) { showToast('בחר קלפים לאיסוף'); return; }
     const card = basraCommittedCard;
     const captureIndices = basraSelectedCaptures.slice();
     basraCommittedCard = null;
