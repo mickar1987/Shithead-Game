@@ -142,14 +142,17 @@ function isBasra(playedCard, capturedCards, tableCards) {
 function createBasraRoom(code, slots, bet = 0) {
     const deck = shuffle(makeDeck());
 
-    // Deal 4 to table, replace any J or 7♦
+    // Deal 4 to table — J and 7♦ are allowed but get sent to end of deck and replaced
     let tableCards = [];
+    const specialReplacements = []; // {card, replacedBy} for client notification
     while (tableCards.length < 4) {
         const card = deck.shift();
         const rank = cardRank(card);
         if (rank === 'J' || is7D(card)) {
-            deck.push(card); // put back
-            shuffle(deck);
+            // Special card: send to end of deck, draw next card instead
+            deck.push(card);
+            specialReplacements.push(card);
+            // Continue loop — next card will be drawn
         } else {
             tableCards.push(card);
         }
@@ -175,6 +178,7 @@ function createBasraRoom(code, slots, bet = 0) {
     return {
         code,
         gameType: 'basra',
+        specialReplacements, // cards that were shown then sent to end of deck
         slots,
         deck,
         tableCards,
@@ -397,14 +401,15 @@ function scoreRound(room) {
 function resetRound(room) {
     const deck = shuffle(makeDeck());
 
-    // New table (recheck for J/7♦)
+    // New table — J/7♦ go to end of deck and get replaced
     let tableCards = [];
+    room.specialReplacements = [];
     while (tableCards.length < 4) {
         const card = deck.shift();
         const rank = cardRank(card);
         if (rank === 'J' || is7D(card)) {
             deck.push(card);
-            shuffle(deck);
+            room.specialReplacements.push(card);
         } else {
             tableCards.push(card);
         }

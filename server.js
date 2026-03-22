@@ -2058,6 +2058,17 @@ function registerBasraHandlers(socket) {
             basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
             // Send state slightly after so client has time to set the block flag
             setTimeout(() => basraEmitAll(room), 80);
+            // Notify about special card replacements
+            if (room.specialReplacements && room.specialReplacements.length > 0) {
+                setTimeout(() => {
+                    room.specialReplacements.forEach(card => {
+                        const rank = card.slice(0,-1);
+                        const suit = card.slice(-1);
+                        const name = rank === 'J' ? 'J' : '7♦';
+                        basraBroadcast(room, 'basraSpecialCard', { card, name });
+                    });
+                }, 800);
+            }
             if (room.teams) {
                 const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
                 const t1 = room.teams[1].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
@@ -2171,6 +2182,14 @@ function registerBasraHandlers(socket) {
         const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
         basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length });
         setTimeout(() => basraEmitAll(room), 80);
+        if (room.specialReplacements && room.specialReplacements.length > 0) {
+            setTimeout(() => {
+                room.specialReplacements.forEach(card => {
+                    const name = card.slice(0,-1) === 'J' ? 'J' : '7♦';
+                    basraBroadcast(room, 'basraSpecialCard', { card, name });
+                });
+            }, 800);
+        }
         // Start timer for first player of new round
         if (room.turnTimer > 0 && !room.gameOver) {
             room._timerStarted = Date.now();
