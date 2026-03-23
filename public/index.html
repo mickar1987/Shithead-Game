@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>שיט-הד 🃏</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1a1a2e">
@@ -36,6 +36,7 @@
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             overflow: hidden; position: fixed;
+            touch-action: manipulation;
             font-family: 'Rubik', sans-serif;
             color: white;
             background: #031a0f; /* same as felt-dark, fills ALL safe areas */
@@ -548,7 +549,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.99</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.100</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3494,10 +3495,22 @@ if (!onlineMode) return; // already left to menu
         let html = '';
         if (forfeitName !== undefined) {
             const iMeLost = forfeitBy === basraMySlot;
-            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:${iMeLost?'#f87171':'var(--gold)'};letter-spacing:3px;text-align:center;margin-bottom:8px;">${iMeLost ? '😞 הפסדת' : '🏆 ניצחת!'}</div>`;
+            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iMeLost?'#ef4444':'#22c55e'};letter-spacing:3px;text-align:center;margin-bottom:8px;">${iMeLost ? '😞 הפסדת' : '🏆 ניצחת!'}</div>`;
+            if (!iMeLost) basraFireworks();
             html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:12px;">${forfeitName} עזב/פסל עצמו</div>`;
+        } else if (!teams) {
+            // 2p: determine winner
+            const winnerIdx = scores[0] >= scores[1] ? 0 : 1;
+            const iWon = winnerIdx === basraMySlot;
+            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon ? '🏆 ניצחת!' : '😞 הפסדת'}</div>`;
+            if (iWon) basraFireworks();
         } else {
-            html += '<div style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:12px;">🏆 משחק הסתיים!</div>';
+            // 4p team with no forfeit
+            const winTeamIdx2 = teamScores ? (teamScores[0] >= teamScores[1] ? 0 : 1) : 0;
+            const myTeamIdx = teams ? teams.findIndex(t => t.includes(basraMySlot)) : -1;
+            const iWon4 = myTeamIdx === winTeamIdx2;
+            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon4?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon4 ? '🏆 ניצחתם!' : '😞 הפסדתם'}</div>`;
+            if (iWon4) basraFireworks();
         }
         html += '<div style="display:flex;flex-direction:column;gap:8px;">';
         if (teams && teamScores) {
@@ -5643,6 +5656,34 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
         // Signal server that deal animation is done — triggers special card replacement
         if (typeof socket !== 'undefined' && socket) socket.emit('basraDealDone');
     }, t + SPEED + 500);
+}
+
+function basraFireworks() {
+    const colors = ['#ff0','#f80','#f0f','#0ff','#0f0','#ff6600','#fff'];
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99999;overflow:hidden;';
+    document.body.appendChild(container);
+    let count = 0;
+    function burst() {
+        if (count++ > 18) { setTimeout(()=>container.remove(), 1500); return; }
+        const x = 10 + Math.random()*80, y = 10 + Math.random()*70;
+        for (let i=0;i<22;i++) {
+            const p = document.createElement('div');
+            const color = colors[Math.floor(Math.random()*colors.length)];
+            const angle = (i/22)*360, dist = 40+Math.random()*80;
+            const rad = angle*Math.PI/180;
+            const dx = Math.cos(rad)*dist, dy = Math.sin(rad)*dist;
+            p.style.cssText = `position:absolute;left:${x}%;top:${y}%;width:6px;height:6px;border-radius:50%;background:${color};transform:translate(-50%,-50%);transition:transform 0.8s ease-out,opacity 0.8s ease-out;opacity:1;`;
+            container.appendChild(p);
+            requestAnimationFrame(()=>requestAnimationFrame(()=>{
+                p.style.transform = `translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;
+                p.style.opacity = '0';
+                setTimeout(()=>p.remove(), 900);
+            }));
+        }
+        setTimeout(burst, 280);
+    }
+    burst();
 }
 
 function basraRenderPile(containerId, capturedCount, basraCards, rotate, showCount) {
