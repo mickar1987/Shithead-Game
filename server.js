@@ -2062,7 +2062,13 @@ function basraBotMove(room) {
             if (isBasra) score += 600;
             // J/7d with few cards: penalize (don't waste on 1 card unless basra)
             if (isJackCard && !isBasra) {
-                score -= (4 - tableCards.length) * 30; // less penalty when more cards on table
+                // Don't use J/7d on fewer than 3 cards unless it's our last card
+                const handSizeAfter = handSize - 1;
+                if (tableCards.length < 3 && handSizeAfter > 0) {
+                    score -= 300; // strong penalty — save for more cards
+                } else {
+                    score -= (4 - tableCards.length) * 20;
+                }
             }
             // Bonus: capturing dangerous (high-threat) cards from table
             combined.forEach(idx => {
@@ -2110,17 +2116,33 @@ function basraBotMove(room) {
     // Phase 2: after 1.8s, show capture selection highlight, then play
     setTimeout(() => {
         if (room.gameOver || room.roundOver) return;
-        // Broadcast capture preview so human sees what bot is about to capture
+        // Re-evaluate captures with current table state (table may have changed)
+        let currentCapture = bestCapture;
         if (bestCapture.length > 0) {
+            const freshCaps = basraBotFindCaptures(bestCard, room.tableCards);
+            if (freshCaps.length > 0) {
+                const used2 = new Set();
+                currentCapture = [];
+                for (const grp of freshCaps.sort((a,b)=>b.length-a.length)) {
+                    if (grp.every(i=>!used2.has(i))) {
+                        grp.forEach(i=>used2.add(i));
+                        currentCapture.push(...grp);
+                    }
+                }
+            } else {
+                currentCapture = [];
+            }
+        }
+        if (currentCapture.length > 0) {
             basraBroadcast(room, 'basraCapturePreview', {
-                captureIndices: bestCapture,
-                groups: [bestCapture]
+                captureIndices: currentCapture,
+                groups: [currentCapture]
             });
         }
         // Phase 3: after another 1s, execute the play
         setTimeout(() => {
             if (room.gameOver || room.roundOver) return;
-            const result = basra.playCard(room, 1, bestCard, bestCapture, true);
+            const result = basra.playCard(room, 1, bestCard, currentCapture, true);
             if (result.ok) {
                 room.committedCard = null;
                 room.committedBy = null;
@@ -2133,7 +2155,7 @@ function basraBotMove(room) {
                 basraEmitAll(room);
                 setTimeout(() => basraAdvanceTurn(room), 300);
             } else {
-                // playCard failed — force throw to table
+                // playCard failed — re-try with no capture (throw)
                 room.tableCards.push(bestCard);
                 room.committedCard = null;
                 room.committedBy = null;
