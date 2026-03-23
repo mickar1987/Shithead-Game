@@ -1983,6 +1983,34 @@ function basraBotFindCaptures(card, tableCards) {
     return result;
 }
 
+function basraBotThreatScore(card, tableCards) {
+    const vals = {'A':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10};
+    const rank = card.slice(0,-1);
+    const cardVal = vals[rank] || 0;
+    if (!cardVal) return 2;
+    if (tableCards.length === 0) return 50; // throwing to empty = opponent basra risk
+    const tableVals = tableCards.map(c => vals[c.slice(0,-1)] || 0).filter(v=>v>0);
+    let threatCount = 0;
+    for (let oppVal = 1; oppVal <= 10; oppVal++) {
+        const n = tableVals.length;
+        for (let mask=0; mask<(1<<n); mask++) {
+            let sum = oppVal;
+            for (let i=0;i<n;i++) if(mask&(1<<i)) sum+=tableVals[i];
+            if (sum === cardVal) { threatCount++; break; }
+        }
+    }
+    return threatCount;
+}
+
+function basraBotCardKeepValue(card) {
+    const rank = card.slice(0,-1);
+    if (rank === 'J' || card === '7d') return 70;
+    if (['8','9','10'].includes(rank)) return 60;
+    if (['5','6','7'].includes(rank)) return 30;
+    if (rank === 'Q' || rank === 'K') return 20;
+    return {'A':0,'2':5,'3':8,'4':10}[rank] || 10;
+}
+
 function basraBotMove(room) {
     if (!room || room.gameOver || room.roundOver || !room.isBot) return;
     if (room.currentPlayer !== 1) return;
