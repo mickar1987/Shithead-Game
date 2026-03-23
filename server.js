@@ -1997,14 +1997,18 @@ function basraBotMove(room) {
 
     // Find best play
     let bestCard = null, bestCapture = [], bestScore = -1;
+    const tableCards = room.tableCards;
+    const handSize = bot.hand.length;
+
     bot.hand.forEach(card => {
-        const caps = basraBotFindCaptures(card, room.tableCards);
+        const rank = card.slice(0,-1);
+        const is7d = card === '7d';
+        const caps = basraBotFindCaptures(card, tableCards);
+
         if (caps.length > 0) {
             // Greedily combine non-overlapping groups to maximize capture
-            const allIndices = new Set(room.tableCards.map((_,i)=>i));
             const used = new Set();
             const combined = [];
-            // Sort groups: prefer larger groups first
             const sorted = [...caps].sort((a,b)=>b.length-a.length);
             for (const grp of sorted) {
                 if (grp.every(i=>!used.has(i))) {
@@ -2012,21 +2016,52 @@ function basraBotMove(room) {
                     combined.push(...grp);
                 }
             }
-            const isBasra = combined.length === room.tableCards.length;
-            const isJack = card.slice(0,-1)==='J' || card==='7d';
-            let score = combined.length * 10 + (isBasra ? 500 : 0) + (isJack && isBasra ? 300 : 0);
-            if ((card.slice(0,-1)==='J'||card==='7d') && !isBasra) score -= 100;
+            const isBasra = combined.length === tableCards.length && tableCards.length > 0;
+            const isJackCard = rank === 'J' || is7d;
+
+            let score = 0;
+            // Base: number of cards captured
+            score += combined.length * 15;
+            // Basra bonus
+            if (isBasra) score += 600;
+            // J/7d with few cards: penalize (don't waste on 1 card unless basra)
+            if (isJackCard && !isBasra) {
+                score -= (4 - tableCards.length) * 30; // less penalty when more cards on table
+            }
+            // Bonus: capturing dangerous (high-threat) cards from table
+            combined.forEach(idx => {
+                const tc = tableCards[idx];
+                const tcRank = tc.slice(0,-1);
+                if (['8','9','10'].includes(tcRank)) score += 20; // capturing good cards
+            });
+            // Bonus: after capture, what remains? Penalize leaving basra opportunities
+            const remaining = tableCards.filter((_,i)=>!combined.includes(i));
+            if (remaining.length === 1) score -= 40; // leaving 1 card = opponent basra risk
+            if (remaining.length === 0 && !isBasra) score += 10; // clear table without basra is still ok
+
             if (score > bestScore) { bestScore = score; bestCard = card; bestCapture = combined; }
         }
     });
+
     if (!bestCard) {
-        // No capture — throw cheapest card (avoid J/7d)
-        const sorted = [...bot.hand].sort((a,b) => {
-            const v = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'A':11,'Q':12,'K':13,'J':15};
-            return (v[a.slice(0,-1)]||7) - (v[b.slice(0,-1)]||7);
+        // No capture — choose best card to throw
+        // Score each card: lower is better to throw
+        const throwScores = bot.hand.map(card => {
+            const rank = card.slice(0,-1);
+            const is7d = card === '7d';
+            const keepVal = basraBotCardKeepValue(card, bot.hand, tableCards);
+            const threat = basraBotThreatScore(card, tableCards);
+            // Throw: low keepVal + low threat to ourselves = good throw
+            // High keepVal = keep it, don't throw
+            // High threat = throwing this card lets opponent capture it easily = bad
+            return { card, throwScore: threat - keepVal };
         });
-        const safe = sorted.filter(c => !(c.slice(0,-1)==='J'||c==='7d') || room.tableCards.length===0);
-        bestCard = safe[0] || sorted[0];
+        // Sort: throw card with lowest throwScore (least valuable to keep, least dangerous)
+        throwScores.sort((a,b) => a.throwScore - b.throwScore);
+        // Never throw J or 7d if there are other options
+        const noJack = throwScores.filter(t => t.card.slice(0,-1)!=='J' && t.card!=='7d');
+        const candidate = noJack[0] || throwScores[0];
+        bestCard = candidate.card;
         bestCapture = [];
     }
 
