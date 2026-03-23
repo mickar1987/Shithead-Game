@@ -1989,9 +1989,10 @@ function basraBotThreatScore(card, tableCards) {
     // Q/K: only capturable by same rank — very low threat even on empty table
     if (rank === 'Q' || rank === 'K') return 1;
     const cardVal = vals[rank] || 0;
-    if (!cardVal) return 2; // J (shouldn't reach here normally)
+    if (!cardVal) return 2;
     // Throwing to empty table: numeric card is basra risk (opponent captures alone = basra)
-    if (tableCards.length === 0) return 50;
+    // EXCEPTION: A,2,3,4 on empty table still risky but less so — value is low
+    if (tableCards.length === 0) return cardVal <= 4 ? 15 : 50;
     const tableVals = tableCards.map(c => vals[c.slice(0,-1)] || 0).filter(v=>v>0);
     let threatCount = 0;
     for (let oppVal = 1; oppVal <= 10; oppVal++) {
@@ -2085,25 +2086,22 @@ function basraBotMove(room) {
         }
     });
 
-    if (!bestCard) {
-        // No capture — choose best card to throw
-        // Score each card: lower is better to throw
-        const throwScores = bot.hand.map(card => {
-            const rank = card.slice(0,-1);
-            const is7d = card === '7d';
-            const keepVal = basraBotCardKeepValue(card, bot.hand, tableCards);
-            const threat = basraBotThreatScore(card, tableCards);
-            // Throw: low keepVal + low threat to ourselves = good throw
-            // High keepVal = keep it, don't throw
-            // High threat = throwing this card lets opponent capture it easily = bad
-            return { card, throwScore: threat - keepVal };
-        });
-        // Sort: throw card with lowest throwScore (least valuable to keep, least dangerous)
-        throwScores.sort((a,b) => a.throwScore - b.throwScore);
-        // Never throw J or 7d if there are other options
-        const noJack = throwScores.filter(t => t.card.slice(0,-1)!=='J' && t.card!=='7d');
-        const candidate = noJack[0] || throwScores[0];
-        bestCard = candidate.card;
+    // Also consider: is throwing a weak card better than a bad capture?
+    // Compute best throw option
+    const throwScores = bot.hand.map(card => {
+        const keepVal = basraBotCardKeepValue(card, tableCards);
+        const threat = basraBotThreatScore(card, tableCards);
+        return { card, throwScore: threat - keepVal };
+    });
+    throwScores.sort((a,b) => a.throwScore - b.throwScore);
+    const noJack = throwScores.filter(t => t.card.slice(0,-1)!=='J' && t.card!=='7d');
+    const bestThrow = noJack[0] || throwScores[0];
+    // Throw score converted to capture-scale: negative throwScore = good throw
+    const throwValue = -bestThrow.throwScore;
+
+    if (!bestCard || bestScore < throwValue) {
+        // Throwing is better than the best capture found (e.g. wasting J on 1 card)
+        bestCard = bestThrow.card;
         bestCapture = [];
     }
 
