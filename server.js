@@ -1986,9 +1986,12 @@ function basraBotFindCaptures(card, tableCards) {
 function basraBotThreatScore(card, tableCards) {
     const vals = {'A':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10};
     const rank = card.slice(0,-1);
+    // Q/K: only capturable by same rank — very low threat even on empty table
+    if (rank === 'Q' || rank === 'K') return 1;
     const cardVal = vals[rank] || 0;
-    if (!cardVal) return 2;
-    if (tableCards.length === 0) return 50; // throwing to empty = opponent basra risk
+    if (!cardVal) return 2; // J (shouldn't reach here normally)
+    // Throwing to empty table: numeric card is basra risk (opponent captures alone = basra)
+    if (tableCards.length === 0) return 50;
     const tableVals = tableCards.map(c => vals[c.slice(0,-1)] || 0).filter(v=>v>0);
     let threatCount = 0;
     for (let oppVal = 1; oppVal <= 10; oppVal++) {
@@ -2002,12 +2005,17 @@ function basraBotThreatScore(card, tableCards) {
     return threatCount;
 }
 
-function basraBotCardKeepValue(card) {
+function basraBotCardKeepValue(card, tableCards) {
     const rank = card.slice(0,-1);
     if (rank === 'J' || card === '7d') return 70;
     if (['8','9','10'].includes(rank)) return 60;
     if (['5','6','7'].includes(rank)) return 30;
-    if (rank === 'Q' || rank === 'K') return 20;
+    // Q/K: great to throw — almost no basra risk, keep value low so they get thrown first
+    // when table is empty or has no matching Q/K
+    if (rank === 'Q' || rank === 'K') {
+        const tableHasSame = tableCards && tableCards.some(c => c.slice(0,-1) === rank);
+        return tableHasSame ? 40 : 5; // if same on table, keep to capture; else throw freely
+    }
     return {'A':0,'2':5,'3':8,'4':10}[rank] || 10;
 }
 
