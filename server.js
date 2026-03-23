@@ -2006,18 +2006,21 @@ function basraBotThreatScore(card, tableCards) {
     return threatCount;
 }
 
-function basraBotCardKeepValue(card, tableCards) {
+function basraBotCardKeepValue(card, tableCards, hand) {
     const rank = card.slice(0,-1);
     if (rank === 'J' || card === '7d') return 70;
-    if (['8','9','10'].includes(rank)) return 60;
-    if (['5','6','7'].includes(rank)) return 30;
-    // Q/K: great to throw — almost no basra risk, keep value low so they get thrown first
-    // when table is empty or has no matching Q/K
+    
+    // Count duplicates in hand — having 2+ of same rank reduces basra risk if one thrown
+    const dupeCount = hand ? hand.filter(c => c.slice(0,-1) === rank).length : 1;
+    const dupeBonus = dupeCount >= 2 ? -15 : 0; // having pairs = less risky to throw one
+    
+    if (['8','9','10'].includes(rank)) return 60 + dupeBonus;
+    if (['5','6','7'].includes(rank)) return 30 + dupeBonus;
     if (rank === 'Q' || rank === 'K') {
         const tableHasSame = tableCards && tableCards.some(c => c.slice(0,-1) === rank);
-        return tableHasSame ? 40 : 5; // if same on table, keep to capture; else throw freely
+        return tableHasSame ? 40 : 5;
     }
-    return {'A':0,'2':5,'3':8,'4':10}[rank] || 10;
+    return ({'A':0,'2':5,'3':8,'4':10}[rank] || 10) + dupeBonus;
 }
 
 function basraBotMove(room) {
@@ -2057,7 +2060,8 @@ function basraBotMove(room) {
             const isJackCard = rank === 'J' || is7d;
 
             let score = 0;
-            // Base: number of cards captured
+            // Base: ALWAYS prefer capturing over throwing (unless J/7d on few cards)
+            score += 200; // floor: any capture beats any throw
             score += combined.length * 15;
             // Basra bonus
             if (isBasra) score += 600;
@@ -2089,7 +2093,7 @@ function basraBotMove(room) {
     // Also consider: is throwing a weak card better than a bad capture?
     // Compute best throw option
     const throwScores = bot.hand.map(card => {
-        const keepVal = basraBotCardKeepValue(card, tableCards);
+        const keepVal = basraBotCardKeepValue(card, tableCards, bot.hand);
         const threat = basraBotThreatScore(card, tableCards);
         return { card, throwScore: threat - keepVal };
     });
