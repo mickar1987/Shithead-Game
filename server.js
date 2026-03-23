@@ -330,6 +330,11 @@ app.get('/api/debug/user', async (req, res) => {
 });
 
 // Admin: set coins for a user
+// Health check — keeps Render free tier awake
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 app.get('/api/admin/set-coins', async (req, res) => {
     try {
         const { key, u, coins } = req.query;
