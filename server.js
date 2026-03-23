@@ -2092,10 +2092,31 @@ function basraBotMove(room) {
 
     // Also consider: is throwing a weak card better than a bad capture?
     // Compute best throw option
+    // Priority: throw safest card (lowest throwPriority = throw first)
+    // 1=best to throw (Q/K safe), 10=worst to throw (J/7d keep)
     const throwScores = bot.hand.map(card => {
-        const keepVal = basraBotCardKeepValue(card, tableCards, bot.hand);
+        const rank = card.slice(0,-1);
+        const is7d = card === '7d';
         const threat = basraBotThreatScore(card, tableCards);
-        return { card, throwScore: threat - keepVal };
+        let priority;
+        if (rank === 'Q' || rank === 'K') {
+            // Safest throw — only captured by same rank
+            priority = 1;
+        } else if (rank === 'J' || is7d) {
+            // Never throw if avoidable
+            priority = 100;
+        } else if (['A','2','3','4'].includes(rank)) {
+            // Weak cards — good to throw, but only if threat is low
+            priority = 3 + threat * 0.5;
+        } else if (['5','6','7'].includes(rank)) {
+            priority = 5 + threat * 0.3;
+        } else { // 8,9,10
+            priority = 8 + threat * 0.2;
+        }
+        // Having duplicates makes a card slightly more throwable
+        const dupes = bot.hand.filter(c=>c.slice(0,-1)===rank).length;
+        if (dupes >= 2) priority -= 1;
+        return { card, throwScore: priority };
     });
     throwScores.sort((a,b) => a.throwScore - b.throwScore);
     const noJack = throwScores.filter(t => t.card.slice(0,-1)!=='J' && t.card!=='7d');
