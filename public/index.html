@@ -597,7 +597,7 @@
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraWinScore(40)"  id="basraWinBtn40"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40</button>
             <button onclick="setBasraWinScore(80)"  id="basraWinBtn80"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">80</button>
-            <button onclick="setBasraWinScore(120)" id="basraWinBtn120" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">120</button>
+            <button onclick="setBasraWinScore(120)" id="basraWinBtn120" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">120</button>
             <button onclick="setBasraWinScore(180)" id="basraWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraWinScore(220)" id="basraWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
@@ -653,7 +653,7 @@
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraAIWinScore(40)"  id="basraAIWinBtn40"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40</button>
             <button onclick="setBasraAIWinScore(80)"  id="basraAIWinBtn80"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">80</button>
-            <button onclick="setBasraAIWinScore(120)" id="basraAIWinBtn120" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">120</button>
+            <button onclick="setBasraAIWinScore(120)" id="basraAIWinBtn120" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">120</button>
             <button onclick="setBasraAIWinScore(180)" id="basraAIWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraAIWinScore(220)" id="basraAIWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
@@ -694,7 +694,7 @@
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraWinScore(40)"  id="basraWinBtn40"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40</button>
             <button onclick="setBasraWinScore(80)"  id="basraWinBtn80"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">80</button>
-            <button onclick="setBasraWinScore(120)" id="basraWinBtn120" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">120</button>
+            <button onclick="setBasraWinScore(120)" id="basraWinBtn120" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">120</button>
             <button onclick="setBasraWinScore(180)" id="basraWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraWinScore(220)" id="basraWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
@@ -4319,6 +4319,7 @@ let basraPlayPhase = 'select'; // 'select' = picking card, 'capture' = picking w
 let basraCommittedCard = null; // card already played to table, waiting for capture selection
 
 function showBasraCreate() {
+    setBasraWinScore(selectedBasraWinScore || 120);
     if (!basraAccessVerified) { basraAccessVerified=true; showMenu('menuBasraCreate'); }
     else showMenu('menuBasraCreate');
 }
@@ -5309,6 +5310,7 @@ function selectBasraCount(n) {
 
 
 function showBasraCreate() {
+    setBasraWinScore(selectedBasraWinScore || 120);
     if (!basraAccessVerified) { basraAccessVerified=true; showMenu('menuBasraCreate'); }
     else showMenu('menuBasraCreate');
 }
