@@ -401,7 +401,7 @@ app.get('/api/admin/users', async (req, res) => {
 
         const rows = sorted.map((u, i) => {
             const isOnline = connectedUsernames.has(u.username);
-            const lastSeen = u.lastSeenTs ? new Date(u.lastSeenTs).toLocaleString('he-IL') : '—';
+            const lastSeen = u.lastSeenTs ? new Date(u.lastSeenTs).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '—';
             const roomInfo = userRoomMap[u.username] || '—';
             return `
             <tr style="border-bottom:1px solid #333">
