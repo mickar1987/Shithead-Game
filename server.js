@@ -2165,6 +2165,69 @@ function basraBotMove(room) {
         bestCapture = [];
     }
 
+    // ══ HARD RULES — override any scoring ══
+
+    // RULE A: NEVER throw J or 7d to empty table unless it's the ONLY card in hand
+    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') &&
+        bestCapture.length === 0 && tableCards.length === 0 && handSize > 1) {
+        // Find best non-J/7d throw
+        const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+        if (safeCards.length > 0) {
+            // Pick Q/K first, then lowest value
+            const priority = c => {
+                const r = c.slice(0,-1);
+                if (r==='Q'||r==='K') return 1;
+                if (r==='A') return 2;
+                const v = {'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10;
+                return v;
+            };
+            safeCards.sort((a,b) => priority(a) - priority(b));
+            bestCard = safeCards[0];
+            bestCapture = [];
+        }
+    }
+
+    // RULE B: J/7d capture only if 3+ cards on table, OR last 2 cards in hand, OR it's a BASRA
+    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') &&
+        bestCapture.length > 0 && bestCapture.length < tableCards.length) {
+        // Non-basra J/7d capture — check table size
+        if (tableCards.length < 3 && handSize > 2) {
+            // Find alternative capture with non-J/7d card
+            let altCard = null, altCapture = [], altScore = -1;
+            bot.hand.forEach(c => {
+                if (c.slice(0,-1) === 'J' || c === '7d') return;
+                const caps = basraBotFindCaptures(c, tableCards);
+                if (caps.length > 0) {
+                    const used = new Set(), combined = [];
+                    caps.sort((a,b)=>b.length-a.length).forEach(grp => {
+                        if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+                    });
+                    if (combined.length > altScore) { altScore = combined.length; altCard = c; altCapture = combined; }
+                }
+            });
+            if (altCard) { bestCard = altCard; bestCapture = altCapture; }
+            else {
+                // No alternative capture — throw safe card instead
+                const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+                if (safeCards.length > 0) {
+                    const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+                    safeCards.sort((a,b) => priority(a)-priority(b));
+                    bestCard = safeCards[0]; bestCapture = [];
+                }
+            }
+        }
+    }
+
+    // RULE C: If bot has J and 7d, prefer throwing J first (7d will capture it for basra)
+    if (bestCard.slice(0,-1) === '7d' && bestCapture.length === 0 &&
+        bot.hand.some(c => c.slice(0,-1) === 'J')) {
+        // We're about to throw 7d — better to throw J instead
+        const jackCard = bot.hand.find(c => c.slice(0,-1) === 'J');
+        if (jackCard && tableCards.length === 0) {
+            bestCard = jackCard; bestCapture = [];
+        }
+    }
+
     // Phase 1: commit card (show it to human player)
     bot.hand.splice(bot.hand.indexOf(bestCard), 1);
     room.committedCard = bestCard;
