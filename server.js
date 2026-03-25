@@ -2044,14 +2044,23 @@ function basraBotMove(room) {
     let bestCard = null, bestCapture = [], bestScore = -1;
     const tableCards = room.tableCards;
     const handSize = bot.hand.length;
+    const botCaptured = room.slots[1].captured.length;
+    const humanCaptured = room.slots[0].captured.length;
+    const conservativeMode = botCaptured >= 27; // already has majority — focus on basra only
+
+    // Rule 1: If bot has J and 7d, prefer J as throw (7d can then capture J for basra)
+    // So when evaluating 7d captures: bonus if J is on table (we put J there last turn)
+    // When evaluating J captures: if 7d also in hand and table has cards, prefer throwing J
+    const hasJ = bot.hand.some(c => c.slice(0,-1) === 'J');
+    const has7d = bot.hand.includes('7d');
 
     bot.hand.forEach(card => {
         const rank = card.slice(0,-1);
         const is7d = card === '7d';
+        const isJack = rank === 'J';
         const caps = basraBotFindCaptures(card, tableCards);
 
         if (caps.length > 0) {
-            // Greedily combine non-overlapping groups to maximize capture
             const used = new Set();
             const combined = [];
             const sorted = [...caps].sort((a,b)=>b.length-a.length);
@@ -2062,34 +2071,46 @@ function basraBotMove(room) {
                 }
             }
             const isBasra = combined.length === tableCards.length && tableCards.length > 0;
-            const isJackCard = rank === 'J' || is7d;
+            const isJackCard = isJack || is7d;
 
             let score = 0;
-            // Base: ALWAYS prefer capturing over throwing (unless J/7d on few cards)
-            score += 200; // floor: any capture beats any throw
+            score += 200; // floor: any capture beats throw
             score += combined.length * 15;
-            // Basra bonus
             if (isBasra) score += 600;
-            // J/7d with few cards: penalize (don't waste on 1 card unless basra)
+
+            // Rule 1: If J + 7d both in hand, DON'T use 7d to capture now
+            // Save 7d to capture after J is thrown to table
+            if (is7d && hasJ && !isBasra && tableCards.length > 0) {
+                score -= 500; // strongly prefer to wait
+            }
+
+            // Rule 2: J/7d minimum threshold
             if (isJackCard && !isBasra) {
-                // Don't use J/7d on fewer than 3 cards unless it's our last card
                 const handSizeAfter = handSize - 1;
-                if (tableCards.length < 3 && handSizeAfter > 0) {
-                    score -= 300; // strong penalty — save for more cards
+                const minCards = 3;
+                if (tableCards.length < minCards) {
+                    if (handSizeAfter <= 1) {
+                        // Last 2 cards — J burn risk, use it
+                        score -= 50;
+                    } else {
+                        score -= 400; // too few cards on table
+                    }
                 } else {
-                    score -= (4 - tableCards.length) * 20;
+                    score -= (4 - tableCards.length) * 10;
                 }
             }
-            // Bonus: capturing dangerous (high-threat) cards from table
+
+            // Rule 3: Conservative mode — only care about basra, not card count
+            if (conservativeMode && !isBasra) {
+                score -= 100; // deprioritize non-basra captures
+            }
+
             combined.forEach(idx => {
-                const tc = tableCards[idx];
-                const tcRank = tc.slice(0,-1);
-                if (['8','9','10'].includes(tcRank)) score += 20; // capturing good cards
+                const tcRank = tableCards[idx]?.slice(0,-1);
+                if (['8','9','10'].includes(tcRank)) score += 20;
             });
-            // Bonus: after capture, what remains? Penalize leaving basra opportunities
             const remaining = tableCards.filter((_,i)=>!combined.includes(i));
-            if (remaining.length === 1) score -= 40; // leaving 1 card = opponent basra risk
-            if (remaining.length === 0 && !isBasra) score += 10; // clear table without basra is still ok
+            if (remaining.length === 1) score -= 40;
 
             if (score > bestScore) { bestScore = score; bestCard = card; bestCapture = combined; }
         }
@@ -2125,7 +2146,16 @@ function basraBotMove(room) {
     });
     throwScores.sort((a,b) => a.throwScore - b.throwScore);
     const noJack = throwScores.filter(t => t.card.slice(0,-1)!=='J' && t.card!=='7d');
-    const bestThrow = noJack[0] || throwScores[0];
+    // Special: if 7d in hand and J in hand, throw J to empty table so 7d gets basra
+    const has7dNow = bot.hand.includes('7d');
+    const jackInHand = bot.hand.find(c => c.slice(0,-1)==='J');
+    const jackThrowOption = throwScores.find(t => t.card.slice(0,-1)==='J');
+    let bestThrow;
+    if (has7dNow && jackInHand && jackThrowOption && tableCards.length === 0 && noJack.length > 0) {
+        bestThrow = jackThrowOption; // throw J to empty table → 7d basra next turn
+    } else {
+        bestThrow = noJack[0] || throwScores[0];
+    }
     // Throw score converted to capture-scale: negative throwScore = good throw
     const throwValue = -bestThrow.throwScore;
 
@@ -2528,9 +2558,18 @@ function registerBasraHandlers(socket) {
             replacement = room.deck.shift();
         }
 
-        // Remove special from table, send to end of deck
+        // Remove special from table, insert into deck so dealer gets it last
         if (tableIdx !== -1) room.tableCards.splice(tableIdx, 1);
-        room.deck.push(specialCard);
+        const n = room.slots.length;
+        const dealerSlot = (room.currentPlayer - 1 + n) % n;
+        // Dealer's last card position in next deal = dealerSlot + 3*n (0-indexed)
+        // But only if deck has enough cards; otherwise just push to end
+        const insertPos = dealerSlot + 3 * n;
+        if (insertPos < room.deck.length) {
+            room.deck.splice(insertPos, 0, specialCard);
+        } else {
+            room.deck.push(specialCard);
+        }
 
         // Add replacement to table
         if (replacement) {
