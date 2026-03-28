@@ -1745,6 +1745,7 @@ function basraStateForPlayer(room, slotIdx) {
         basraCards: room.slots.map(s => (s.basraCards || []).map(b => typeof b === 'string' ? b : b.card)),
         teams: room.teams || null,
         roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+        winScore: room.winScore || 120,
         roundOver: room.roundOver,
         gameOver: room.gameOver,
         lastCapturer: room.lastCapturer,
@@ -1845,6 +1846,7 @@ function basraAdvanceTurn(room) {
                 pendingMajority: room.pendingMajorityPoints,
                 teams: room.teams || null,
                 roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+        winScore: room.winScore || 120,
                 cardCounts: room.slots.map(s => s.captured.length),
             });
             const winThreshold = room.winScore || 120;
@@ -1878,7 +1880,17 @@ function basraAdvanceTurn(room) {
                         room.gameOver = true;
                         const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
                         const winnerSlotIdx = room.slots.indexOf(sorted[0]);
-                        basraBroadcast(room, 'basraGameOver', { names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0) });
+                        // Send slotIndices so client can identify themselves correctly
+                        room.slots.forEach((sl, i) => {
+                            if (sl.socketId) {
+                                io.to(sl.socketId).emit('basraGameOver', {
+                                    names: sorted.map(s=>s.name),
+                                    scores: sorted.map(s=>s.score||0),
+                                    mySlot: i,
+                                    slotOrder: sorted.map(s=>room.slots.indexOf(s))
+                                });
+                            }
+                        });
                         setTimeout(() => settleBasraCoins(room, winnerSlotIdx).catch(e => console.error('[basra coins]', e.message)), 300);
                     } else {
                         basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
@@ -1933,6 +1945,7 @@ function basraAdvanceTurn(room) {
                     forfeitName: p.name,
                     teams: room.teams || null,
         roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+        winScore: room.winScore || 120,
                     teamScores: room.teams ? room.teams.map(t => room.slots[t[0]].score || 0) : null,
                 });
                 basraEmitAll(room);
@@ -2622,14 +2635,15 @@ function registerBasraHandlers(socket) {
             replacement = room.deck.shift();
         }
 
-        // Remove special from table, insert into deck so dealer gets it last
+        // Remove special from table, insert at end of deck so dealer gets it last
         if (tableIdx !== -1) room.tableCards.splice(tableIdx, 1);
         const n = room.slots.length;
         const dealerSlot = (room.currentPlayer - 1 + n) % n;
-        // Dealer's last card position in next deal = dealerSlot + 3*n (0-indexed)
-        // But only if deck has enough cards; otherwise just push to end
-        const insertPos = dealerSlot + 3 * n;
-        if (insertPos < room.deck.length) {
+        // In round-robin deal, dealer gets cards at positions: dealerSlot, dealerSlot+n, ...
+        // Last card to dealer in final deal = deck.length - n + dealerSlot
+        // This ensures J arrives to dealer as their last card in the last deal cycle
+        const insertPos = room.deck.length - n + dealerSlot;
+        if (insertPos >= 0 && insertPos <= room.deck.length) {
             room.deck.splice(insertPos, 0, specialCard);
         } else {
             room.deck.push(specialCard);
