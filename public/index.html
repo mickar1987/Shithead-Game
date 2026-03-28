@@ -549,7 +549,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.115</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.118</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3444,6 +3444,9 @@ if (!onlineMode) return; // already left to menu
         if (pendingMajority>0) html+=`<div style="font-size:11px;color:rgba(255,200,50,0.5);">⏳ ${pendingMajority} נק' רוב עברו לסיבוב הבא</div>`;
         html+='</div>';
         scoresEl.innerHTML=html;
+        // Show win score target
+        const winScoreTarget = (basraState && basraState.winScore) ? basraState.winScore : '—';
+        scoresEl.innerHTML += `<div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:8px;letter-spacing:1px;">יעד: ${winScoreTarget} נקודות</div>`;
         let _countdown = 7;
         btnsEl.innerHTML=`<div id="basraNextCountdown" style="font-size:13px;color:rgba(255,255,255,0.5);">סיבוב הבא בעוד ${_countdown}...</div>`;
         if (window._basraRoundTimer) clearInterval(window._basraRoundTimer);
@@ -3489,7 +3492,9 @@ if (!onlineMode) return; // already left to menu
         }
     });
 
-    socket.on('basraGameOver', ({names, scores, forfeitBy, forfeitName, teams, teamScores}) => {
+    socket.on('basraGameOver', ({names, scores, forfeitBy, forfeitName, teams, teamScores, mySlot, slotOrder}) => {
+        // Update basraMySlot if server sent corrected slot info
+        if (mySlot !== undefined) basraMySlot = mySlot;
         // Cancel round countdown if running
         if (window._basraRoundTimer) { clearInterval(window._basraRoundTimer); window._basraRoundTimer = null; }
         const overlay=document.getElementById('basraResultOverlay');
@@ -3501,8 +3506,17 @@ if (!onlineMode) return; // already left to menu
             html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:12px;">${forfeitName} עזב/פסל עצמו</div>`;
         } else if (!teams) {
             // 2p: determine winner
-            const winnerIdx = scores[0] >= scores[1] ? 0 : 1;
-            const iWon = winnerIdx === basraMySlot;
+            // slotOrder[i] = original slot index of position i in sorted list
+            // Find where my slot appears in slotOrder
+            let myPositionInSorted;
+            if (slotOrder) {
+                myPositionInSorted = slotOrder.indexOf(basraMySlot);
+            } else {
+                // Fallback: highest score wins
+                myPositionInSorted = scores[0] >= scores[1] ? 0 : 1;
+                if (basraMySlot === 1) myPositionInSorted = scores[1] > scores[0] ? 0 : 1;
+            }
+            const iWon = myPositionInSorted === 0; // position 0 = winner (sorted descending)
             html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon ? '🏆 ניצחת!' : '😞 הפסדת'}</div>`;
             if (iWon) basraFireworks();
         } else {
@@ -5783,7 +5797,7 @@ function basraRender(state) {
     if (state.teams) {
         // 4p: show team scores
         const tScores = state.teams.map(team =>
-            team.reduce((sum, idx) => sum + (state.scores[idx]||0), 0));
+            state.scores[team[0]]||0); // both members have same score, use first
         const tNames = state.teams.map((team, ti) =>
             team.map(idx => state.playerNames[idx].split(' ')[0]).join('+'));
         document.getElementById('basraScoreBar').textContent =
