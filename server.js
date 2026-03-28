@@ -2179,6 +2179,31 @@ function basraBotMove(room) {
     }
 
     // ══ HARD RULES — override any scoring ══
+    console.log(`[BOT] hand=${bot.hand.join(',')} table=${tableCards.join(',')} bestCard=${bestCard} bestCapture=${JSON.stringify(bestCapture)} score=${bestScore}`);
+
+    // RULE 0: If a regular card can make basra, ALWAYS prefer it over J/7d
+    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') && bestCapture.length > 0) {
+        const isJBasra = bestCapture.length === tableCards.length && tableCards.length > 0;
+        if (isJBasra) {
+            // Check if any non-J/7d card can also make basra
+            let regularBasraCard = null, regularBasraCapture = [];
+            bot.hand.forEach(c => {
+                if (c.slice(0,-1) === 'J' || c === '7d') return;
+                const caps = basraBotFindCaptures(c, tableCards);
+                const used = new Set(), combined = [];
+                caps.sort((a,b)=>b.length-a.length).forEach(grp => {
+                    if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+                });
+                if (combined.length === tableCards.length) { // basra!
+                    regularBasraCard = c; regularBasraCapture = combined;
+                }
+            });
+            if (regularBasraCard) {
+                console.log(`[BOT] RULE0: preferring ${regularBasraCard} basra over J/7d`);
+                bestCard = regularBasraCard; bestCapture = regularBasraCapture;
+            }
+        }
+    }
 
     // RULE A: NEVER throw J or 7d to empty table unless it's the ONLY card in hand
     if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') &&
