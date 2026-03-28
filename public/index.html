@@ -496,6 +496,34 @@
         .card-special-10 { border-color: rgba(252,129,74,0.7)  !important; }
         .card-special-7  { border-color: rgba(154,211,73,0.7)  !important; }
         .card-special-8  { border-color: rgba(214,158,46,0.7)  !important; }
+        /* ── BASRA CHAT ── */
+        .basra-chat-btn {
+            position:absolute; top:6px; left:6px;
+            background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+            border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; z-index:10;
+        }
+        .basra-chat-panel {
+            position:fixed; bottom:200px; left:50%; transform:translateX(-50%);
+            background:rgba(10,40,20,0.97); border:1px solid rgba(240,192,64,0.3);
+            border-radius:12px; padding:10px; z-index:9999;
+            display:none; flex-direction:column; gap:6px; min-width:240px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.6);
+        }
+        .basra-chat-panel.open { display:flex; }
+        .basra-chat-emojis { display:flex; gap:8px; justify-content:center; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.1); }
+        .basra-chat-emojis span { font-size:22px; cursor:pointer; }
+        .basra-chat-msg { font-size:13px; color:rgba(255,255,255,0.85); padding:6px 10px; border-radius:6px; cursor:pointer; text-align:right; }
+        .basra-chat-msg:active { background:rgba(240,192,64,0.2); }
+        .basra-bubble {
+            position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+            background:rgba(10,40,20,0.95); border:1px solid rgba(240,192,64,0.5);
+            border-radius:10px; padding:5px 10px; font-size:13px; color:white;
+            z-index:200; pointer-events:none; white-space:nowrap; max-width:180px;
+            white-space:normal; text-align:center;
+            animation:bubblePop 0.2s ease-out;
+        }
+        @keyframes bubblePop { from{opacity:0;transform:translateX(-50%) scale(0.7)} to{opacity:1;transform:translateX(-50%) scale(1)} }
     </style>
 </head>
 <body>
@@ -549,7 +577,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.120</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.121</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3576,6 +3604,10 @@ if (!onlineMode) return; // already left to menu
         }
     }
 
+    socket.on('basraChat', ({ slotIdx, msg }) => {
+        basraShowBubble(slotIdx, msg);
+    });
+
     socket.on('coinsResult', (results) => {
         // Basra: if overlay visible apply now, else store pending
         const basraOverlay = document.getElementById('basraResultOverlay');
@@ -5678,6 +5710,52 @@ function basraDealAnimation(dealerIdx, cardCount, tableCount) {
     }, t + SPEED + 500);
 }
 
+function basraToggleChat() {
+    // Only in real multiplayer (not vs AI)
+    if (!socket || !basraRoomCode) return;
+    const panel = document.getElementById('basraChatPanel');
+    panel.classList.toggle('open');
+    // Close on outside click
+    if (panel.classList.contains('open')) {
+        setTimeout(() => {
+            document.addEventListener('click', function closeChatPanel(e) {
+                if (!panel.contains(e.target) && !e.target.classList.contains('basra-chat-btn')) {
+                    panel.classList.remove('open');
+                    document.removeEventListener('click', closeChatPanel);
+                }
+            });
+        }, 10);
+    }
+}
+
+function basraSendChat(msg) {
+    document.getElementById('basraChatPanel').classList.remove('open');
+    if (!socket) return;
+    socket.emit('basraChat', { msg });
+    // Show own bubble immediately
+    basraShowBubble(basraMySlot, msg);
+}
+
+function basraShowBubble(slotIdx, msg) {
+    // Find the area element for this slot
+    const mySlot = basraMySlot;
+    let areaId;
+    if (slotIdx === mySlot) areaId = 'basraPlayerArea';
+    else if (window._basraSlotAreaMap) areaId = window._basraSlotAreaMap[slotIdx];
+    else areaId = 'basraOpponentArea';
+    const area = document.getElementById(areaId);
+    if (!area) return;
+    // Remove existing bubble
+    const existing = area.querySelector('.basra-bubble');
+    if (existing) existing.remove();
+    const bubble = document.createElement('div');
+    bubble.className = 'basra-bubble';
+    bubble.textContent = msg;
+    area.style.position = 'relative';
+    area.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 3000);
+}
+
 function basraFireworks() {
     const colors = ['#ff0','#f80','#f0f','#0ff','#0f0','#ff6600','#fff'];
     const container = document.createElement('div');
@@ -6121,7 +6199,8 @@ function basraCancelSelection() {
     </div>
 
     <!-- Player area (bottom) -->
-    <div id="basraPlayerArea" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:fit-content;min-width:300px;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px);padding-top:8px;background:linear-gradient(transparent, rgba(0,0,0,0.6) 30%);z-index:501;padding-left:10px;padding-right:10px;border-radius:12px 12px 0 0;">
+    <div id="basraPlayerArea" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:fit-content;min-width:300px;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px);padding-top:8px;background:linear-gradient(transparent, rgba(0,0,0,0.6) 30%);z-index:501;padding-left:10px;padding-right:10px;border-radius:12px 12px 0 0;position:relative;">
+        <button class="basra-chat-btn" id="basraChatToggleBtn" onclick="basraToggleChat()" style="position:absolute;top:8px;left:8px;">💬</button>
         <div id="basraMyInfo" style="font-size:11px;color:rgba(255,200,50,0.6);"></div>
         <div style="display:flex;align-items:flex-end;gap:10px;justify-content:center;width:100%;">
             <div id="basraMyHand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;flex:1;"></div>
@@ -6154,5 +6233,24 @@ function basraCancelSelection() {
     <div id="basraRoundBtns" style="display:flex;flex-direction:column;gap:10px;align-items:center;"></div>
 </div>
 
+
+    <!-- Basra Chat Panel -->
+    <div class="basra-chat-panel" id="basraChatPanel">
+        <div class="basra-chat-emojis">
+            <span onclick="basraSendChat('👍')">👍</span>
+            <span onclick="basraSendChat('😂')">😂</span>
+            <span onclick="basraSendChat('😮')">😮</span>
+            <span onclick="basraSendChat('🔥')">🔥</span>
+            <span onclick="basraSendChat('👌')">👌</span>
+            <span onclick="basraSendChat('🫶')">🫶</span>
+        </div>
+        <div class="basra-chat-msg" onclick="basraSendChat('🎉 כל הכבוד!')">🎉 כל הכבוד!</div>
+        <div class="basra-chat-msg" onclick="basraSendChat('⚡ בסרה!')">⚡ בסרה!</div>
+        <div class="basra-chat-msg" onclick="basraSendChat('💪 אדיר..!!')">💪 אדיר..!!</div>
+        <div class="basra-chat-msg" onclick="basraSendChat('🚪 צא..!!')">🚪 צא..!!</div>
+        <div class="basra-chat-msg" onclick="basraSendChat('⚠️ אל תסכן..')">⚠️ אל תסכן..</div>
+        <div class="basra-chat-msg" onclick="basraSendChat('🙌 תרים..')">🙌 תרים..</div>
+        <div class="basra-chat-msg" onclick="basraSendChat('🤝 טוב שותף..!!')">🤝 טוב שותף..!!</div>
+    </div>
 </body>
 </html>
