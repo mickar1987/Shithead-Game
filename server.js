@@ -2763,6 +2763,16 @@ function registerBasraHandlers(socket) {
         }
     });
 
+    socket.on('basraChat', ({ msg }) => {
+        const code = socket.data.basraRoom;
+        const slotIdx = socket.data.basraSlot;
+        const room = basraRooms[code];
+        if (!room || !msg) return;
+        // Sanitize: max 40 chars, strip HTML
+        const clean = String(msg).replace(/<[^>]*>/g,'').slice(0, 40);
+        basraBroadcast(room, 'basraChat', { slotIdx, msg: clean });
+    });
+
     socket.on('basraLeave', () => {
         const code = socket.data.basraRoom;
         if (code && basraRooms[code]) {
