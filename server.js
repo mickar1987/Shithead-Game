@@ -112,7 +112,7 @@ function buildDisplayName(first, last) {
 // ══════════════════════════════════════════════
 //  MONGODB
 // ══════════════════════════════════════════════
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://shithead_user:Mickar87@cluster0.kiznwpz.mongodb.net/?appName=Cluster0&tls=true&tlsAllowInvalidCertificates=false';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://shithead_user:Mickar87@shithead.rxbmlst.mongodb.net/?appName=Shithead&retryWrites=true&w=majority';
 const mongoClient = new MongoClient(MONGO_URI, {
     tls: true,
     tlsAllowInvalidCertificates: false,
@@ -367,7 +367,13 @@ app.get('/api/admin/users', async (req, res) => {
     try {
         const key = req.query.key;
         if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
-        const allUsers = await usersCol.find({}, { projection: { pinHash: 0, token: 0 } }).toArray();
+        // Use memory fallback if MongoDB unavailable
+        let allUsers;
+        if (usersCol && mongoOk) {
+            allUsers = await usersCol.find({}, { projection: { pinHash: 0, token: 0 } }).toArray();
+        } else {
+            allUsers = Object.values(memUsers).map(u => { const {pinHash, token, ...rest} = u; return rest; });
+        }
         const sorted = allUsers.sort((a, b) => (b.coins || 0) - (a.coins || 0));
 
         // Build connected users set from all sources
