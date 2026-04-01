@@ -340,6 +340,13 @@ app.get('/health', (req, res) => {
 });
 
 // Self-ping every 4 minutes to prevent Render free tier sleep
+process.on('uncaughtException', (err) => {
+    console.error('[UNCAUGHT]', err.message, err.stack?.split('\n')[1]);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[UNHANDLED]', reason);
+});
+
 const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'https://shithead-game-xl4r.onrender.com';
 setInterval(async () => {
     try {
@@ -2333,7 +2340,7 @@ function basraBotMove(room) {
     basraEmitAll(room);
 
     // Phase 2: after 1.8s, show capture selection highlight, then play
-    setTimeout(() => {
+    setTimeout(() => { try {
         if (room.gameOver || room.roundOver) return;
         // Re-evaluate captures with current table state (table may have changed)
         let currentCapture = bestCapture;
@@ -2359,7 +2366,7 @@ function basraBotMove(room) {
             });
         }
         // Phase 3: after another 1s, execute the play
-        setTimeout(() => {
+        setTimeout(() => { try {
             if (room.gameOver || room.roundOver) return;
             const result = basra.playCard(room, 1, bestCard, currentCapture, true);
             if (result.ok) {
@@ -2381,7 +2388,9 @@ function basraBotMove(room) {
                 basraEmitAll(room);
                 setTimeout(() => basraAdvanceTurn(room), 300);
             }
+        } catch(e2) { console.error('[BOT phase3]', e2.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
         }, 1000);
+    } catch(e) { console.error('[BOT phase2]', e.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
     }, 1000);
     } catch(e) {
         console.error('[BOT] crash prevented:', e.message);
