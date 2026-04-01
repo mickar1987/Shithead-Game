@@ -2286,6 +2286,23 @@ function basraBotMove(room) {
         }
     }
 
+    // SAFETY: if somehow bestCard is still null or invalid, pick first card
+    if (!bestCard || !bot.hand.includes(bestCard)) {
+        const safeFirst = bot.hand.find(c => c.slice(0,-1)!=='J' && c!=='7d') || bot.hand[0];
+        bestCard = safeFirst; bestCapture = [];
+    }
+
+    // SAFETY: if bestCard is J/7d with no capture and there are safe alternatives, throw safe card
+    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') && bestCapture.length === 0 && bot.hand.length > 1) {
+        const safeAlt = bot.hand.find(c => c.slice(0,-1)!=='J' && c!=='7d');
+        if (safeAlt) {
+            const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+            const safeCards = bot.hand.filter(c => c.slice(0,-1)!=='J' && c!=='7d');
+            safeCards.sort((a,b) => priority(a)-priority(b));
+            bestCard = safeCards[0]; bestCapture = [];
+        }
+    }
+
     // Phase 1: commit card (show it to human player)
     bot.hand.splice(bot.hand.indexOf(bestCard), 1);
     room.committedCard = bestCard;
