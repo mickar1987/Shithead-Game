@@ -347,17 +347,7 @@ process.on('unhandledRejection', (reason) => {
     console.error('[UNHANDLED]', reason);
 });
 
-const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'https://shithead-game-xl4r.onrender.com';
-setInterval(async () => {
-    try {
-        const https = require('https');
-        https.get(SELF_URL + '/health', (res) => {
-            console.log('[keepalive] ping ok:', res.statusCode);
-        }).on('error', (e) => {
-            console.warn('[keepalive] ping failed:', e.message);
-        });
-    } catch(e) {}
-}, 4 * 60 * 1000);
+// keepalive moved to after server.listen
 
 app.get('/api/admin/set-coins', async (req, res) => {
     try {
