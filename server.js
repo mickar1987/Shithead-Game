@@ -2235,11 +2235,20 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE B: J/7d capture only if 3+ cards on table, OR last 2 cards in hand, OR basra
+    // RULE B: J/7d capture only if:
+    //   - 3+ cards on table, OR
+    //   - ≤2 cards left in hand (burn risk), OR
+    //   - basra with 3+ cards on table, OR
+    //   - 7d basra (always allowed regardless of count)
     const _isBasraCapture = bestCapture.length === tableCards.length && tableCards.length > 0;
-    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') &&
-        bestCapture.length > 0 && !_isBasraCapture) {
-        // Not a basra — need 3+ cards on table (except when burn risk)
+    const _is7d = bestCard === '7d';
+    const _isJ = bestCard.slice(0,-1) === 'J';
+    // 7d basra: always allowed (7d is special)
+    // J basra with <3 cards: only if ≤2 cards in hand
+    const _jackBasraOnFewCards = _isJ && _isBasraCapture && tableCards.length < 3 && handSize > 2;
+    if ((_isJ || _is7d) && bestCapture.length > 0 &&
+        (!_isBasraCapture || _jackBasraOnFewCards)) {
+        // Need 3+ cards on table (except burn risk)
         if (tableCards.length < 3 && handSize > 2) {
             // Find alternative capture with non-J/7d card
             let altCard = null, altCapture = [], altScore = -1;
