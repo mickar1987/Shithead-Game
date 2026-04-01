@@ -2863,8 +2863,7 @@ const PORT = process.env.PORT || 3000;
 // Start server only after MongoDB is ready
 connectMongo().then(connected => {
     if (!connected) {
-        console.error('[fatal] Could not connect to MongoDB. Exiting.');
-        process.exit(1);
+        console.warn('[mongo] Running without MongoDB — using in-memory fallback');
     }
     server.listen(PORT, () => {
         console.log(`🃏 Shithead server running on port ${PORT} ✅`);
