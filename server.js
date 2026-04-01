@@ -339,6 +339,19 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Self-ping every 4 minutes to prevent Render free tier sleep
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'https://shithead-game-xl4r.onrender.com';
+setInterval(async () => {
+    try {
+        const https = require('https');
+        https.get(SELF_URL + '/health', (res) => {
+            console.log('[keepalive] ping ok:', res.statusCode);
+        }).on('error', (e) => {
+            console.warn('[keepalive] ping failed:', e.message);
+        });
+    } catch(e) {}
+}, 4 * 60 * 1000);
+
 app.get('/api/admin/set-coins', async (req, res) => {
     try {
         const { key, u, coins } = req.query;
