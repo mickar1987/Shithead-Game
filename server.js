@@ -128,7 +128,7 @@ async function connectMongo(retries = 5) {
             const db = mongoClient.db('shithead');
             usersCol = db.collection('users');
             await usersCol.createIndex({ username: 1 }, { unique: true });
-            console.log('[mongo] Connected to MongoDB Atlas ✅');
+            console.log('[mongo] Connected to MongoDB Atlas ✅'); mongoOk = true;
             return true;
         } catch(e) {
             console.error(`[mongo] Connection attempt ${i+1} failed: ${e.message}`);
@@ -139,30 +139,34 @@ async function connectMongo(retries = 5) {
     return false;
 }
 
+// In-memory fallback when MongoDB is unavailable
+const memUsers = {};
+let mongoOk = false;
+
 async function getUser(username) {
-    if (!usersCol) return null;
-    return usersCol.findOne({ username });
+    if (usersCol && mongoOk) {
+        try { return await usersCol.findOne({ username }); } catch(e) { mongoOk = false; }
+    }
+    return memUsers[username] || null;
 }
 
 async function saveUser(username, data) {
-    if (!usersCol) { console.error('[saveUser] no DB connection!'); return; }
-    const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
-    console.log(`[saveUser] ${username} fields=${Object.keys(data).join(',')} matched=${result.matchedCount}`);
+    // Always update in-memory
+    memUsers[username] = Object.assign(memUsers[username] || { username }, data);
+    if (usersCol && mongoOk) {
+        try {
+            const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
+            console.log(`[saveUser] ${username} fields=${Object.keys(data).join(',')} matched=${result.matchedCount}`);
+        } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error, using memory fallback'); }
+    }
 }
 
 async function updateCoins(username, delta) {
-    if (!usersCol) return null;
-    const result = await usersCol.findOneAndUpdate(
-        { username },
-        { $inc: { coins: delta } },
-        { returnDocument: 'after' }
-    );
-    // Ensure coins don't go below 0
-    if (result && result.coins < 0) {
-        await usersCol.updateOne({ username }, { $set: { coins: 0 } });
-        result.coins = 0;
-    }
-    return result;
+    const user = await getUser(username);
+    if (!user) return null;
+    const newCoins = Math.max(0, (user.coins || 0) + delta);
+    await saveUser(username, { coins: newCoins });
+    return { ...user, coins: newCoins };
 }
 
 const app = express();
