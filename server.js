@@ -2379,7 +2379,7 @@ function basraBotMove(room) {
         } catch(e2) { console.error('[BOT phase3]', e2.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
         }, 1000);
     } catch(e) { console.error('[BOT phase2]', e.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
-    }, 1000);
+    }, 900);
     } catch(e) {
         console.error('[BOT] crash prevented:', e.message);
         room.committedCard = null;
