@@ -2316,7 +2316,17 @@ function basraBotMove(room) {
         }
     }
 
+    // Final validation
+    const bestCardIdx = bot.hand.indexOf(bestCard);
+    if (bestCardIdx === -1) {
+        console.error('[BOT] bestCard not in hand:', bestCard, bot.hand);
+        bestCard = bot.hand[0];
+        bestCapture = [];
+        if (!bestCard) { console.error('[BOT] empty hand, skipping'); return; }
+    }
+
     // Phase 1: commit card (show it to human player)
+    try {
     bot.hand.splice(bot.hand.indexOf(bestCard), 1);
     room.committedCard = bestCard;
     room.committedBy = 1;
@@ -2373,6 +2383,13 @@ function basraBotMove(room) {
             }
         }, 1000);
     }, 1000);
+    } catch(e) {
+        console.error('[BOT] crash prevented:', e.message);
+        room.committedCard = null;
+        room.committedBy = null;
+        basraEmitAll(room);
+        setTimeout(() => basraAdvanceTurn(room), 500);
+    }
 }
 
 function basraMaybeTriggerBot(room) {
