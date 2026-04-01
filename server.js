@@ -236,7 +236,7 @@ app.post('/api/verify', async (req, res) => {
         const u = await getUser(name);
         console.log(`[verify] user=${name} found=${!!u} tokenMatch=${u?.token === token} dbToken=${u?.token?.slice(0,8)} reqToken=${token?.slice(0,8)}`);
         if (!u || u.token !== token) return res.json({ ok: false });
-        await saveUser(name, { lastSeenTs: Date.now() });
+        saveUser(name, { lastSeenTs: Date.now() }).catch(()=>{}); // non-blocking
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
         res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
     } catch(e) { console.error('[verify error]', e); res.json({ ok: false }); }
@@ -2377,9 +2377,9 @@ function basraBotMove(room) {
                 setTimeout(() => basraAdvanceTurn(room), 300);
             }
         } catch(e2) { console.error('[BOT phase3]', e2.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
-        }, 700);
+        }, 1000);
     } catch(e) { console.error('[BOT phase2]', e.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
-    }, 600);
+    }, 1000);
     } catch(e) {
         console.error('[BOT] crash prevented:', e.message);
         room.committedCard = null;
