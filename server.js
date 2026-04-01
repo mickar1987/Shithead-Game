@@ -2199,7 +2199,6 @@ function basraBotMove(room) {
     }
 
     // ══ HARD RULES — override any scoring ══
-    console.log(`[BOT] hand=${bot.hand.join(',')} table=${tableCards.join(',')} bestCard=${bestCard} bestCapture=${JSON.stringify(bestCapture)} score=${bestScore}`);
 
     // RULE 0: If a regular card can make basra, ALWAYS prefer it over J/7d
     if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') && bestCapture.length > 0) {
@@ -2219,7 +2218,6 @@ function basraBotMove(room) {
                 }
             });
             if (regularBasraCard) {
-                console.log(`[BOT] RULE0: preferring ${regularBasraCard} basra over J/7d`);
                 bestCard = regularBasraCard; bestCapture = regularBasraCapture;
             }
         }
@@ -2379,9 +2377,9 @@ function basraBotMove(room) {
                 setTimeout(() => basraAdvanceTurn(room), 300);
             }
         } catch(e2) { console.error('[BOT phase3]', e2.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
-        }, 1000);
+        }, 700);
     } catch(e) { console.error('[BOT phase2]', e.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
-    }, 1000);
+    }, 600);
     } catch(e) {
         console.error('[BOT] crash prevented:', e.message);
         room.committedCard = null;
@@ -2565,11 +2563,7 @@ function registerBasraHandlers(socket) {
         const slotIdx = socket.data.basraSlot;
         const room = basraRooms[code];
         if (!room || room.gameOver || room.roundOver) return;
-        console.log(`[COMMIT] slotIdx=${slotIdx} currentPlayer=${room.currentPlayer} committedBy=${room.committedBy} committedCard=${room.committedCard} hand=${room.slots[slotIdx]?.hand}`);
-        if (room.currentPlayer !== slotIdx) { 
-            console.log(`[COMMIT] BLOCKED: currentPlayer=${room.currentPlayer} !== slotIdx=${slotIdx}`);
-            socket.emit('basraError', 'לא התורך'); return; 
-        }
+        if (room.currentPlayer !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
         // If bot is mid-move (committedCard by bot), clear it — human reclaimed turn
         if (room.committedCard && room.committedBy !== slotIdx) {
             room.committedCard = null;
@@ -2601,7 +2595,6 @@ function registerBasraHandlers(socket) {
         const slotIdx = socket.data.basraSlot;
         const room = basraRooms[code];
         if (!room || room.gameOver || room.roundOver) return;
-        console.log(`[PLAY] slotIdx=${slotIdx} currentPlayer=${room.currentPlayer} committedBy=${room.committedBy} committedCard=${room.committedCard}`);
         // If bot has stale commit but it's human's turn, clear it
         if (room.isBot && room.committedBy !== slotIdx && room.currentPlayer === slotIdx) {
             room.committedCard = null;
