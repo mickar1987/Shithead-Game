@@ -156,8 +156,7 @@ async function saveUser(username, data) {
     if (usersCol && mongoOk) {
         try {
             const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
-            console.log(`[saveUser] ${username} fields=${Object.keys(data).join(',')} matched=${result.matchedCount}`);
-        } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error, using memory fallback'); }
+                } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error, using memory fallback'); }
     }
 }
 
@@ -234,8 +233,7 @@ app.post('/api/verify', async (req, res) => {
         const { username, token } = req.body;
         const name = username?.trim().toLowerCase();
         const u = await getUser(name);
-        console.log(`[verify] user=${name} found=${!!u} tokenMatch=${u?.token === token} dbToken=${u?.token?.slice(0,8)} reqToken=${token?.slice(0,8)}`);
-        if (!u || u.token !== token) return res.json({ ok: false });
+            if (!u || u.token !== token) return res.json({ ok: false });
         saveUser(name, { lastSeenTs: Date.now() }).catch(()=>{}); // non-blocking
         const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
         res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
@@ -2454,7 +2452,6 @@ function registerBasraHandlers(socket) {
         room.slots[0].username = creatorUsername;
         room.isPublic = !!isPublic;
         room.turnTimer = parseInt(turnTimer) || 0;
-        console.log(`[basra] room created, turnTimer=${room.turnTimer}, raw=${turnTimer}`);
         room.gameStarted = false;
         room.committedCard = null;
         room.committedBy = null;
@@ -2819,11 +2816,9 @@ function registerBasraHandlers(socket) {
         socket.data.basraRoom = code.toUpperCase();
         socket.data.basraSlot = slot.id;
         socket.join('basra_' + code.toUpperCase());
-        console.log(`[RECONNECT] user=${username} slot=${slot.id} currentPlayer=${room.currentPlayer} committedBy=${room.committedBy} committedCard=${room.committedCard}`);
         // If bot is in a stale committed state and it's the human's turn, clear it
         if (room.isBot && room.currentPlayer === slot.id &&
             room.committedCard && room.committedBy !== slot.id) {
-            console.log(`[RECONNECT] clearing stale bot commit`);
             room.committedCard = null;
             room.committedBy = null;
         }
