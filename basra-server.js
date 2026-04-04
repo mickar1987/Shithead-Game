@@ -142,11 +142,12 @@ function isBasra(playedCard, capturedCards, tableCards) {
 function createBasraRoom(code, slots, bet = 0) {
     const deck = shuffle(makeDeck());
 
-    // Deal 4 to table — FORCE 7d for testing
+    // Deal 4 to table — FORCE J and 7d for testing
     let tableCards = [];
-    // Remove 7d from deck and put it first in table
-    const idx7d = deck.indexOf('7d');
-    if (idx7d !== -1) { deck.splice(idx7d, 1); tableCards.push('7d'); }
+    const _7dIdx = deck.indexOf('7d');
+    if (_7dIdx !== -1) { tableCards.push(deck.splice(_7dIdx, 1)[0]); }
+    const _jIdx = deck.findIndex(c => c.slice(0,-1) === 'J');
+    if (_jIdx !== -1) { tableCards.push(deck.splice(_jIdx, 1)[0]); }
     while (tableCards.length < 4) tableCards.push(deck.shift());
     // Track which positions have special cards (replaced after animation)
     const specialReplacements = tableCards
@@ -192,13 +193,11 @@ function createBasraRoom(code, slots, bet = 0) {
 
 function dealNewHands(room) {
     if (room.deck.length === 0) return false;
-    console.log(`[deal] deckLen=${room.deck.length} deck5last=${room.deck.slice(-5).join(',')}`);
-    room.slots.forEach((s, idx) => {
+    room.slots.forEach(s => {
         const count = Math.min(4, room.deck.length);
         for (let i = 0; i < count; i++) {
             if (room.deck.length > 0) s.hand.push(room.deck.shift());
         }
-        console.log(`[deal] slot${idx} last4=${s.hand.slice(-4).join(',')}`);
     });
     return true;
 }
@@ -397,11 +396,13 @@ function scoreRound(room) {
 function resetRound(room) {
     const deck = shuffle(makeDeck());
 
-    // Deal 4 table cards including J/7♦ (replaced after animation)
+    // Deal 4 table cards — FORCE J and 7d for testing
     let tableCards = [];
-    for (let i = 0; i < 4; i++) {
-        tableCards.push(deck.shift());
-    }
+    const _7dIdx2 = deck.indexOf('7d');
+    if (_7dIdx2 !== -1) { tableCards.push(deck.splice(_7dIdx2, 1)[0]); }
+    const _jIdx2 = deck.findIndex(c => c.slice(0,-1) === 'J');
+    if (_jIdx2 !== -1) { tableCards.push(deck.splice(_jIdx2, 1)[0]); }
+    while (tableCards.length < 4) tableCards.push(deck.shift());
     room.specialReplacements = tableCards.filter(c => cardRank(c) === 'J' || is7D(c));
 
     room.deck = deck;
