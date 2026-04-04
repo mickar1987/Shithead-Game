@@ -2282,26 +2282,21 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE C: If bot has J and 7d together — coordinate them
+    // RULE C: If bot has J and 7d together — always play J before 7d
     const _hasJ = bot.hand.some(c => c.slice(0,-1) === 'J');
     const _has7d = bot.hand.includes('7d');
     if (_hasJ && _has7d) {
         const jackCard = bot.hand.find(c => c.slice(0,-1) === 'J');
         const _7dCanBasra = tableCards.length > 0 &&
             basraBotFindCaptures('7d', tableCards).some(g => g.length === tableCards.length);
-        const _jCanBasra = tableCards.length > 0 &&
-            basraBotFindCaptures(jackCard, tableCards).some(g => g.length === tableCards.length);
 
-        if (_7dCanBasra) {
-            // 7d can make basra NOW — use it, save J for later
-            // (don't override if 7d was already chosen as bestCard with basra)
-        } else if (tableCards.length === 0 || !_jCanBasra) {
-            // Table empty or J can't basra — throw J first, 7d captures later
-            if (bestCard !== jackCard) {
-                bestCard = jackCard; bestCapture = [];
-            }
+        if (_7dCanBasra && bestCard === '7d' && bestCapture.length > 0) {
+            // 7d makes basra NOW — correct, use it
+        } else if (bestCard === '7d') {
+            // 7d chosen for anything else — switch to J instead
+            // J thrown to table, next turn 7d captures J (+others) for basra
+            bestCard = jackCard; bestCapture = [];
         }
-        // If J can basra but 7d can't — J was already chosen by scoring
     }
 
     // SAFETY: if somehow bestCard is still null or invalid, pick first card
