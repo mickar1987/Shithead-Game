@@ -1931,7 +1931,6 @@ function basraAdvanceTurn(room) {
         basraClearBasraTimer(room);
         room._timerStarted = Date.now();
         room._timerRemaining = room.turnTimer;
-        console.log(`[basra] starting timer interval, turnTimer=${room.turnTimer}`);
         room._timerInterval = setInterval(() => {
             room._timerRemaining--;
             console.log(`[basra] timerTick remaining=${room._timerRemaining}`);
@@ -2403,6 +2402,8 @@ function basraBotMove(room) {
 
 function basraMaybeTriggerBot(room) {
     if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver && !room._dealInProgress) {
+        // Don't trigger if bot already has a committed card (already running)
+        if (room.committedBy === 1) return;
         setTimeout(() => basraBotMove(room), 800);
     }
 }
