@@ -1847,6 +1847,7 @@ function basraAdvanceTurn(room) {
             setTimeout(() => {
                 basra.dealNewHands(room); // deal AFTER summary shown
                 const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+                room.dealerIdx = dealerIdx2;
                 basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
                 basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
                 setTimeout(() => basraEmitAll(room), 80);
@@ -2650,6 +2651,7 @@ function registerBasraHandlers(socket) {
         basra.resetRound(room);
         basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
         const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+        room.dealerIdx = dealerIdxNR;
         basraClearBasraTimer(room); // stop timer during deal animation
         basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length });
         setTimeout(() => basraEmitAll(room), 80);
@@ -2731,17 +2733,22 @@ function registerBasraHandlers(socket) {
         // Remove special from table, insert at end of deck so dealer gets it last
         if (tableIdx !== -1) room.tableCards.splice(tableIdx, 1);
         const n = room.slots.length;
-        const dealerSlot = (room.currentPlayer - 1 + n) % n;
-        console.log(`[special] card=${specialCard} currentPlayer=${room.currentPlayer} dealerSlot=${dealerSlot} deckLen=${room.deck.length} n=${n}`);
-        // In round-robin deal, dealer gets cards at positions: dealerSlot, dealerSlot+n, ...
-        // Last card to dealer in final deal = deck.length - n + dealerSlot
-        const insertPos = room.deck.length - n + dealerSlot;
-        console.log(`[special] insertPos=${insertPos}`);
-        if (insertPos >= 0 && insertPos <= room.deck.length) {
-            room.deck.splice(insertPos, 0, specialCard);
-        } else {
-            room.deck.push(specialCard);
+        const dealerSlot = room.dealerIdx !== undefined ? room.dealerIdx : (room.currentPlayer - 1 + n) % n;
+        // Simulate block deal to find exact position of dealer's last card
+        let _pos = 0, _dealerLast = room.deck.length - 1;
+        const _deckLen = room.deck.length;
+        while (_pos < _deckLen) {
+            for (let _sl = 0; _sl < n; _sl++) {
+                for (let _c = 0; _c < 4; _c++) {
+                    if (_pos < _deckLen) {
+                        if (_sl === dealerSlot) _dealerLast = _pos;
+                        _pos++;
+                    }
+                }
+            }
         }
+        const insertPos = _dealerLast;
+        room.deck.splice(insertPos, 0, specialCard);
 
         // Add replacement to table
         if (replacement) {
@@ -2798,6 +2805,7 @@ function registerBasraHandlers(socket) {
         socket.emit('basraJoined', { code, slotIdx: 0, playerCount: 2, bet: 0 });
         // Start game
         const dealerIdx = (room.currentPlayer - 1 + 2) % 2;
+        room.dealerIdx = dealerIdx;
         basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
         basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
         setTimeout(() => {

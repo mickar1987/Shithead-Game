@@ -192,11 +192,13 @@ function createBasraRoom(code, slots, bet = 0) {
 
 function dealNewHands(room) {
     if (room.deck.length === 0) return false;
-    room.slots.forEach(s => {
+    console.log(`[deal] deckLen=${room.deck.length} deck5last=${room.deck.slice(-5).join(',')}`);
+    room.slots.forEach((s, idx) => {
         const count = Math.min(4, room.deck.length);
         for (let i = 0; i < count; i++) {
             if (room.deck.length > 0) s.hand.push(room.deck.shift());
         }
+        console.log(`[deal] slot${idx} last4=${s.hand.slice(-4).join(',')}`);
     });
     return true;
 }
