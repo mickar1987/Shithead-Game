@@ -2732,10 +2732,11 @@ function registerBasraHandlers(socket) {
         if (tableIdx !== -1) room.tableCards.splice(tableIdx, 1);
         const n = room.slots.length;
         const dealerSlot = (room.currentPlayer - 1 + n) % n;
+        console.log(`[special] card=${specialCard} currentPlayer=${room.currentPlayer} dealerSlot=${dealerSlot} deckLen=${room.deck.length} n=${n}`);
         // In round-robin deal, dealer gets cards at positions: dealerSlot, dealerSlot+n, ...
         // Last card to dealer in final deal = deck.length - n + dealerSlot
-        // This ensures J arrives to dealer as their last card in the last deal cycle
         const insertPos = room.deck.length - n + dealerSlot;
+        console.log(`[special] insertPos=${insertPos}`);
         if (insertPos >= 0 && insertPos <= room.deck.length) {
             room.deck.splice(insertPos, 0, specialCard);
         } else {

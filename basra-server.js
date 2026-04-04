@@ -142,11 +142,12 @@ function isBasra(playedCard, capturedCards, tableCards) {
 function createBasraRoom(code, slots, bet = 0) {
     const deck = shuffle(makeDeck());
 
-    // Deal 4 to table — include J and 7♦ (shown during deal, then replaced after)
+    // Deal 4 to table — FORCE 7d for testing
     let tableCards = [];
-    for (let i = 0; i < 4; i++) {
-        tableCards.push(deck.shift());
-    }
+    // Remove 7d from deck and put it first in table
+    const idx7d = deck.indexOf('7d');
+    if (idx7d !== -1) { deck.splice(idx7d, 1); tableCards.push('7d'); }
+    while (tableCards.length < 4) tableCards.push(deck.shift());
     // Track which positions have special cards (replaced after animation)
     const specialReplacements = tableCards
         .filter(c => cardRank(c) === 'J' || is7D(c));
