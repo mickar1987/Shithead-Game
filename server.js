@@ -2284,14 +2284,26 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE C: If bot has J and 7d, prefer throwing J first (7d will capture it for basra)
-    if (bestCard.slice(0,-1) === '7d' && bestCapture.length === 0 &&
-        bot.hand.some(c => c.slice(0,-1) === 'J')) {
-        // We're about to throw 7d — better to throw J instead
+    // RULE C: If bot has J and 7d together — coordinate them
+    const _hasJ = bot.hand.some(c => c.slice(0,-1) === 'J');
+    const _has7d = bot.hand.includes('7d');
+    if (_hasJ && _has7d) {
         const jackCard = bot.hand.find(c => c.slice(0,-1) === 'J');
-        if (jackCard && tableCards.length === 0) {
-            bestCard = jackCard; bestCapture = [];
+        const _7dCanBasra = tableCards.length > 0 &&
+            basraBotFindCaptures('7d', tableCards).some(g => g.length === tableCards.length);
+        const _jCanBasra = tableCards.length > 0 &&
+            basraBotFindCaptures(jackCard, tableCards).some(g => g.length === tableCards.length);
+
+        if (_7dCanBasra) {
+            // 7d can make basra NOW — use it, save J for later
+            // (don't override if 7d was already chosen as bestCard with basra)
+        } else if (tableCards.length === 0 || !_jCanBasra) {
+            // Table empty or J can't basra — throw J first, 7d captures later
+            if (bestCard !== jackCard) {
+                bestCard = jackCard; bestCapture = [];
+            }
         }
+        // If J can basra but 7d can't — J was already chosen by scoring
     }
 
     // SAFETY: if somehow bestCard is still null or invalid, pick first card
@@ -2327,7 +2339,7 @@ function basraBotMove(room) {
     room.committedBy = 1;
     basraEmitAll(room);
 
-    // Phase 2: after 1.8s, show capture selection highlight, then play
+    // Phase 2: show capture preview (900ms after commit)
     setTimeout(() => { try {
         if (room.gameOver || room.roundOver) return;
         // Re-evaluate captures with current table state (table may have changed)
