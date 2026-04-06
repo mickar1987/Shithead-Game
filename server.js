@@ -2282,17 +2282,19 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE C: J + 7d in hand — J ALWAYS goes first unless 7d makes basra NOW
+    // RULE C: J + 7d in hand — J ALWAYS goes first unless 7d makes REAL basra NOW
     {
         const _hasJ2 = bot.hand.some(c => c.slice(0,-1) === 'J');
         const _has7d2 = bot.hand.includes('7d');
-        console.log(`[RULEC] hasJ=${_hasJ2} has7d=${_has7d2} bestCard=${bestCard} bestCapture=${bestCapture.length} tableLen=${tableCards.length} hand=${bot.hand.join(',')}`);
         if (_hasJ2 && _has7d2) {
             const _jackCard2 = bot.hand.find(c => c.slice(0,-1) === 'J');
-            const _7dBasraNow = bestCard === '7d' && bestCapture.length > 0 &&
-                bestCapture.length === tableCards.length && tableCards.length > 0;
-            console.log(`[RULEC] _7dBasraNow=${_7dBasraNow} → ${_7dBasraNow ? 'use 7d' : 'force J'}`);
-            if (!_7dBasraNow) {
+            // Use basra module to check if 7d capture is a REAL basra
+            const _capturedCards = bestCapture.map(i => tableCards[i]).filter(Boolean);
+            const _7dRealBasra = bestCard === '7d' && bestCapture.length > 0 &&
+                bestCapture.length === tableCards.length &&
+                basra.isBasra('7d', _capturedCards, tableCards);
+            if (!_7dRealBasra) {
+                // Force J first — 7d will capture later
                 bestCard = _jackCard2;
                 bestCapture = [];
             }
