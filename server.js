@@ -2101,6 +2101,12 @@ function basraBotMove(room) {
                     combined.push(...grp);
                 }
             }
+            // Also capture all remaining size-1 matching groups (e.g. two 2s on table)
+            for (const grp of caps) {
+                if (grp.length === 1 && !used.has(grp[0])) {
+                    used.add(grp[0]); combined.push(grp[0]);
+                }
+            }
             const isBasra = combined.length === tableCards.length && tableCards.length > 0;
             const isJackCard = isJack || is7d;
 
@@ -2348,6 +2354,12 @@ function basraBotMove(room) {
                     if (grp.every(i=>!used2.has(i))) {
                         grp.forEach(i=>used2.add(i));
                         currentCapture.push(...grp);
+                    }
+                }
+                // Include all remaining size-1 groups
+                for (const grp of freshCaps) {
+                    if (grp.length === 1 && !used2.has(grp[0])) {
+                        used2.add(grp[0]); currentCapture.push(grp[0]);
                     }
                 }
             } else {
