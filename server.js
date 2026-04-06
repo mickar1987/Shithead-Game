@@ -2286,13 +2286,13 @@ function basraBotMove(room) {
     {
         const _hasJ2 = bot.hand.some(c => c.slice(0,-1) === 'J');
         const _has7d2 = bot.hand.includes('7d');
+        console.log(`[RULEC] hasJ=${_hasJ2} has7d=${_has7d2} bestCard=${bestCard} bestCapture=${bestCapture.length} tableLen=${tableCards.length} hand=${bot.hand.join(',')}`);
         if (_hasJ2 && _has7d2) {
             const _jackCard2 = bot.hand.find(c => c.slice(0,-1) === 'J');
-            // Only allow 7d to play if it makes basra right now
             const _7dBasraNow = bestCard === '7d' && bestCapture.length > 0 &&
                 bestCapture.length === tableCards.length && tableCards.length > 0;
+            console.log(`[RULEC] _7dBasraNow=${_7dBasraNow} → ${_7dBasraNow ? 'use 7d' : 'force J'}`);
             if (!_7dBasraNow) {
-                // Force J to play first — regardless of what scoring chose
                 bestCard = _jackCard2;
                 bestCapture = [];
             }
