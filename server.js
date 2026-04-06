@@ -2282,20 +2282,20 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE C: If bot has J and 7d together — always play J before 7d
-    const _hasJ = bot.hand.some(c => c.slice(0,-1) === 'J');
-    const _has7d = bot.hand.includes('7d');
-    if (_hasJ && _has7d) {
-        const jackCard = bot.hand.find(c => c.slice(0,-1) === 'J');
-        const _7dCanBasra = tableCards.length > 0 &&
-            basraBotFindCaptures('7d', tableCards).some(g => g.length === tableCards.length);
-
-        if (_7dCanBasra && bestCard === '7d' && bestCapture.length > 0) {
-            // 7d makes basra NOW — correct, use it
-        } else if (bestCard === '7d') {
-            // 7d chosen for anything else — switch to J instead
-            // J thrown to table, next turn 7d captures J (+others) for basra
-            bestCard = jackCard; bestCapture = [];
+    // RULE C: J + 7d in hand — J ALWAYS goes first unless 7d makes basra NOW
+    {
+        const _hasJ2 = bot.hand.some(c => c.slice(0,-1) === 'J');
+        const _has7d2 = bot.hand.includes('7d');
+        if (_hasJ2 && _has7d2) {
+            const _jackCard2 = bot.hand.find(c => c.slice(0,-1) === 'J');
+            // Only allow 7d to play if it makes basra right now
+            const _7dBasraNow = bestCard === '7d' && bestCapture.length > 0 &&
+                bestCapture.length === tableCards.length && tableCards.length > 0;
+            if (!_7dBasraNow) {
+                // Force J to play first — regardless of what scoring chose
+                bestCard = _jackCard2;
+                bestCapture = [];
+            }
         }
     }
 

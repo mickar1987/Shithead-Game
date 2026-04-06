@@ -110,6 +110,12 @@ function isBasra(playedCard, capturedCards, tableCards) {
     if (is7D(playedCard)) {
         if (tableCards.length === 0) return false;
         if (tableCards.length === 1) return true; // single card → basra always
+        // All same Q or all same K → basra
+        const allSameFace = tableCards.every(c => cardRank(c) === cardRank(tableCards[0])) &&
+            ['Q','K'].includes(cardRank(tableCards[0]));
+        if (allSameFace) return true;
+        // Any J on table → basra (J basra = 20pts)
+        if (tableCards.some(c => cardRank(c) === 'J')) return true;
         const faceRanks = ['J','Q','K'];
         const rv = r => r==='A' ? 1 : (faceRanks.includes(r) ? null : parseInt(r));
         const vals = tableCards.map(c => rv(cardRank(c)));
