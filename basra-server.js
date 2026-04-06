@@ -148,17 +148,13 @@ function isBasra(playedCard, capturedCards, tableCards) {
 function createBasraRoom(code, slots, bet = 0) {
     const deck = shuffle(makeDeck());
 
-    // TEST: Force J and 7d in table
-    let tableCards = [];
-    const _7dIdx = deck.indexOf('7d');
-    if (_7dIdx !== -1) tableCards.push(deck.splice(_7dIdx, 1)[0]);
-    const _jIdx = deck.findIndex(c => c.slice(0,-1) === 'J');
-    if (_jIdx !== -1) tableCards.push(deck.splice(_jIdx, 1)[0]);
-    while (tableCards.length < 4) tableCards.push(deck.shift());
-    // Track which positions have special cards (replaced after animation)
-    const specialReplacements = tableCards
-        .filter(c => cardRank(c) === 'J' || is7D(c));
+    // FORCE: 4 Kings on table, 7d in human hand
+    let tableCards = ['Kh','Kd','Kc','Ks'];
+    tableCards.forEach(k => { const i = deck.indexOf(k); if (i !== -1) deck.splice(i,1); });
+    // Track special cards (none in this test)
+    const specialReplacements = [];
 
+    // Deal 4 to each player
     // Deal 4 to each player
     slots.forEach(s => {
         s.hand = [];
@@ -169,9 +165,14 @@ function createBasraRoom(code, slots, bet = 0) {
         s.score = 0; // cumulative game score
     });
 
-    for (let i = 0; i < 4; i++) {
-        slots.forEach(s => s.hand.push(deck.shift()));
-    }
+    // Force 7d into human (slot 0) first card
+    const _7dI = deck.indexOf('7d');
+    if (_7dI !== -1) deck.splice(_7dI, 1);
+    slots.forEach((sl, si) => {
+        sl.hand = [];
+        if (si === 0) sl.hand.push('7d');
+        for (let i = sl.hand.length; i < 4; i++) sl.hand.push(deck.shift());
+    });
 
     // Teams assigned externally after all players join
     let teams = null;
