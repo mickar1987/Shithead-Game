@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.149</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.150</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1027,6 +1027,9 @@ function showToast(msg, duration = 900) {
 // ══════════════════════════════════════════════════════
 let lastAIPlayerCount = 2; // remember for restart
 function startGame(count) {
+    // Hide any lingering basra overlays
+    const _bro = document.getElementById('basraResultOverlay'); if (_bro) _bro.style.display='none';
+    const _bg = document.getElementById('basraGame'); if (_bg) _bg.style.display='none';
     lastAIPlayerCount = count;
     // Notify server user is active (for admin online status)
     if (authUser?.username && authUser?.token) {
@@ -2736,6 +2739,10 @@ function setBet(amount) {
 
 function showMenu(id) {
     if (id === 'menuBasraVsAI') setTimeout(() => setBasraAIWinScore(basraAIWinScore || 120), 10);
+    // Hide basra result overlay when navigating away from basra
+    if (!id.startsWith('menuBasra') && !id.startsWith('Basra')) {
+        const _bro2 = document.getElementById('basraResultOverlay'); if (_bro2) _bro2.style.display='none';
+    }
     fetchOnlineStats();
     refreshCoins();
     if (id === 'menuCreate') {
