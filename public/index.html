@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.159</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.160</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1856,8 +1856,8 @@ function drawUpToThree(playerIdx) {
 function aiCardValue(card) {
     const r = card.slice(0,-1);
     if (r === '10') return 100;
+    if (r === '3')  return 98;
     if (r === '2')  return 95;
-    if (r === '3')  return 90;
     if (r === 'A')  return 14;
     if (r === 'K')  return 13;
     if (r === 'Q')  return 12;
@@ -1896,51 +1896,40 @@ function aiGetBestPlay(validCards, hand) {
     if (!validCards.length) return null;
     const _ret = (cards) => cards && cards.length ? [cards[0].slice(0,-1), cards] : null;
 
-    const myHand = hand || [];
     const pileSize = pile.length;
     const isPileEmpty = pileSize === 0;
+    const lastCard = !isPileEmpty ? pile[pile.length-1] : null;
+    const lastVal = lastCard ? aiCardValue(lastCard) : 0;
     const POWERS = ['2','10','3'];
     const powers = validCards.filter(c => POWERS.includes(c.slice(0,-1)));
     const normals = validCards.filter(c => !POWERS.includes(c.slice(0,-1)));
 
-    // ── חוק ברזל: קופה ריקה + יש קלף רגיל → לעולם לא 2/3/10 ──
+    // 1. חוק קופה ריקה: לעולם לא 2/3/10 על ריק אם יש קלף רגיל
     if (isPileEmpty && normals.length > 0) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        const lowestRank = normals[0].slice(0,-1);
-        return _ret(normals.filter(c => c.slice(0,-1) === lowestRank));
+        return _ret([normals[0]]);
     }
 
-    // ── מצב הגנה: יריב על קלף אחרון ──
-    const opponentDanger = players.some((p, i) => {
-        if (i === currentPlayer || p.finished) return false;
-        const total = p.hand.length + p.faceUp.filter(Boolean).length + p.faceDown.filter(Boolean).length;
-        return total <= 2;
-    });
-    if (opponentDanger) {
-        const sorted = [...validCards].sort((a,b) => aiCardValue(b) - aiCardValue(a));
-        const bestRank = sorted[0].slice(0,-1);
-        return _ret(validCards.filter(c => c.slice(0,-1) === bestRank));
+    // 2. אסטרטגיית ה-3: רק אם קלף בקופה הוא 8 ומעלה (לא A/K/Q)
+    const threes = validCards.filter(c => c.slice(0,-1) === '3');
+    if (threes.length > 0 && !isPileEmpty && lastVal >= 8 && lastVal < 20) {
+        return _ret([threes[0]]);
     }
 
-    // ── עדיפות רגילה: להיפטר מנמוכים ──
+    // 3. קלפים רגילים: הנמוך ביותר, כל הסדרה
     if (normals.length > 0) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        const lowestRank = normals[0].slice(0,-1);
-        return _ret(normals.filter(c => c.slice(0,-1) === lowestRank));
+        const rank = normals[0].slice(0,-1);
+        return _ret(normals.filter(c => c.slice(0,-1) === rank));
     }
 
-    // ── קלפי כוח בלבד ──
+    // 4. קלפי כוח בלבד
     if (powers.length > 0) {
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        if (ten && pileSize >= 3) return _ret([ten]);
-        const others = powers.filter(c => c.slice(0,-1) !== '10');
-        others.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        if (others.length > 0) {
-            if (isPileEmpty) return _ret([others[0]]); // קופה ריקה - קלף אחד בלבד
-            const r = others[0].slice(0,-1);
-            return _ret(powers.filter(c => c.slice(0,-1) === r));
-        }
-        return _ret([ten || powers[0]]);
+        if (ten && (pileSize >= 3 || lastVal > 12)) return _ret([ten]);
+        const two = powers.find(c => c.slice(0,-1) === '2');
+        if (two) return _ret([two]);
+        return _ret([powers[0]]);
     }
 
     return null;
