@@ -400,13 +400,11 @@ function scoreRound(room) {
 function resetRound(room) {
     const deck = shuffle(makeDeck());
 
-    // TEST: Force J and 7d in table
+    // Deal 4 table cards including J/7♦ (replaced after animation)
     let tableCards = [];
-    const _7dIdx2 = deck.indexOf('7d');
-    if (_7dIdx2 !== -1) tableCards.push(deck.splice(_7dIdx2, 1)[0]);
-    const _jIdx2 = deck.findIndex(c => c.slice(0,-1) === 'J');
-    if (_jIdx2 !== -1) tableCards.push(deck.splice(_jIdx2, 1)[0]);
-    while (tableCards.length < 4) tableCards.push(deck.shift());
+    for (let i = 0; i < 4; i++) {
+        tableCards.push(deck.shift());
+    }
     room.specialReplacements = tableCards.filter(c => cardRank(c) === 'J' || is7D(c));
 
     room.deck = deck;
