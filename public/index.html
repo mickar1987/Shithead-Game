@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.155</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.156</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1855,20 +1855,20 @@ function drawUpToThree(playerIdx) {
 // Card play-cost: higher = more valuable, save for later
 function aiCardValue(card) {
     const r = card.slice(0,-1);
-    if (r === '10') return 35; // strongest — save for big piles
-    if (r === '2')  return 28; // escape card
-    if (r === '3')  return 24; // transparent + strong
-    if (r === '8')  return 16; // skip — tactical
-    if (r === 'A')  return 13; // hard to beat
-    if (r === 'K')  return 11;
-    if (r === 'Q')  return 9;
-    if (r === '7')  return 7;
-    if (r === 'J')  return 5;
-    if (r === '9')  return 4;
-    if (r === '6')  return 3;
-    if (r === '5')  return 2;
-    if (r === '4')  return 1;
-    return 5;
+    if (r === '10') return 100;
+    if (r === '3')  return 90;
+    if (r === '2')  return 80;
+    if (r === 'A')  return 70;
+    if (r === 'K')  return 65;
+    if (r === 'Q')  return 60;
+    if (r === 'J')  return 55;
+    if (r === '9')  return 50;
+    if (r === '8')  return 57;
+    if (r === '7')  return 58;
+    if (r === '6')  return 30;
+    if (r === '5')  return 20;
+    if (r === '4')  return 10;
+    return 50;
 }
 
 function aiHandStrength(hand) {
