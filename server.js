@@ -770,6 +770,19 @@ function emitStateToPlayer(room, slotIdx) {
             return needed > 0 ? needed : 0;
         })(),
         pileTopRank: (() => { if(!room.pile.length) return null; for(let i=room.pile.length-1;i>=0;i--) if(room.pile[i].slice(0,-1)!=='3') return room.pile[i].slice(0,-1); return null; })(),
+        faceUpBurnCount: (() => {
+            // Can player burn with faceUp cards? (only when hand is empty)
+            const p = room.slots[slotIdx];
+            if (p.hand.length > 0 || !room.pile.length || room.isSwapPhase) return 0;
+            if (room.currentPlayer === slotIdx) return 0; // it's their turn, normal play
+            const topRank = (() => { for(let i=room.pile.length-1;i>=0;i--) if(room.pile[i].slice(0,-1)!=='3') return room.pile[i].slice(0,-1); return null; })();
+            if (!topRank) return 0;
+            let streak=0; for(let i=room.pile.length-1;i>=0;i--){ if(room.pile[i].slice(0,-1)===topRank) streak++; else break; }
+            const needed = 4 - streak;
+            if (needed <= 0) return 0;
+            const faceUpCount = p.faceUp.filter(c => c && c.slice(0,-1) === topRank).length;
+            return faceUpCount >= needed ? needed : 0;
+        })(),
         players: room.slots.map((s, i) => ({
             id: i,
             name: s.name,
@@ -961,8 +974,9 @@ function executeMove(room, playerIdx, cards) {
     const skips = r === '8' ? cards.length : 1;
 
     // Open interrupt window for all ranks except 10 (burn)
-    // 8s can be interrupted with more 8s for extra skips
-    if (r !== '10') {
+    // Only if player doesn't still have more of same rank in hand (i.e., played all they had)
+    const remainingSameRank = room.slots[playerIdx].hand.filter(c => c.slice(0,-1) === r).length;
+    if (r !== '10' && remainingSameRank === 0) {
         room.interruptWindow = true;
         room.lastPlayedRank = r;
         room.lastPlayerIdx = playerIdx;
