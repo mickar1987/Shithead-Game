@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.158</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.159</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1856,19 +1856,13 @@ function drawUpToThree(playerIdx) {
 function aiCardValue(card) {
     const r = card.slice(0,-1);
     if (r === '10') return 100;
+    if (r === '2')  return 95;
     if (r === '3')  return 90;
-    if (r === '2')  return 80;
-    if (r === 'A')  return 70;
-    if (r === 'K')  return 65;
-    if (r === 'Q')  return 60;
-    if (r === 'J')  return 55;
-    if (r === '9')  return 50;
-    if (r === '8')  return 57;
-    if (r === '7')  return 58;
-    if (r === '6')  return 30;
-    if (r === '5')  return 20;
-    if (r === '4')  return 10;
-    return 50;
+    if (r === 'A')  return 14;
+    if (r === 'K')  return 13;
+    if (r === 'Q')  return 12;
+    if (r === 'J')  return 11;
+    return parseInt(r) || 0;
 }
 
 function aiHandStrength(hand) {
@@ -1904,49 +1898,46 @@ function aiGetBestPlay(validCards, hand) {
 
     const myHand = hand || [];
     const pileSize = pile.length;
+    const isPileEmpty = pileSize === 0;
     const POWERS = ['2','10','3'];
-
-    // Check if any opponent is close to winning (≤2 cards total)
-    const opponentDanger = players.some((p, i) => {
-        if (i === currentPlayer || p.finished || p.isAI) return false;
-        const total = p.hand.length + p.faceUp.filter(Boolean).length + p.faceDown.filter(Boolean).length;
-        return total <= 2;
-    });
-
     const powers = validCards.filter(c => POWERS.includes(c.slice(0,-1)));
     const normals = validCards.filter(c => !POWERS.includes(c.slice(0,-1)));
 
-    // ── DEFENCE MODE: opponent about to win ──
+    // ── חוק ברזל: קופה ריקה + יש קלף רגיל → לעולם לא 2/3/10 ──
+    if (isPileEmpty && normals.length > 0) {
+        normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+        const lowestRank = normals[0].slice(0,-1);
+        return _ret(normals.filter(c => c.slice(0,-1) === lowestRank));
+    }
+
+    // ── מצב הגנה: יריב על קלף אחרון ──
+    const opponentDanger = players.some((p, i) => {
+        if (i === currentPlayer || p.finished) return false;
+        const total = p.hand.length + p.faceUp.filter(Boolean).length + p.faceDown.filter(Boolean).length;
+        return total <= 2;
+    });
     if (opponentDanger) {
         const sorted = [...validCards].sort((a,b) => aiCardValue(b) - aiCardValue(a));
-        // Don't burn 10 on empty pile if alternatives exist
-        if (sorted[0].slice(0,-1) === '10' && pileSize === 0 && sorted.length > 1) {
-            const backup = sorted.find(c => c.slice(0,-1) !== '10');
-            if (backup) { const r = backup.slice(0,-1); return _ret(validCards.filter(c => c.slice(0,-1) === r)); }
-        }
         const bestRank = sorted[0].slice(0,-1);
         return _ret(validCards.filter(c => c.slice(0,-1) === bestRank));
     }
 
-    // ── NORMAL MODE: dump lowest, keep pairs ──
+    // ── עדיפות רגילה: להיפטר מנמוכים ──
     if (normals.length > 0) {
-        // Sort by value asc — play weakest first
-        const sorted = [...normals].sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        const lowestRank = sorted[0].slice(0,-1);
-        // Play ALL copies of lowest rank together
-        return _ret(validCards.filter(c => c.slice(0,-1) === lowestRank));
+        normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+        const lowestRank = normals[0].slice(0,-1);
+        return _ret(normals.filter(c => c.slice(0,-1) === lowestRank));
     }
 
-    // ── POWER CARDS only ──
+    // ── קלפי כוח בלבד ──
     if (powers.length > 0) {
-        // Save 10 for big pile (≥3 cards)
         const ten = powers.find(c => c.slice(0,-1) === '10');
         if (ten && pileSize >= 3) return _ret([ten]);
-        // Prefer 2 or 3 over 10
         const others = powers.filter(c => c.slice(0,-1) !== '10');
+        others.sort((a,b) => aiCardValue(a) - aiCardValue(b));
         if (others.length > 0) {
-            const sorted = [...others].sort((a,b) => aiCardValue(a) - aiCardValue(b));
-            const r = sorted[0].slice(0,-1);
+            if (isPileEmpty) return _ret([others[0]]); // קופה ריקה - קלף אחד בלבד
+            const r = others[0].slice(0,-1);
             return _ret(powers.filter(c => c.slice(0,-1) === r));
         }
         return _ret([ten || powers[0]]);
