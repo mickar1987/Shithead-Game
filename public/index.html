@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.161</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.162</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1504,7 +1504,7 @@ function _endSwapAI() {
     }
     currentPlayer = starter;
     log(`🎮 התחלנו! ${players[starter].name} ראשון`);
-    if (players[currentPlayer].isAI) setTimeout(aiMove, 600);
+    if (players[currentPlayer].isAI) setTimeout(aiMove, 300);
     render();
 }
 
@@ -1778,7 +1778,7 @@ function executeMove(played) {
             // Animation was superseded — pile state already handled by interrupt
             render();
             if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
-                setTimeout(aiMove, 600);
+                setTimeout(aiMove, 300);
         }
     });
 }
@@ -1813,7 +1813,7 @@ function _doExecuteMove(played) {
                 drawUpToThree(currentPlayer);
                 checkWin(currentPlayer);
                 if (!players[currentPlayer].finished) {
-                    if (players[currentPlayer].isAI) setTimeout(aiMove, 600);
+                    if (players[currentPlayer].isAI) setTimeout(aiMove, 300);
                 } else {
                     nextTurn();
                 }
@@ -1951,7 +1951,7 @@ let aiStaleCount = 0;
 
 function aiMove() {
     if (gameOver) return;
-    if (animating) { setTimeout(aiMove, fastMode ? 150 : 700); return; }
+    if (animating) { setTimeout(aiMove, fastMode ? 100 : 300); return; }
     const p = players[currentPlayer];
 
     // Loop detection: track GLOBAL game state across all AI players
@@ -2201,7 +2201,7 @@ function nextTurn(skips = 1) {
                         currentPlayer = pi;
                         render();
                         if (!gameOver && !players[pi].finished)
-                            setTimeout(aiMove, 600);
+                            setTimeout(aiMove, 300);
                     }, 600);
                 } else {
                     showToast(`⚡ ${players[pi].name} התפרץ!`);
@@ -2210,7 +2210,7 @@ function nextTurn(skips = 1) {
                     render();
                     // Continue to next player's turn
                     if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
-                        setTimeout(aiMove, 600);
+                        setTimeout(aiMove, 300);
                 }
                 return;
             }
@@ -2219,7 +2219,7 @@ function nextTurn(skips = 1) {
 
     render();
     if (!players[currentPlayer].finished && players[currentPlayer].isAI)
-        setTimeout(aiMove, 600); // AI plays immediately (no delay unless interrupt window)
+        setTimeout(aiMove, 300); // AI plays immediately (no delay unless interrupt window)
 }
 
 
@@ -3774,10 +3774,13 @@ function renderOnline(state) {
 
     const isMyTurn = state.currentPlayer === myIdx && !state.isSwapPhase;
     // Type 1: same-player add-on interrupt
+    // Interrupt only if player has more of same rank AND played all same-rank cards they had
+    // (server handles this via interruptWindow=false if remaining same rank > 0)
+    const remainingSameRankInHand = state.myHand.filter(c => c.slice(0,-1) === state.lastPlayedRank).length;
     const canAddInterrupt = !!(state.interruptWindow
         && state.lastPlayerIdx === myIdx
         && state.currentPlayer !== myIdx
-        && state.myHand.some(c => c.slice(0,-1) === state.lastPlayedRank));
+        && remainingSameRankInHand > 0);
     // Type 2: burn interrupt — any player completing 4-of-a-kind
     const burnNeeded = state.burnInterruptCount || 0;
     const faceUpBurnNeeded = state.faceUpBurnCount || 0;
@@ -4792,10 +4795,13 @@ function renderOnline(state) {
 
     const isMyTurn = state.currentPlayer === myIdx && !state.isSwapPhase;
     // Type 1: same-player add-on interrupt
+    // Interrupt only if player has more of same rank AND played all same-rank cards they had
+    // (server handles this via interruptWindow=false if remaining same rank > 0)
+    const remainingSameRankInHand = state.myHand.filter(c => c.slice(0,-1) === state.lastPlayedRank).length;
     const canAddInterrupt = !!(state.interruptWindow
         && state.lastPlayerIdx === myIdx
         && state.currentPlayer !== myIdx
-        && state.myHand.some(c => c.slice(0,-1) === state.lastPlayedRank));
+        && remainingSameRankInHand > 0);
     // Type 2: burn interrupt — any player completing 4-of-a-kind
     const burnNeeded = state.burnInterruptCount || 0;
     const faceUpBurnNeeded = state.faceUpBurnCount || 0;
