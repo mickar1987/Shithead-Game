@@ -836,33 +836,65 @@ function checkWin(room, idx) {
 // ── Next turn ──
 // ── Bot play logic ──
 function doBotTurn(room) {
-    if (room.gameOver || room.isSwapPhase) return;
-    const idx = room.currentPlayer;
-    const p = room.slots[idx];
-    if (!p || !p.isBot || p.finished) return;
+function getAiRankValue(card) {
+    const r = card.slice(0, -1);
+    if (r === '2') return 15; 
+    if (r === '10') return 16;
+    if (r === 'A') return 14;
+    if (r === 'K') return 13;
+    if (r === 'Q') return 12;
+    if (r === 'J') return 11;
+    return parseInt(r);
+}
 
-    const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
+function getSmartBotMove(hand, pile, lastRank) {
+    // משתמש בפונקציית canPlay שכבר קיימת אצלך בקובץ
+    const validCards = hand.filter(c => canPlay(c, pile, lastRank));
+    if (validCards.length === 0) return null;
+
+    const powerCards = validCards.filter(c => ['2', '10'].includes(c.slice(0, -1)));
+    const normalCards = validCards.filter(c => !['2', '10'].includes(c.slice(0, -1)));
+
+    // 1. עדיפות לקלפים רגילים נמוכים (לשמור את החזקים לסוף)
+    if (normalCards.length > 0) {
+        normalCards.sort((a, b) => getAiRankValue(a) - getAiRankValue(b));
+        const lowestRank = normalCards[0].slice(0, -1);
+        return normalCards.filter(c => c.slice(0, -1) === lowestRank);
+    }
+
+    // 2. שימוש בקלפי כוח (רק אם אין ברירה או שהקופה גדולה)
+    if (powerCards.length > 0) {
+        const ten = powerCards.find(c => c.startsWith('10'));
+        if (ten && pile.length > 3) return [ten];
+        const two = powerCards.find(c => c.startsWith('2'));
+        return [two || powerCards[0]];
+    }
+    return null;
+}
+
+async function doBotTurn(room) {
+    const slot = room.slots[room.currentPlayer];
+    if (!slot || !slot.isBot || room.gameOver || room.waitingForEight) return;
+
+    let cardsToPlay = null;
+
+    if (slot.hand.length > 0) {
+        cardsToPlay = getSmartBotMove(slot.hand, room.pile, room.lastPlayedRank);
+    } else if (slot.faceUp.length > 0) {
+        cardsToPlay = getSmartBotMove(slot.faceUp, room.pile, room.lastPlayedRank);
+    } else if (slot.faceDown.length > 0) {
+        const idx = Math.floor(Math.random() * slot.faceDown.length);
+        cardsToPlay = [slot.faceDown[idx]];
+    }
 
     setTimeout(() => {
-        if (room.gameOver || room.currentPlayer !== idx) return;
-
-        // Play from hand
-        if (p.hand.length > 0) {
-            const valid = p.hand.filter(c => canPlay(c, room.pile));
-            if (valid.length > 0) {
-                valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
-                const card = valid[0];
-                p.hand = p.hand.filter(c => c !== card);
-                executeMove(room, idx, [card]);
-            } else {
-                // Take pile
-                p.hand.push(...room.pile);
-                room.pile = [];
-                broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
-                emitStateToAll(room);
-                nextTurn(room);
-            }
-            return;
+        if (!cardsToPlay) {
+            handlePickUp(room, room.currentPlayer);
+        } else {
+            handlePlayCards(room, room.currentPlayer, cardsToPlay);
+        }
+    }, 1200);
+}
         }
 
         // Play from faceUp
