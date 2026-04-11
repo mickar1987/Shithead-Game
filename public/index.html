@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.157</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.158</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1900,6 +1900,7 @@ function aiPileDifficulty(rank, opponents) {
 
 function aiGetBestPlay(validCards, hand) {
     if (!validCards.length) return null;
+    const _ret = (cards) => cards && cards.length ? [cards[0].slice(0,-1), cards] : null;
 
     const myHand = hand || [];
     const pileSize = pile.length;
@@ -1921,10 +1922,10 @@ function aiGetBestPlay(validCards, hand) {
         // Don't burn 10 on empty pile if alternatives exist
         if (sorted[0].slice(0,-1) === '10' && pileSize === 0 && sorted.length > 1) {
             const backup = sorted.find(c => c.slice(0,-1) !== '10');
-            if (backup) { const r = backup.slice(0,-1); return validCards.filter(c => c.slice(0,-1) === r); }
+            if (backup) { const r = backup.slice(0,-1); return _ret(validCards.filter(c => c.slice(0,-1) === r)); }
         }
         const bestRank = sorted[0].slice(0,-1);
-        return validCards.filter(c => c.slice(0,-1) === bestRank);
+        return _ret(validCards.filter(c => c.slice(0,-1) === bestRank));
     }
 
     // ── NORMAL MODE: dump lowest, keep pairs ──
@@ -1933,22 +1934,22 @@ function aiGetBestPlay(validCards, hand) {
         const sorted = [...normals].sort((a,b) => aiCardValue(a) - aiCardValue(b));
         const lowestRank = sorted[0].slice(0,-1);
         // Play ALL copies of lowest rank together
-        return validCards.filter(c => c.slice(0,-1) === lowestRank);
+        return _ret(validCards.filter(c => c.slice(0,-1) === lowestRank));
     }
 
     // ── POWER CARDS only ──
     if (powers.length > 0) {
         // Save 10 for big pile (≥3 cards)
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        if (ten && pileSize >= 3) return [ten];
+        if (ten && pileSize >= 3) return _ret([ten]);
         // Prefer 2 or 3 over 10
         const others = powers.filter(c => c.slice(0,-1) !== '10');
         if (others.length > 0) {
             const sorted = [...others].sort((a,b) => aiCardValue(a) - aiCardValue(b));
             const r = sorted[0].slice(0,-1);
-            return powers.filter(c => c.slice(0,-1) === r);
+            return _ret(powers.filter(c => c.slice(0,-1) === r));
         }
-        return [ten || powers[0]];
+        return _ret([ten || powers[0]]);
     }
 
     return null;
