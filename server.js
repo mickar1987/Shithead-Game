@@ -835,57 +835,85 @@ function checkWin(room, idx) {
 
 // ── Next turn ──
 // ── Bot play logic ──
+// ══ IMPROVED AI ENGINE ══
+
+function getAiValue(card) {
+    const r = card.slice(0, -1);
+    if (r === '10') return 100; // הכי חזק (שורף)
+    if (r === '3')  return 95;  // שקוף (יקר מאוד)
+    if (r === '2')  return 90;  // מאפס
+    if (r === 'A')  return 14;
+    if (r === 'K')  return 13;
+    if (r === 'Q')  return 12;
+    if (r === 'J')  return 11;
+    return parseInt(r);
+}
+
+function getSmartMove(hand, pile, lastRank) {
+    const valid = hand.filter(c => canPlay(c, pile, lastRank));
+    if (valid.length === 0) return null;
+
+    const powers = valid.filter(c => ['2', '10'].includes(c.slice(0, -1)));
+    const normals = valid.filter(c => !['2', '10'].includes(c.slice(0, -1)));
+
+    if (normals.length > 0) {
+        // ממיינים מהנמוך לגבוה כדי להיפטר מהנמוכים קודם
+        normals.sort((a, b) => getAiRankValue(a) - getAiRankValue(b));
+        const lowestRank = normals[0].slice(0, -1);
+        
+        // המחשב בודק אם יש לו עוד קלפים מאותו סוג וזורק את כולם יחד!
+        return normals.filter(c => c.slice(0, -1) === lowestRank);
+    }
+
+    if (powers.length > 0) {
+        const ten = powers.find(c => c.startsWith('10'));
+        // משתמש ב-10 רק אם הקופה גדולה (למשל מעל 3 קלפים)
+        if (ten && pile.length > 3) return [ten];
+        
+        const two = powers.find(c => c.startsWith('2'));
+        return [two || powers[0]];
+    }
+    return null;
+}
 function doBotTurn(room) {
     if (room.gameOver || room.isSwapPhase) return;
     const idx = room.currentPlayer;
     const p = room.slots[idx];
     if (!p || !p.isBot || p.finished) return;
 
-    const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
-
     setTimeout(() => {
         if (room.gameOver || room.currentPlayer !== idx) return;
 
-        // Play from hand
+        let cardsToPlay = null;
+
         if (p.hand.length > 0) {
-            const valid = p.hand.filter(c => canPlay(c, room.pile));
-            if (valid.length > 0) {
-                valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
-                const card = valid[0];
+            cardsToPlay = getSmartBotMove(p.hand, room.pile, room.lastPlayedRank);
+        } else if (p.faceUp.length > 0) {
+            cardsToPlay = getSmartBotMove(p.faceUp, room.pile, room.lastPlayedRank);
+        } else if (p.faceDown.length > 0) {
+            const rndIdx = Math.floor(Math.random() * p.faceDown.length);
+            cardsToPlay = [p.faceDown[rndIdx]];
+        }
+
+        if (cardsToPlay) {
+            // במקום executeMove הישן, אנחנו מסננים את הקלפים מהיד/שולחן ומשחקים
+            cardsToPlay.forEach(card => {
                 p.hand = p.hand.filter(c => c !== card);
-                executeMove(room, idx, [card]);
-            } else {
-                // Take pile
-                p.hand.push(...room.pile);
-                room.pile = [];
-                broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
-                emitStateToAll(room);
-                nextTurn(room);
-            }
-            return;
+                p.faceUp = p.faceUp.filter(c => c !== card);
+                p.faceDown = p.faceDown.filter(c => c !== card);
+            });
+            executeMove(room, idx, cardsToPlay);
+        } else {
+            // הבוט לוקח את הקופה
+            p.hand.push(...room.pile);
+            room.pile = [];
+            room.lastPlayedRank = null;
+            broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
+            emitStateToAll(room);
+            nextTurn(room);
         }
-
-        // Play from faceUp
-        const faceUpCards = p.faceUp.filter(c => c);
-        if (faceUpCards.length > 0 && room.drawPile.length === 0) {
-            const valid = faceUpCards.filter(c => canPlay(c, room.pile));
-            if (valid.length > 0) {
-                valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
-                const card = valid[0];
-                const fi = p.faceUp.indexOf(card);
-                p.faceUp[fi] = null;
-                executeMove(room, idx, [card]);
-            } else {
-                p.hand.push(...room.pile, ...faceUpCards);
-                p.faceUp = [null, null, null];
-                room.pile = [];
-                broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
-                emitStateToAll(room);
-                nextTurn(room);
-            }
-            return;
-        }
-
+    }, 1200);
+}
         // Flip faceDown
         const fdIdx = p.faceDown.findIndex(c => c);
         if (fdIdx >= 0 && p.hand.length === 0) {
@@ -1269,20 +1297,23 @@ io.on('connection', (socket) => {
     });
 
     // ── End swap ──
-    socket.on('endSwap', () => {
+ socket.on('endSwap', () => {
         const { roomCode, slotIdx } = socket.data;
         const room = rooms[roomCode];
         if (!room || !room.isSwapPhase) return;
-        // Prevent double-submit from same player this round
-        if (room.slots[slotIdx]._swapDone) {
-            console.log(`[endSwap] slot${slotIdx} BLOCKED (already done) swapDoneCount=${room.swapDoneCount}`);
-            return;
-        }
+
+        if (room.slots[slotIdx]._swapDone) return;
+        
         room.slots[slotIdx]._swapDone = true;
         room.swapDoneCount = (room.swapDoneCount || 0) + 1;
+
         const needed = room.slots.filter(s => s.socketId).length;
-        console.log(`[endSwap] slot${slotIdx} counted: ${room.swapDoneCount}/${needed}`);
+
         if (room.swapDoneCount >= needed) {
+            // --- תוספת כאן ---
+            performBotSwaps(room); // הבוטים מחליפים לקלפים הכי חזקים (10, 3, 2, A)
+            // -----------------
+
             clearRoomTimer(room.code + '_swap');
             broadcast(room, 'swapTick', { remaining: 0 });
             room.isSwapPhase = false;
@@ -1292,6 +1323,9 @@ io.on('connection', (socket) => {
             broadcast(room, 'toast', `המשחק התחיל! ${room.slots[starter].name} ראשון`);
             emitStateToAll(room);
             startTurnTimer(room);
+            
+            // אם הבוט ראשון, תן לו לשחק
+            if (room.slots[starter].isBot) doBotTurn(room);
         } else {
             const waiting = needed - room.swapDoneCount;
             broadcast(room, 'toast', `${room.slots[slotIdx].name} סיים החלפה. ממתין לעוד ${waiting}...`);
