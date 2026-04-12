@@ -758,7 +758,7 @@ function emitStateToPlayer(room, slotIdx) {
         interruptWindow: room.interruptWindow || false,
         lastPlayedRank: room.lastPlayedRank || null,
         lastPlayerIdx: room.lastPlayerIdx ?? null,
-        interruptEarned: room.interruptEarned || false,
+        interruptEarned: (room.interruptEarned && room.lastPlayerIdx === slotIdx) || false,
         burnInterruptCount: (() => {
             // How many cards of top rank does THIS player need to burn pile?
             if (!room.pile.length || room.isSwapPhase) return 0;
@@ -860,14 +860,16 @@ function doBotTurn(room) {
     setTimeout(() => {
         if (room.gameOver || room.currentPlayer !== idx) return;
 
-        // Play from hand
+        // Play from hand - play ALL copies of chosen rank
         if (p.hand.length > 0) {
             const valid = p.hand.filter(c => canPlay(c, room.pile));
             if (valid.length > 0) {
                 valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
                 const card = valid[0];
-                p.hand = p.hand.filter(c => c !== card);
-                executeMove(room, idx, [card]);
+                const rank = card.slice(0,-1);
+                const allSameRank = p.hand.filter(c => c.slice(0,-1) === rank);
+                p.hand = p.hand.filter(c => c.slice(0,-1) !== rank);
+                executeMove(room, idx, allSameRank);
             } else {
                 // Take pile
                 p.hand.push(...room.pile);
@@ -955,16 +957,19 @@ function executeMove(room, playerIdx, cards) {
         (pile.length >= 4 && pile.slice(-4).every(c => c.slice(0, -1) === r));
 
     if (isBurned) {
-        broadcast(room, 'burn', { playerIdx });
-        room.pile = [];
-        drawUpToThree(room, playerIdx);
-        checkWin(room, playerIdx);
-        if (!room.slots[playerIdx].finished) {
-            emitStateToAll(room); // same player goes again
-            startTurnTimer(room); // reset timer after burn
-        } else {
-            nextTurn(room);
-        }
+        broadcast(room, 'cardPlayed', { playerIdx, cards });
+        setTimeout(() => {
+            broadcast(room, 'burn', { playerIdx });
+            room.pile = [];
+            drawUpToThree(room, playerIdx);
+            checkWin(room, playerIdx);
+            if (!room.slots[playerIdx].finished) {
+                emitStateToAll(room);
+                startTurnTimer(room);
+            } else {
+                nextTurn(room);
+            }
+        }, 400);
         return;
     }
 
