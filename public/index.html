@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.172</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.173</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1686,22 +1686,23 @@ function _humanTakeAI() {
     nextTurn();
 }
 
-function animateCardToPile(played, callback) {
+function animateCardToPile(played, callback, fromPlayer) {
     const pileEl = document.getElementById('pile');
     const pileRect = pileEl.getBoundingClientRect();
     const pileCx = pileRect.left + pileRect.width / 2;
     const pileCy = pileRect.top + pileRect.height / 2;
+    const srcPlayer = (fromPlayer !== undefined) ? fromPlayer : currentPlayer;
 
     // Source position
     let srcX, srcY;
-    if (currentPlayer === 0) {
+    if (srcPlayer === 0) {
         const handEl = document.getElementById('playerHand');
         const rect = handEl.getBoundingClientRect();
         srcX = rect.left + rect.width / 2;
         srcY = rect.top + 38;
     } else {
         const posMap2 = {2:{1:'pos-top'},3:{1:'pos-left',2:'pos-right'},4:{1:'pos-left',2:'pos-top',3:'pos-right'}};
-        const sid = posMap2[players.length]?.[currentPlayer] || 'pos-top';
+        const sid = posMap2[players.length]?.[srcPlayer] || 'pos-top';
         const rect = document.getElementById(sid)?.getBoundingClientRect() || pileRect;
         srcX = rect.left + rect.width / 2;
         srcY = rect.top + rect.height / 2;
@@ -2251,7 +2252,7 @@ function nextTurn(skips = 1) {
                         if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
                             setTimeout(aiMove, 300);
                     }
-                });
+                }), pi;
                 return;
             }
         }
