@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.174</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.175</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1070,39 +1070,11 @@ function startGame(count) {
     }));
     drawPile = deck;
 
-    // AI swap: optimal card placement across all 9 cards
-    //
-    // PHILOSOPHY:
-    // faceDown (hidden, last resort) = BEST specials: 10 > 2 > 3 > 8
-    //   then high cards (A,K,Q) — want max chance of surviving blindly
-    // faceUp (visible to all, mid-game) = cards easy to REACH FROM HAND:
-    //   2,3 always playable; A,K,Q hard to beat (pile pusher);
-    //   avoid 4,5,6 in faceUp — they block you when pile is high
-    // hand = keep WEAKEST cards (4,5,6,9,J) — dump these first!
+    // AI swap: only arrange faceUp and hand — faceDown stays as dealt (random, fair)
     players.forEach(p => {
         if (!p.isAI) return;
-        const all = [...p.hand, ...p.faceUp, ...p.faceDown]; // all 9 cards
-
-        // faceDown: best hidden cards — survive anything
-        const fdScore = r => {
-            if (r === '10') return 100;
-            if (r === '2')  return 95;
-            if (r === '3')  return 88;
-            if (r === '8')  return 70;
-            if (r === 'A')  return 52;
-            if (r === 'K')  return 46;
-            if (r === 'Q')  return 40;
-            if (r === '7')  return 32;
-            if (r === 'J')  return 20;
-            if (r === '9')  return 14;
-            if (r === '6')  return 7;
-            if (r === '5')  return 4;
-            if (r === '4')  return 1;
-            return 10;
-        };
-        const sortedAll = [...all].sort((a,b) => fdScore(b.slice(0,-1)) - fdScore(a.slice(0,-1)));
-        p.faceDown = sortedAll.slice(0, 3);
-        const rest = sortedAll.slice(3); // 6 remaining for faceUp + hand
+        // faceDown stays untouched — random as dealt
+        const rest = [...p.hand, ...p.faceUp]; // only 6 cards to arrange
 
         // faceUp: cards easy to play (high coverage) + hard to beat
         // 2,3 = play on anything; A,K,Q = high, hard to answer
