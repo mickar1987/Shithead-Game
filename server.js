@@ -957,6 +957,9 @@ function executeMove(room, playerIdx, cards) {
         (pile.length >= 4 && pile.slice(-4).every(c => c.slice(0, -1) === r));
 
     if (isBurned) {
+        const burnerName = room.slots[playerIdx]?.name || '';
+        broadcast(room, 'toast', `🔥 ${burnerName} שרף!`);
+        broadcast(room, 'log', `🔥 שריפה! תור נוסף ל-${burnerName}`);
         broadcast(room, 'cardPlayed', { playerIdx, cards });
         setTimeout(() => {
             broadcast(room, 'burn', { playerIdx });
