@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.166</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.167</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2778,13 +2778,23 @@ const overlay = document.getElementById('setupOverlay');
              </div>`;
         }).join('');
     });
-    socket.on('burn', () => {
-        playSound('burn');
+    socket.on('burn', ({ playerIdx } = {}) => {
+        const burnerName = onlineState?.players?.[playerIdx]?.name || '';
+        if (burnerName) log(`🔥 שריפה! תור נוסף ל-${burnerName}`);
         showToast('🔥 שריפה!');
+        playSound('burn');
         const pileEl = document.getElementById('pile');
-        pileEl.classList.add('burn-effect');
-        setTimeout(() => pileEl.classList.remove('burn-effect'), 600);
+        // Scale up then burn
+        pileEl.style.transition = 'transform 0.3s ease-in';
+        pileEl.style.transform = 'scale(1.15)';
+        setTimeout(() => {
+            pileEl.classList.add('burn-effect');
+            pileEl.style.transform = '';
+            pileEl.style.transition = '';
+            setTimeout(() => pileEl.classList.remove('burn-effect'), 800);
+        }, 300);
     });
+    socket.on('log', (msg) => { log(msg); });
     socket.on('cardPlayed', ({ playerIdx, cards, isInterrupt }) => {
         if (playerIdx !== mySlotIdx) playSound('play');
         if (onlineState) {
