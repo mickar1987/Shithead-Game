@@ -803,6 +803,7 @@ function emitStateToAll(room) {
 
 function checkBotBurnInterrupt(room) {
     if (room.gameOver || room.isSwapPhase || !room.pile.length) return;
+    console.log(`[botBurn] checking room=${room.code} pile=${room.pile.length} current=${room.currentPlayer}`);
     // Find top rank (skip 3s)
     let topRank = null;
     for (let i = room.pile.length-1; i >= 0; i--) {
@@ -823,6 +824,7 @@ function checkBotBurnInterrupt(room) {
         const matching = slot.hand.filter(c => c.slice(0,-1) === topRank);
         if (matching.length >= needed) {
             const burnCards = matching.slice(0, needed);
+            console.log(`[botBurn] bot ${i} (${slot.name}) can burn with ${burnCards} needed=${needed}`);
             setTimeout(() => {
                 if (room.gameOver || !room.pile.length) return;
                 // Verify still valid
