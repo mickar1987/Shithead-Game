@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.170</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.171</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2181,7 +2181,14 @@ function nextTurn(skips = 1) {
     }
 
     // AI interrupt: check if any non-current AI player can burn or add-on
-    if (!isSwapPhase && !players[prevPlayer].finished) {
+    // Only if human player cannot interrupt (human gets priority)
+    const _humanCanBurnNow = (() => {
+        if (isSwapPhase || players[0].finished || currentPlayer === 0) return false;
+        const topR2 = pileTopRank(); const str2 = pileStreak();
+        const need2 = topR2 ? 4 - str2 : 0;
+        return need2 > 0 && players[0].hand.filter(c => c.slice(0,-1) === topR2).length >= need2;
+    })();
+    if (!isSwapPhase && !players[prevPlayer].finished && !_humanCanBurnNow) {
         const topR = pileTopRank();
         const streak = pileStreak();
         const needed = topR ? 4 - streak : 0;
