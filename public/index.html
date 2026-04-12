@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.171</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.172</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2195,12 +2195,11 @@ function nextTurn(skips = 1) {
         for (let pi = 0; pi < players.length; pi++) {
             if (pi === currentPlayer || players[pi].finished || !players[pi].isAI) continue;
             const canBurnAI = needed > 0 && needed <= players[pi].hand.filter(c => c.slice(0,-1) === topR).length;
-            const canAddAI = playedRank && playedRank !== '10' && playedRank !== '8'
-                && players[pi].hand.some(c => c.slice(0,-1) === playedRank);
-            if (canBurnAI || canAddAI) {
-                const intRank = canBurnAI ? topR : playedRank;
+            // Only BURN interrupts allowed for non-current players (not add-on)
+            if (canBurnAI) {
+                const intRank = topR;
                 const intCards = players[pi].hand.filter(c => c.slice(0,-1) === intRank);
-                const takeCount = canBurnAI ? needed : intCards.length;
+                const takeCount = needed;
                 const toPlay = intCards.slice(0, takeCount);
                 // Animate cards flying to pile first
                 animating = true;
