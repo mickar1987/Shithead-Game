@@ -758,6 +758,7 @@ function emitStateToPlayer(room, slotIdx) {
         interruptWindow: room.interruptWindow || false,
         lastPlayedRank: room.lastPlayedRank || null,
         lastPlayerIdx: room.lastPlayerIdx ?? null,
+        interruptEarned: room.interruptEarned || false,
         burnInterruptCount: (() => {
             // How many cards of top rank does THIS player need to burn pile?
             if (!room.pile.length || room.isSwapPhase) return 0;
@@ -967,26 +968,28 @@ function executeMove(room, playerIdx, cards) {
         return;
     }
 
+    // Check remaining same-rank BEFORE drawing (so we know if player held back cards)
+    const remainingSameRankBeforeDraw = room.slots[playerIdx].hand.filter(c => c.slice(0,-1) === r).length;
+
     drawUpToThree(room, playerIdx);
     checkWin(room, playerIdx);
     if (room.slots[playerIdx].finished) { nextTurn(room); return; }
 
     const skips = r === '8' ? cards.length : 1;
 
-    // Open interrupt window for all ranks except 10 (burn)
-    // Only if player doesn't still have more of same rank in hand (i.e., played all they had)
-    const remainingSameRank = room.slots[playerIdx].hand.filter(c => c.slice(0,-1) === r).length;
-    if (r !== '10' && remainingSameRank === 0) {
+    // Open interrupt window only if player played ALL same-rank cards they had before drawing
+    if (r !== '10' && remainingSameRankBeforeDraw === 0) {
         room.interruptWindow = true;
         room.lastPlayedRank = r;
         room.lastPlayerIdx = playerIdx;
+        room.interruptEarned = true;
     } else {
         room.interruptWindow = false;
         room.lastPlayedRank = null;
         room.lastPlayerIdx = null;
+        room.interruptEarned = false;
     }
     nextTurn(room, skips);
-    // interruptWindow stays open until next player actually plays
 }
 
 // ══════════════════════════════════════════════
@@ -1354,7 +1357,7 @@ io.on('connection', (socket) => {
             // Add to pile and execute
             cards.forEach(c => room.pile.push(c));
             broadcast(room, 'toast', `⚡ ${p.name} התפרץ!`);
-            broadcast(room, 'cardPlayed', { playerIdx: slotIdx, cards });
+            broadcast(room, 'cardPlayed', { playerIdx: slotIdx, cards, isInterrupt: true });
             // Check burn
             const topR = room.pile[room.pile.length-1].slice(0,-1);
             const isBurned = topR === '10' || (room.pile.length >= 4 && room.pile.slice(-4).every(c=>c.slice(0,-1)===topR));
