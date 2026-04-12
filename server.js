@@ -799,6 +799,60 @@ function emitStateToPlayer(room, slotIdx) {
 
 function emitStateToAll(room) {
     room.slots.forEach((_, i) => emitStateToPlayer(room, i));
+    // Check if any non-current bot can do a burn interrupt
+    checkBotBurnInterrupt(room);
+}
+
+function checkBotBurnInterrupt(room) {
+    if (room.gameOver || room.isSwapPhase || !room.pile.length) return;
+    // Find top rank (skip 3s)
+    let topRank = null;
+    for (let i = room.pile.length-1; i >= 0; i--) {
+        if (room.pile[i].slice(0,-1) !== '3') { topRank = room.pile[i].slice(0,-1); break; }
+    }
+    if (!topRank) return;
+    let streak = 0;
+    for (let i = room.pile.length-1; i >= 0; i--) {
+        if (room.pile[i].slice(0,-1) === topRank) streak++;
+        else break;
+    }
+    const needed = 4 - streak;
+    if (needed <= 0) return;
+    // Find a non-current bot that can complete the burn
+    for (let i = 0; i < room.slots.length; i++) {
+        const slot = room.slots[i];
+        if (!slot.isBot || slot.finished || i === room.currentPlayer) continue;
+        const matching = slot.hand.filter(c => c.slice(0,-1) === topRank);
+        if (matching.length >= needed) {
+            const burnCards = matching.slice(0, needed);
+            setTimeout(() => {
+                if (room.gameOver || !room.pile.length) return;
+                // Verify still valid
+                let tr2 = null;
+                for (let j = room.pile.length-1; j >= 0; j--) {
+                    if (room.pile[j].slice(0,-1) !== '3') { tr2 = room.pile[j].slice(0,-1); break; }
+                }
+                if (tr2 !== topRank) return;
+                // Execute burn interrupt
+                burnCards.forEach(c => { const idx = slot.hand.indexOf(c); if (idx !== -1) slot.hand.splice(idx, 1); });
+                burnCards.forEach(c => room.pile.push(c));
+                broadcast(room, 'toast', `⚡🔥 ${slot.name} התפרץ ושרף!`);
+                broadcast(room, 'log', `⚡🔥 ${slot.name} התפרץ לשריפה!`);
+                broadcast(room, 'cardPlayed', { playerIdx: i, cards: burnCards, isInterrupt: true });
+                setTimeout(() => {
+                    const burnerName = slot.name;
+                    broadcast(room, 'log', `🔥 שריפה! תור נוסף ל-${burnerName}`);
+                    broadcast(room, 'burn', { playerIdx: i });
+                    room.pile = [];
+                    drawUpToThree(room, i);
+                    checkWin(room, i);
+                    emitStateToAll(room);
+                    startTurnTimer(room);
+                }, 600);
+            }, 800);
+            break; // only one bot can interrupt
+        }
+    }
 }
 
 // ── Broadcast a toast/log to all in room ──
