@@ -799,8 +799,6 @@ function emitStateToPlayer(room, slotIdx) {
 
 function emitStateToAll(room) {
     room.slots.forEach((_, i) => emitStateToPlayer(room, i));
-    // Check if any non-current bot can do a burn interrupt
-    checkBotBurnInterrupt(room);
 }
 
 function checkBotBurnInterrupt(room) {
@@ -992,6 +990,8 @@ function nextTurn(room, skips = 1) {
     }
     emitStateToAll(room);
     startTurnTimer(room);
+    // Check if any non-current bot can do a burn interrupt
+    checkBotBurnInterrupt(room);
     // If current player is a bot, trigger bot move
     const cur = room.slots[room.currentPlayer];
     if (cur && cur.isBot && !cur.finished && !room.gameOver) {
