@@ -766,7 +766,7 @@ function emitStateToPlayer(room, slotIdx) {
             if (!topRank) return 0;
             const streak = room.pile.filter(c=>c.slice(0,-1)===topRank).length; // streak from top
             // count consecutive from top
-            let s=0; for(let i=room.pile.length-1;i>=0;i--){ if(room.pile[i].slice(0,-1)===topRank) s++; else break; }
+            let s=0; for(let i=room.pile.length-1;i>=0;i--){ const _r=room.pile[i].slice(0,-1); if(_r===topRank) s++; else if(_r==='3') continue; else break; }
             const needed = 4 - s;
             return needed > 0 ? needed : 0;
         })(),
@@ -778,7 +778,7 @@ function emitStateToPlayer(room, slotIdx) {
             if (room.currentPlayer === slotIdx) return 0; // it's their turn, normal play
             const topRank = (() => { for(let i=room.pile.length-1;i>=0;i--) if(room.pile[i].slice(0,-1)!=='3') return room.pile[i].slice(0,-1); return null; })();
             if (!topRank) return 0;
-            let streak=0; for(let i=room.pile.length-1;i>=0;i--){ if(room.pile[i].slice(0,-1)===topRank) streak++; else break; }
+            let streak=0; for(let i=room.pile.length-1;i>=0;i--){ const _r=room.pile[i].slice(0,-1); if(_r===topRank) streak++; else if(_r==='3') continue; else break; }
             const needed = 4 - streak;
             if (needed <= 0) return 0;
             const faceUpCount = p.faceUp.filter(c => c && c.slice(0,-1) === topRank).length;
@@ -812,7 +812,9 @@ function checkBotBurnInterrupt(room) {
     if (!topRank) return;
     let streak = 0;
     for (let i = room.pile.length-1; i >= 0; i--) {
-        if (room.pile[i].slice(0,-1) === topRank) streak++;
+        const _cr = room.pile[i].slice(0,-1);
+        if (_cr === topRank) streak++;
+        else if (_cr === '3') continue;
         else break;
     }
     const needed = 4 - streak;
@@ -1009,8 +1011,8 @@ function executeMove(room, playerIdx, cards) {
 
     broadcast(room, 'cardPlayed', { playerIdx, cards });
 
-    const isBurned = r === '10' ||
-        (pile.length >= 4 && pile.slice(-4).every(c => c.slice(0, -1) === r));
+    let _bs1 = 0; for (let i = pile.length-1; i >= 0; i--) { const _c=pile[i].slice(0,-1); if(_c===r) _bs1++; else if(_c==='3') continue; else break; }
+    const isBurned = r === '10' || _bs1 >= 4;
 
     if (isBurned) {
         const burnerName = room.slots[playerIdx]?.name || '';
@@ -1424,7 +1426,8 @@ io.on('connection', (socket) => {
             broadcast(room, 'cardPlayed', { playerIdx: slotIdx, cards, isInterrupt: true });
             // Check burn
             const topR = room.pile[room.pile.length-1].slice(0,-1);
-            const isBurned = topR === '10' || (room.pile.length >= 4 && room.pile.slice(-4).every(c=>c.slice(0,-1)===topR));
+            let _bs2=0; for(let i=room.pile.length-1;i>=0;i--){const _c2=room.pile[i].slice(0,-1);if(_c2===topR)_bs2++;else if(_c2==='3')continue;else break;}
+            const isBurned = topR === '10' || _bs2 >= 4;
             if (isBurned) {
                 broadcast(room, 'burn', { playerIdx: slotIdx });
                 room.pile = [];
@@ -1466,7 +1469,7 @@ io.on('connection', (socket) => {
             // Count streak
             let streak = 0;
             for (let i = room.pile.length-1; i >= 0; i--) {
-                if (room.pile[i].slice(0,-1) === topRank) streak++; else break;
+                if (room.pile[i].slice(0,-1) === topRank) streak++; else if (room.pile[i].slice(0,-1) === '3') continue; else break;
             }
             const needed = 4 - streak;
             if (needed <= 0) { socket.emit('error', 'לא התורו שלך'); return; }
