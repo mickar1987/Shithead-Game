@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.162</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.163</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2768,11 +2768,41 @@ const overlay = document.getElementById('setupOverlay');
         pileEl.classList.add('burn-effect');
         setTimeout(() => pileEl.classList.remove('burn-effect'), 600);
     });
-    socket.on('cardPlayed', ({ playerIdx, cards }) => {
+    socket.on('cardPlayed', ({ playerIdx, cards, isInterrupt }) => {
         if (playerIdx !== mySlotIdx) playSound('play');
         if (onlineState) {
             const pName = onlineState.players?.[playerIdx]?.name || `שחקן ${playerIdx+1}`;
-            if (cards?.length) log(`${pName}: ${cards.join(', ')}`);
+            if (cards?.length) log(`${isInterrupt ? '⚡ ' : ''}${pName}: ${cards.join(', ')}`);
+        }
+        // Animate card flying from player position to pile
+        if (playerIdx !== mySlotIdx && cards?.length && onlineState) {
+            const pileEl = document.getElementById('pile');
+            if (!pileEl) return;
+            const pileRect = pileEl.getBoundingClientRect();
+            const pileCx = pileRect.left + pileRect.width / 2;
+            const pileCy = pileRect.top + pileRect.height / 2;
+            const n = onlineState.players.length;
+            const posMap = {2:{1:'pos-top'},3:{1:'pos-left',2:'pos-right'},4:{1:'pos-left',2:'pos-top',3:'pos-right'}};
+            const sid = posMap[n]?.[playerIdx] || 'pos-top';
+            const srcEl = document.getElementById(sid);
+            const srcRect = srcEl ? srcEl.getBoundingClientRect() : pileRect;
+            const srcX = srcRect.left + srcRect.width / 2;
+            const srcY = srcRect.top + srcRect.height / 2;
+            const layer = document.getElementById('animLayer') || document.body;
+            cards.forEach((card, idx) => {
+                setTimeout(() => {
+                    const el = document.createElement('div');
+                    el.textContent = card.slice(0,-1);
+                    el.style.cssText = `position:fixed;z-index:9500;width:44px;height:64px;background:#fff;border:2px solid ${isInterrupt?'#dc2626':'#333'};border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:1.1rem;color:${['h','d'].includes(card.slice(-1))?'#dc2626':'#222'};pointer-events:none;left:${srcX-22}px;top:${srcY-32}px;transition:all 0.35s ease-in;box-shadow:0 0 ${isInterrupt?'12px #dc2626':'6px rgba(0,0,0,0.4)'};`;
+                    layer.appendChild(el);
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                        el.style.left = (pileCx-22) + 'px';
+                        el.style.top = (pileCy-32) + 'px';
+                        el.style.transform = 'scale(1.2)';
+                    }));
+                    setTimeout(() => { el.style.opacity='0'; setTimeout(() => el.remove(), 200); }, 380);
+                }, idx * 80);
+            });
         }
     });
     socket.on('swapTick', ({ remaining }) => {
@@ -3774,13 +3804,11 @@ function renderOnline(state) {
 
     const isMyTurn = state.currentPlayer === myIdx && !state.isSwapPhase;
     // Type 1: same-player add-on interrupt
-    // Interrupt only if player has more of same rank AND played all same-rank cards they had
-    // (server handles this via interruptWindow=false if remaining same rank > 0)
-    const remainingSameRankInHand = state.myHand.filter(c => c.slice(0,-1) === state.lastPlayedRank).length;
+    // Interrupt only when server confirms it was earned (played all same-rank cards)
     const canAddInterrupt = !!(state.interruptWindow
+        && state.interruptEarned
         && state.lastPlayerIdx === myIdx
-        && state.currentPlayer !== myIdx
-        && remainingSameRankInHand > 0);
+        && state.currentPlayer !== myIdx);
     // Type 2: burn interrupt — any player completing 4-of-a-kind
     const burnNeeded = state.burnInterruptCount || 0;
     const faceUpBurnNeeded = state.faceUpBurnCount || 0;
@@ -4795,13 +4823,11 @@ function renderOnline(state) {
 
     const isMyTurn = state.currentPlayer === myIdx && !state.isSwapPhase;
     // Type 1: same-player add-on interrupt
-    // Interrupt only if player has more of same rank AND played all same-rank cards they had
-    // (server handles this via interruptWindow=false if remaining same rank > 0)
-    const remainingSameRankInHand = state.myHand.filter(c => c.slice(0,-1) === state.lastPlayedRank).length;
+    // Interrupt only when server confirms it was earned (played all same-rank cards)
     const canAddInterrupt = !!(state.interruptWindow
+        && state.interruptEarned
         && state.lastPlayerIdx === myIdx
-        && state.currentPlayer !== myIdx
-        && remainingSameRankInHand > 0);
+        && state.currentPlayer !== myIdx);
     // Type 2: burn interrupt — any player completing 4-of-a-kind
     const burnNeeded = state.burnInterruptCount || 0;
     const faceUpBurnNeeded = state.faceUpBurnCount || 0;
