@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.164</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.165</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1823,16 +1823,24 @@ function _doExecuteMove(played) {
         return;
     }
 
+    // Save how many of same rank remained in hand BEFORE drawing
+    const _sameRankBeforeDraw = players[currentPlayer].hand.filter(c2 => c2.slice(0,-1) === r).length;
+
     drawUpToThree(currentPlayer);
     checkWin(currentPlayer);
 
     // 8 = skip
     const skips = r === '8' ? played.length + 1 : 1;
 
-    // If human just played, open 3s add-on interrupt window (can add same rank)
+    // If human just played ALL of that rank, open add-on interrupt window
+    // Only show if player played ALL copies they had (none remaining from before draw)
+    // played.filter gives how many of rank were played; if hand still has same rank after draw
+    // it means new ones were drawn - original ones were all played
+    // Open interrupt only if player had NO remaining same-rank before draw
+    // _sameRankBeforeDraw=0 means they played ALL copies they had
+    const remainingAfterDraw = players[0].hand.filter(c => c.slice(0,-1) === r).length;
     if (!fastMode && !isSwapPhase && currentPlayer === 0 && !players[0].finished
-        && r !== '8' && players[0].hand.some(c => c.slice(0,-1) === r)) {
-        // Open add-on window
+        && r !== '8' && _sameRankBeforeDraw === 0 && remainingAfterDraw > 0) {
         if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
         aiInterrupt = {
             type: 'self-add',
@@ -1902,7 +1910,13 @@ function aiPileDifficulty(rank, opponents) {
 
 function aiGetBestPlay(validCards, hand) {
     if (!validCards.length) return null;
-    const _ret = (cards) => cards && cards.length ? [cards[0].slice(0,-1), cards] : null;
+    // allOfRank: returns ALL copies of rank from hand (not just validCards)
+    const myHand = hand || [];
+    const allOfRank = (rank) => {
+        const all = myHand.filter(c => c.slice(0,-1) === rank);
+        return all.length > 0 ? all : validCards.filter(c => c.slice(0,-1) === rank);
+    };
+    const _ret = (rank) => { const cards = allOfRank(rank); return cards.length ? [rank, cards] : null; };
 
     const pileSize = pile.length;
     const isPileEmpty = pileSize === 0;
@@ -1915,29 +1929,28 @@ function aiGetBestPlay(validCards, hand) {
     // 1. חוק קופה ריקה: לעולם לא 2/3/10 על ריק אם יש קלף רגיל
     if (isPileEmpty && normals.length > 0) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        return _ret([normals[0]]);
+        return _ret(normals[0].slice(0,-1));
     }
 
     // 2. אסטרטגיית ה-3: רק אם קלף בקופה הוא 8 ומעלה (לא A/K/Q)
-    const threes = validCards.filter(c => c.slice(0,-1) === '3');
-    if (threes.length > 0 && !isPileEmpty && lastVal >= 8 && lastVal < 20) {
-        return _ret([threes[0]]);
+    const threeCard = validCards.find(c => c.slice(0,-1) === '3');
+    if (threeCard && !isPileEmpty && lastVal >= 8 && lastVal < 20) {
+        return _ret('3');
     }
 
     // 3. קלפים רגילים: הנמוך ביותר, כל הסדרה
     if (normals.length > 0) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        const rank = normals[0].slice(0,-1);
-        return _ret(normals.filter(c => c.slice(0,-1) === rank));
+        return _ret(normals[0].slice(0,-1));
     }
 
     // 4. קלפי כוח בלבד
     if (powers.length > 0) {
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        if (ten && (pileSize >= 3 || lastVal > 12)) return _ret([ten]);
+        if (ten && (pileSize >= 3 || lastVal > 12)) return _ret('10');
         const two = powers.find(c => c.slice(0,-1) === '2');
-        if (two) return _ret([two]);
-        return _ret([powers[0]]);
+        if (two) return _ret('2');
+        return _ret(powers[0].slice(0,-1));
     }
 
     return null;
