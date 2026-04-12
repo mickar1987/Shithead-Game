@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.169log</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.170</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2180,55 +2180,72 @@ function nextTurn(skips = 1) {
         }
     }
 
-    // AI interrupt: check if any AI player can burn when human just played
-    if (!isSwapPhase && prevPlayer === 0 && !players[prevPlayer].finished) {
+    // AI interrupt: check if any non-current AI player can burn or add-on
+    if (!isSwapPhase && !players[prevPlayer].finished) {
         const topR = pileTopRank();
         const streak = pileStreak();
         const needed = topR ? 4 - streak : 0;
-        // Check each AI player for burn possibility
-        for (let pi = 1; pi < players.length; pi++) {
-            if (players[pi].finished || !players[pi].isAI) continue;
+        for (let pi = 0; pi < players.length; pi++) {
+            if (pi === currentPlayer || players[pi].finished || !players[pi].isAI) continue;
             const canBurnAI = needed > 0 && needed <= players[pi].hand.filter(c => c.slice(0,-1) === topR).length;
             const canAddAI = playedRank && playedRank !== '10' && playedRank !== '8'
                 && players[pi].hand.some(c => c.slice(0,-1) === playedRank);
             if (canBurnAI || canAddAI) {
-                // AI decides to interrupt (smart: always interrupt if can burn, or if add-on leads to burn)
                 const intRank = canBurnAI ? topR : playedRank;
                 const intCards = players[pi].hand.filter(c => c.slice(0,-1) === intRank);
                 const takeCount = canBurnAI ? needed : intCards.length;
                 const toPlay = intCards.slice(0, takeCount);
-                toPlay.forEach(c => { const i = players[pi].hand.indexOf(c); if (i !== -1) players[pi].hand.splice(i, 1); });
-                toPlay.forEach(c => pile.push(c));
-                const newTopR = pileTopRank();
-                const isBurned2 = newTopR === '10' || pileStreak() >= 4;
-                if (isBurned2) {
-                    playSound('burn');
-                    showToast(`🔥 ${players[pi].name} שרף!`);
-                    const pileEl = document.getElementById('pile');
-                    pileEl.classList.add('burn-effect');
-                    animating = true;
-                    _execMoveToken++; // invalidate any pending animation callback
-                    setTimeout(() => {
-                        pile = [];
-                        pileEl.classList.remove('burn-effect');
-                        animating = false;
+                // Animate cards flying to pile first
+                animating = true;
+                _execMoveToken++;
+                const myToken2 = _execMoveToken;
+                // Remove from hand for render
+                toPlay.forEach(c => { const idx2 = players[pi].hand.indexOf(c); if (idx2 !== -1) players[pi].hand.splice(idx2, 1); });
+                render();
+                animateCardToPile(toPlay, () => {
+                    if (myToken2 !== _execMoveToken) return;
+                    animating = false;
+                    toPlay.forEach(c => pile.push(c));
+                    const newTopR = pileTopRank();
+                    const isBurned2 = newTopR === '10' || pileStreak() >= 4;
+                    log(`${canBurnAI ? '🔥' : '⚡'} ${players[pi].name}: ${toPlay.join(', ')}`);
+                    if (isBurned2) {
+                        playSound('burn');
+                        showToast(`🔥 ${players[pi].name} שרף!`);
+                        log(`🔥 שריפה! תור נוסף ל-${players[pi].name}`);
+                        animating = true;
+                        _execMoveToken++;
+                        const pileEl = document.getElementById('pile');
+                        render();
+                        setTimeout(() => {
+                            pileEl.style.transition = 'transform 0.3s ease-in';
+                            pileEl.style.transform = 'scale(1.15)';
+                            setTimeout(() => {
+                                pileEl.classList.add('burn-effect');
+                                pileEl.style.transform = '';
+                                pileEl.style.transition = '';
+                                setTimeout(() => {
+                                    pile = [];
+                                    pileEl.classList.remove('burn-effect');
+                                    animating = false;
+                                    drawUpToThree(pi);
+                                    checkWin(pi);
+                                    currentPlayer = pi;
+                                    render();
+                                    if (!gameOver && !players[pi].finished)
+                                        setTimeout(aiMove, 300);
+                                }, 800);
+                            }, 350);
+                        }, 100);
+                    } else {
+                        showToast(`⚡ ${players[pi].name} התפרץ!`);
                         drawUpToThree(pi);
                         checkWin(pi);
-                        // After AI burn: AI gets the turn
-                        currentPlayer = pi;
                         render();
-                        if (!gameOver && !players[pi].finished)
+                        if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
                             setTimeout(aiMove, 300);
-                    }, 600);
-                } else {
-                    showToast(`⚡ ${players[pi].name} התפרץ!`);
-                    drawUpToThree(pi);
-                    checkWin(pi);
-                    render();
-                    // Continue to next player's turn
-                    if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
-                        setTimeout(aiMove, 300);
-                }
+                    }
+                });
                 return;
             }
         }
