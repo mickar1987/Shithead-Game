@@ -1901,8 +1901,22 @@ function basraStartTimer(room) {
         if (!p) return;
         if (room.committedCard && room.committedBy === room.currentPlayer) {
             const thrown = room.committedCard;
-            room.tableCards.push(thrown); room.committedCard = null; room.committedBy = null;
-            basraBroadcast(room, 'toast', `${p.name} זרק ${thrown} (פג הזמן)`);
+            // RULE: if captures available, auto-capture minimum (don't just throw)
+            const allCaps = basraBotFindCaptures(thrown, room.tableCards);
+            if (allCaps.length > 0) {
+                const minGroup = allCaps.sort((a,b) => a.length - b.length)[0];
+                room.committedCard = null; room.committedBy = null;
+                const result = basra.playCard(room, room.currentPlayer, thrown, minGroup, true);
+                if (result.ok) {
+                    basraBroadcast(room, 'toast', `${p.name} אסף אוטומטית (פג הזמן)`);
+                } else {
+                    room.tableCards.push(thrown);
+                    basraBroadcast(room, 'toast', `${p.name} זרק ${thrown} (פג הזמן)`);
+                }
+            } else {
+                room.tableCards.push(thrown); room.committedCard = null; room.committedBy = null;
+                basraBroadcast(room, 'toast', `${p.name} זרק ${thrown} (פג הזמן)`);
+            }
             basraAdvanceTurn(room);
         } else if (p.hand.length > 0) {
             const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
@@ -2310,13 +2324,12 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE A: NEVER throw J or 7d to empty table unless it's the ONLY card in hand
+    // RULE A: NEVER throw J or 7d unless table has 3+ cards (or last card in hand)
     if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') &&
-        bestCapture.length === 0 && tableCards.length === 0 && handSize > 1) {
+        bestCapture.length === 0 && tableCards.length < 3 && handSize > 1) {
         // Find best non-J/7d throw
         const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
         if (safeCards.length > 0) {
-            // Pick Q/K first, then lowest value
             const priority = c => {
                 const r = c.slice(0,-1);
                 if (r==='Q'||r==='K') return 1;
@@ -2325,6 +2338,16 @@ function basraBotMove(room) {
                 return v;
             };
             safeCards.sort((a,b) => priority(a) - priority(b));
+            bestCard = safeCards[0];
+            bestCapture = [];
+        }
+    }
+
+    // RULE A2: J as second-to-last card — if only 0-1 cards on table, wait one more turn
+    if (bestCard.slice(0,-1) === 'J' && bestCapture.length === 0 &&
+        handSize === 2 && tableCards.length <= 1) {
+        const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+        if (safeCards.length > 0) {
             bestCard = safeCards[0];
             bestCapture = [];
         }
@@ -2710,7 +2733,19 @@ function registerBasraHandlers(socket) {
 
         const card = room.committedCard;
 
-        const result = basra.playCard(room, slotIdx, card, captureIndices || [], true);
+        // RULE: if captures are available, player MUST capture — cannot throw
+        let enforcedCaptures = captureIndices || [];
+        if (enforcedCaptures.length === 0 && room.tableCards.length > 0) {
+            const allCaps = basraBotFindCaptures(card, room.tableCards);
+            if (allCaps.length > 0) {
+                // Enforce minimum capture (smallest group)
+                const minGroup = allCaps.sort((a,b) => a.length - b.length)[0];
+                enforcedCaptures = minGroup;
+                basraBroadcast(room, 'toast', `חייב לאסוף! (כלל חובת אסיפה)`);
+            }
+        }
+
+        const result = basra.playCard(room, slotIdx, card, enforcedCaptures, true);
         if (!result.ok) {
             // Keep committedCard so player can retry — it's still their turn
             socket.emit('basraError', result.error);
