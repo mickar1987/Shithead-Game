@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.178</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.180</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1935,7 +1935,7 @@ function aiGetBestPlay(validCards, hand) {
     // 4. קלפי כוח בלבד
     if (powers.length > 0) {
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        if (ten && (pileSize >= 3 || lastVal > 12)) return _ret('10');
+        if (ten && (pileSize >= 3 || lastVal > 12)) return ['10', [ten]]; // תמיד רק 10 אחד
         const two = powers.find(c => c.slice(0,-1) === '2');
         if (two) return _ret('2');
         return _ret(powers[0].slice(0,-1));
