@@ -1912,16 +1912,24 @@ function aiGetBestPlay(validCards, hand) {
         return _ret(normals[0].slice(0,-1));
     }
 
-    // 2. אסטרטגיית ה-3: רק אם קלף בקופה הוא 8 ומעלה (לא A/K/Q)
-    const threeCard = validCards.find(c => c.slice(0,-1) === '3');
-    if (threeCard && !isPileEmpty && lastVal >= 8 && lastVal < 20) {
-        return _ret('3');
-    }
-
-    // 3. קלפים רגילים: הנמוך ביותר, כל הסדרה
+    // 2. קלפים רגילים (לא power, לא 3): הנמוך ביותר שיכול לענות
     if (normals.length > 0) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
         return _ret(normals[0].slice(0,-1));
+    }
+
+    // 3. אסטרטגיית ה-3: רק אם אין קלף רגיל אחר לשחק, AND הקופה היא A או K (מצב קריטי)
+    //    3 שקוף — הקופה נשארת גבוהה אחריו, אז עדיף רק כשאין ברירה
+    const threeCard = validCards.find(c => c.slice(0,-1) === '3');
+    if (threeCard && !isPileEmpty) {
+        // יש 3 — אבל כבר בדקנו שאין normals. בדוק אם יש 2/10 עדיף לפני 3
+        const twoCard = powers.find(c => c.slice(0,-1) === '2');
+        const tenCard = powers.find(c => c.slice(0,-1) === '10');
+        // שחק 3 רק אם: אין 2, ואין 10 שכדאי לשמור, ורק כשאין ברירה
+        // (אנחנו כאן כי normals ריק — כל הvalidCards הם powers/3)
+        if (!twoCard && (!tenCard || (pileSize < 3 && lastVal <= 12))) {
+            return _ret('3');
+        }
     }
 
     // 4. קלפי כוח בלבד
