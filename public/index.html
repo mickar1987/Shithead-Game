@@ -577,18 +577,8 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;">🀄 Basra</button>
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
-        <button onclick="showStatsModal()" class="setup-btn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:0.85rem;padding:8px;">📊 הסטטיסטיקה שלי</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.184</div>
-
-    <!-- Stats Modal -->
-    <div id="statsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;">
-        <div style="background:linear-gradient(160deg,#1a2a1a,#0f1a0f);border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:24px 20px;width:90%;max-width:340px;max-height:85vh;overflow-y:auto;position:relative;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--gold);letter-spacing:3px;text-align:center;margin-bottom:16px;">📊 הסטטיסטיקה שלי</div>
-            <div id="statsContent"></div>
-            <button onclick="closeStatsModal()" class="setup-btn" style="margin-top:16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);font-size:0.9rem;padding:8px;">✕ סגור</button>
-        </div>
-    </div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.185</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -938,124 +928,8 @@ let authUser = null; // { username, token, coins }
 
 let mySwapDone = false;
 let winnersOrder = [], isPeeking = false, revealedFaceDownIndex = null;
-let _basraIsVsBot = false;
 
-// ── Game Statistics ──
-function loadGameStats() {
-    try { return JSON.parse(localStorage.getItem('gameStats') || 'null') || { shithead:{played:0,places:[0,0,0,0],abandoned:0}, basra:{played:0,won:0,lost:0,abandoned:0} }; }
-    catch(e) { return { shithead:{played:0,places:[0,0,0,0],abandoned:0}, basra:{played:0,won:0,lost:0,abandoned:0} }; }
-}
-function saveGameStats(stats) {
-    try { localStorage.setItem('gameStats', JSON.stringify(stats)); } catch(e) {}
-}
-function recordShitheadResult(place, totalPlayers) {
-    const s = loadGameStats();
-    s.shithead.played++;
-    if (place >= 1 && place <= 4) s.shithead.places[place-1]++;
-    saveGameStats(s);
-}
-function recordShitheadAbandoned() {
-    const s = loadGameStats();
-    s.shithead.abandoned++;
-    saveGameStats(s);
-}
-function recordBasraResult(won) {
-    const s = loadGameStats();
-    s.basra.played++;
-    if (won) s.basra.won++; else s.basra.lost++;
-    saveGameStats(s);
-}
-function recordBasraAbandoned() {
-    const s = loadGameStats();
-    s.basra.abandoned++;
-    saveGameStats(s);
-}
 
-function showStatsModal() {
-    const s = loadGameStats();
-    const sh = s.shithead;
-    const ba = s.basra;
-    const placeLabels = ['🥇 מקום 1','🥈 מקום 2','🥉 מקום 3','💩 מקום 4'];
-    const placeColors = ['#fbbf24','#9ca3af','#cd7c3a','#6b7280'];
-
-    let html = '';
-
-    // Shithead section
-    html += `<div style="margin-bottom:18px;">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:#7dd3fc;letter-spacing:2px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:6px;">🃏 Shithead — מול מחשב</div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:8px;">
-            <span>משחקים שוחקו</span><span style="color:#fff;font-weight:700;">${sh.played}</span>
-        </div>`;
-
-    placeLabels.forEach((label, i) => {
-        const count = sh.places[i] || 0;
-        const pct = sh.played > 0 ? Math.round(count / sh.played * 100) : 0;
-        html += `<div style="margin-bottom:6px;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:2px;">
-                <span style="color:${placeColors[i]};">${label}</span>
-                <span>${count} <span style="color:rgba(255,255,255,0.35);">(${pct}%)</span></span>
-            </div>
-            <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:6px;overflow:hidden;">
-                <div style="width:${pct}%;background:${placeColors[i]};height:100%;border-radius:4px;transition:width 0.4s;"></div>
-            </div>
-        </div>`;
-    });
-
-    html += `<div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.45);margin-top:6px;">
-            <span>🚪 ננטשו</span><span>${sh.abandoned}</span>
-        </div>
-    </div>`;
-
-    // Basra section
-    const baTotal = ba.won + ba.lost;
-    const baWinPct = baTotal > 0 ? Math.round(ba.won / baTotal * 100) : 0;
-    const baLosePct = baTotal > 0 ? Math.round(ba.lost / baTotal * 100) : 0;
-    html += `<div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:#86efac;letter-spacing:2px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:6px;">🀄 Basra — מול מחשב</div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:8px;">
-            <span>משחקים שוחקו</span><span style="color:#fff;font-weight:700;">${ba.played}</span>
-        </div>
-        <div style="margin-bottom:6px;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:2px;">
-                <span style="color:#22c55e;">🏆 ניצחונות</span>
-                <span>${ba.won} <span style="color:rgba(255,255,255,0.35);">(${baWinPct}%)</span></span>
-            </div>
-            <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:6px;overflow:hidden;">
-                <div style="width:${baWinPct}%;background:#22c55e;height:100%;border-radius:4px;"></div>
-            </div>
-        </div>
-        <div style="margin-bottom:6px;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:2px;">
-                <span style="color:#ef4444;">😞 הפסדות</span>
-                <span>${ba.lost} <span style="color:rgba(255,255,255,0.35);">(${baLosePct}%)</span></span>
-            </div>
-            <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:6px;overflow:hidden;">
-                <div style="width:${baLosePct}%;background:#ef4444;height:100%;border-radius:4px;"></div>
-            </div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.45);margin-top:6px;">
-            <span>🚪 ננטשו</span><span>${ba.abandoned}</span>
-        </div>
-    </div>`;
-
-    // Reset button
-    html += `<div style="margin-top:16px;text-align:center;">
-        <button onclick="resetStats()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:rgba(239,68,68,0.7);border-radius:8px;padding:6px 16px;font-size:11px;cursor:pointer;letter-spacing:1px;">🗑 איפוס נתונים</button>
-    </div>`;
-
-    document.getElementById('statsContent').innerHTML = html;
-    document.getElementById('statsModal').style.display = 'flex';
-}
-
-function closeStatsModal() {
-    document.getElementById('statsModal').style.display = 'none';
-}
-
-function resetStats() {
-    if (!confirm('למחוק את כל הסטטיסטיקה?')) return;
-    localStorage.removeItem('gameStats');
-    showStatsModal(); // refresh
-}
 let animating = false;
 let soundEnabled = false;
 let fastMode = false;
@@ -2229,11 +2103,6 @@ function showResults() {
     gameOver = true;
     const last = players.find(p => !p.finished);
     if (last) winnersOrder.push(last.id);
-    // Record stats: find human player (id=0) place
-    if (players[0] && players[0].isAI === false) {
-        const humanPlace = winnersOrder.indexOf(0) + 1;
-        if (humanPlace > 0) recordShitheadResult(humanPlace, players.length);
-    }
     // Stop VS AI ping — game over
     if (window._vsAIPing) { clearInterval(window._vsAIPing); window._vsAIPing = null; }
     if (authUser?.username && authUser?.token) {
@@ -3601,16 +3470,6 @@ if (!onlineMode) return; // already left to menu
     socket.on('basraGameOver', ({names, scores, forfeitBy, forfeitName, teams, teamScores, mySlot, slotOrder}) => {
         if (window._forfeitTimeout) { clearTimeout(window._forfeitTimeout); window._forfeitTimeout = null; }
         if (window._forfeitTimeout) { clearTimeout(window._forfeitTimeout); window._forfeitTimeout = null; }
-        // Record stats for vs-bot games only
-        if (_basraIsVsBot) {
-            if (forfeitBy !== undefined) {
-                if (forfeitBy === (mySlot !== undefined ? mySlot : basraMySlot)) recordBasraAbandoned();
-                else recordBasraResult(true); // opponent forfeited = we won
-            } else if (!teams && slotOrder) {
-                const pos = slotOrder.indexOf(mySlot !== undefined ? mySlot : basraMySlot);
-                recordBasraResult(pos === 0);
-            }
-        }
         // Update basraMySlot if server sent corrected slot info
         if (mySlot !== undefined) basraMySlot = mySlot;
         // Cancel round countdown if running
@@ -4556,7 +4415,6 @@ function basraCreate() {
 }
 function basraJoin(codeOverride) {
     if (!socket) initSocket();
-    _basraIsVsBot = false;
     const code = codeOverride || document.getElementById('basraRoomCode')?.value.trim().toUpperCase();
     const errEl = document.getElementById('basraJoinError');
     if (errEl) errEl.textContent = '';
@@ -5552,7 +5410,6 @@ function basraCreate() {
 }
 function basraJoin(codeOverride) {
     if (!socket) initSocket();
-    _basraIsVsBot = false;
     const code = codeOverride || document.getElementById('basraRoomCode')?.value.trim().toUpperCase();
     const errEl = document.getElementById('basraJoinError');
     if (errEl) errEl.textContent = '';
@@ -5646,7 +5503,6 @@ function setBasraAIWinScore(score) {
 
 function startBasraVsAI() {
     if (!socket) initSocket();
-    _basraIsVsBot = true;
     const name = authUser?.username || localStorage.getItem('guestName') || 'שחקן';
     socket.emit('basraCreateVsAI', {
         name,
