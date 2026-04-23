@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.187</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.188</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4241,29 +4241,50 @@ function leaveLobby() {
 }
 
 function leaveToMenu() {
+    // If mid-game vs AI — show results first with abandon place, then leave
+    if (!gameOver && players && players.some(p => p.isAI)) {
+        // Calculate place: current winnersOrder.length + 1 (i.e. next place to finish)
+        const abandonPlace = winnersOrder.length + 1;
+        // Push human (id=0) at current place
+        if (!winnersOrder.includes(0)) winnersOrder.push(0);
+        // Fill remaining AIs at last places
+        players.forEach(p => { if (!p.finished && !winnersOrder.includes(p.id)) winnersOrder.push(p.id); });
+        // Record stats
+        if (authUser?.username && authUser?.token) {
+            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ username: authUser.username, token: authUser.token,
+                    game: 'shithead', mode: 'bot', result: 'abandon', place: abandonPlace })
+            }).catch(()=>{});
+        }
+        // Show results overlay with abandon note
+        showResults();
+        // Override leave button to actually exit after showing results
+        const leaveBtn = document.getElementById('leaveBtn');
+        if (leaveBtn) {
+            leaveBtn.onclick = function() { _doLeaveToMenu(); };
+            leaveBtn.textContent = '🚪 צא לתפריט';
+        }
+        return;
+    }
+    _doLeaveToMenu();
+}
+
+function _doLeaveToMenu() {
     if (window._vsAIPing) { clearInterval(window._vsAIPing); window._vsAIPing = null; }
-    // Signal server we're no longer in VS AI
     if (authUser?.username && authUser?.token) {
         fetch('/api/ping-stop', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ username: authUser.username, token: authUser.token }) }).catch(()=>{});
-        // Record abandon if leaving mid-game vs AI
-        if (!gameOver && players && players.some(p => p.isAI)) {
-            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ username: authUser.username, token: authUser.token,
-                    game: 'shithead', mode: 'bot', result: 'abandon' })
-            }).catch(()=>{});
-        }
     }
     document.getElementById('resultOverlay').style.display = 'none';
     document.getElementById('gameTopBar').style.display = 'none';
     document.getElementById('setupOverlay').style.display = 'flex';
     showMenu('menuMain');
     if (socket) {
-        socket.emit('playerLeaving'); // dedicated event — server handles before disconnect
+        socket.emit('playerLeaving');
         setTimeout(() => {
             if (socket) { socket.disconnect(); socket = null; }
             onlineMode = false;
-        }, 400); // wait 400ms for server to receive
+        }, 400);
     } else {
         onlineMode = false;
     }
@@ -5458,6 +5479,17 @@ function basraConfirmExit() {
     else basraLeave(); // fallback
 }
 function basraLeave() {
+    // Record abandon+lose for vs-bot games if game not over
+    if (authUser?.username && authUser?.token && basraState && basraState.isBot && !basraState.gameOver) {
+        fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ username: authUser.username, token: authUser.token,
+                game: 'basra', mode: 'bot', result: 'lose' })
+        }).catch(()=>{});
+        fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ username: authUser.username, token: authUser.token,
+                game: 'basra', mode: 'bot', result: 'abandon' })
+        }).catch(()=>{});
+    }
     socket.emit('basraLeave');
     document.getElementById('basraGame').style.display = 'none';
     document.getElementById('basraResultOverlay').style.display = 'none';
