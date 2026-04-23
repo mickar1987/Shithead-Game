@@ -2075,6 +2075,7 @@ function basraStateForPlayer(room, slotIdx) {
         teams: room.teams || null,
         roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
         winScore: room.winScore || 120,
+        isBot: room.isBot || false,
         roundOver: room.roundOver,
         gameOver: room.gameOver,
         lastCapturer: room.lastCapturer,
