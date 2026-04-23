@@ -59,6 +59,28 @@ async function settleCoins(room) {
     }
     console.log(`[coins] settled. bet=${bet}`);
     io.to(room.code).emit('coinsResult', results);
+
+    // Record stats for each human player
+    const isBot = room.slots.some(s => s.isBot && !s.wasHuman);
+    const mode = isBot ? 'bot' : 'online';
+    for (const slotIdx of room.winnersOrder) {
+        const slot = room.slots[slotIdx];
+        if (!slot.username || (slot.isBot && !slot.wasHuman)) continue;
+        try {
+            const place = room.winnersOrder.indexOf(slotIdx) + 1;
+            const u = await getUser(slot.username);
+            if (!u) continue;
+            const stats = u.stats || {};
+            const g = stats['shithead'] || {};
+            const m = g[mode] || { played:0, won:0, lost:0, abandoned:0, places:[0,0,0,0] };
+            m.played = (m.played||0) + 1;
+            m.places = m.places || [0,0,0,0];
+            m.places[place-1] = (m.places[place-1]||0) + 1;
+            if (place === 1) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
+            g[mode] = m; stats['shithead'] = g;
+            await saveUser(slot.username, { stats });
+        } catch(e) { console.error('[stats shithead] error:', e.message); }
+    }
 }
 
 
@@ -98,6 +120,26 @@ async function settleBasraCoins(room, winnerSlotIdx) {
     room.slots.forEach(s => {
         if (s.socketId) io.to(s.socketId).emit('coinsResult', results);
     });
+
+    // Record stats for each human player
+    const _isBot = room.slots.some(s => s.isBot);
+    const _mode = _isBot ? 'bot' : 'online';
+    for (let i = 0; i < room.slots.length; i++) {
+        const slot = room.slots[i];
+        if (!slot.username || slot.isBot) continue;
+        try {
+            const won = deltas[i] > 0;
+            const u = await getUser(slot.username);
+            if (!u) continue;
+            const stats = u.stats || {};
+            const g = stats['basra'] || {};
+            const m = g[_mode] || { played:0, won:0, lost:0, abandoned:0 };
+            m.played = (m.played||0) + 1;
+            if (won) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
+            g[_mode] = m; stats['basra'] = g;
+            await saveUser(slot.username, { stats });
+        } catch(e) { console.error('[stats basra] error:', e.message); }
+    }
 }
 
 function buildDisplayName(first, last) {
@@ -347,6 +389,50 @@ process.on('unhandledRejection', (reason) => {
 
 // keepalive moved to after server.listen
 
+// ── Stats API ──
+app.post('/api/stats/record', async (req, res) => {
+    try {
+        const { username, token, game, mode, result, place } = req.body;
+        if (!username || !token) return res.json({ ok: false, error: 'auth required' });
+        const u = await getUser(username);
+        if (!u || u.token !== token) return res.json({ ok: false, error: 'invalid token' });
+        // game: 'shithead' | 'basra'
+        // mode: 'bot' | 'online'
+        // result: 'win' | 'lose' | 'abandon' (basra) OR 'finish' | 'abandon' (shithead)
+        // place: 1-4 (shithead only)
+        const stats = u.stats || {};
+        const g = stats[game] || {};
+        const m = g[mode] || { played: 0, won: 0, lost: 0, abandoned: 0, places: [0,0,0,0] };
+        m.played = (m.played || 0) + 1;
+        if (result === 'abandon') {
+            m.abandoned = (m.abandoned || 0) + 1;
+        } else if (game === 'shithead' && place >= 1 && place <= 4) {
+            m.places = m.places || [0,0,0,0];
+            m.places[place - 1]++;
+            if (place === 1) m.won = (m.won || 0) + 1;
+            else m.lost = (m.lost || 0) + 1;
+        } else if (result === 'win') {
+            m.won = (m.won || 0) + 1;
+        } else if (result === 'lose') {
+            m.lost = (m.lost || 0) + 1;
+        }
+        g[mode] = m;
+        stats[game] = g;
+        await saveUser(username, { stats });
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/stats/user', async (req, res) => {
+    try {
+        const { key, u } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const user = await getUser(u);
+        if (!user) return res.json({ ok: false, error: 'user not found' });
+        res.json({ ok: true, stats: user.stats || {}, username: u });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.get('/api/admin/set-coins', async (req, res) => {
     try {
         const { key, u, coins } = req.query;
@@ -417,6 +503,25 @@ app.get('/api/admin/users', async (req, res) => {
             if (sl.username && sl.socketId && io.sockets.sockets.has(sl.socketId)) userRoomMap[sl.username] = 'BS:' + r.code;
         }));
 
+        const totalCoins = sorted.reduce((s,u)=>s+(u.coins||0),0).toLocaleString();
+        const totalUsers = sorted.length;
+        const connectedCount = connectedUsernames.size;
+
+        // Aggregate global stats across all users
+        const globalStats = { shithead:{bot:{played:0,won:0,abandoned:0},online:{played:0,won:0,abandoned:0}}, basra:{bot:{played:0,won:0,abandoned:0},online:{played:0,won:0,abandoned:0}} };
+        sorted.forEach(u => {
+            if (!u.stats) return;
+            ['shithead','basra'].forEach(g => {
+                ['bot','online'].forEach(m => {
+                    const s = u.stats[g]?.[m];
+                    if (!s) return;
+                    globalStats[g][m].played += s.played||0;
+                    globalStats[g][m].won    += s.won||0;
+                    globalStats[g][m].abandoned += s.abandoned||0;
+                });
+            });
+        });
+
         const rows = sorted.map((u, i) => {
             const isOnline = connectedUsernames.has(u.username);
             const lastSeen = u.lastSeenTs ? new Date(u.lastSeenTs).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '—';
@@ -439,7 +544,8 @@ app.get('/api/admin/users', async (req, res) => {
                     </span>
                 </td>
                 <td style="padding:8px;text-align:center">
-                    <button onclick="deleteUser('${u.username}')" style="padding:4px 10px;background:#dc2626;border:none;color:#fff;border-radius:4px;cursor:pointer">🗑 מחק</button>
+                    <button onclick="showStats('${u.username}')" style="padding:4px 10px;background:#1d4ed8;border:none;color:#fff;border-radius:4px;cursor:pointer;margin-bottom:4px">📊</button>
+                    <button onclick="deleteUser('${u.username}')" style="padding:4px 10px;background:#dc2626;border:none;color:#fff;border-radius:4px;cursor:pointer">🗑</button>
                 </td>
             </tr>`;
         }).join('');
@@ -453,9 +559,18 @@ app.get('/api/admin/users', async (req, res) => {
   table{border-collapse:collapse;width:100%;font-size:14px}
   th{background:#1a4a2a;padding:10px;text-align:right;position:sticky;top:0}
   tr:hover{background:rgba(255,255,255,0.05)}
-  .stats{display:flex;gap:20px;margin-bottom:16px}
+  .stats{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
   .stat{background:#1a3a2a;padding:10px 16px;border-radius:8px;font-size:13px}
   .stat span{color:gold;font-size:18px;font-weight:700;display:block}
+  .stat-section{background:#0f2a1a;border:1px solid #1a4a2a;border-radius:10px;padding:12px 16px;margin-bottom:12px}
+  .stat-section h3{margin:0 0 10px 0;font-size:14px;color:#86efac;letter-spacing:1px}
+  .stat-row{display:flex;gap:16px;flex-wrap:wrap}
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:999;align-items:center;justify-content:center}
+  .modal-box{background:#0f2a1a;border:1px solid #1a4a2a;border-radius:12px;padding:24px;min-width:320px;max-width:500px;width:90%}
+  .modal-box h3{color:gold;margin:0 0 16px 0}
+  .srow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px}
+  .srow:last-child{border:none}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;margin-right:4px}
 </style>
 <script>
 const KEY = '${key}';
@@ -463,29 +578,105 @@ async function setCoins(u) {
     const coins = document.getElementById('coins_' + u).value;
     const r = await fetch('/api/admin/set-coins?key=' + KEY + '&u=' + u + '&coins=' + coins);
     const d = await r.json();
-    if (d.ok) { alert('✅ עודכן ל-' + coins + ' מטבעות'); }
-    else alert('❌ ' + JSON.stringify(d));
+    if (d.ok) { alert('OK: ' + coins); } else alert('ERR: ' + JSON.stringify(d));
 }
 async function deleteUser(u) {
-    if (!confirm('למחוק את המשתמש ' + u + '?')) return;
+    if (!confirm('Delete ' + u + '?')) return;
     const r = await fetch('/api/admin/delete-user?key=' + KEY + '&u=' + u);
     const d = await r.json();
-    if (d.ok) { location.reload(); }
-    else alert('❌ ' + JSON.stringify(d));
+    if (d.ok) { location.reload(); } else alert('ERR: ' + JSON.stringify(d));
+}
+async function showStats(u) {
+    const r = await fetch('/api/stats/user?key=' + KEY + '&u=' + encodeURIComponent(u));
+    const d = await r.json();
+    if (!d.ok) { alert('Error: ' + d.error); return; }
+    const s = d.stats || {};
+    function modeHtml(game, mode, label) {
+        const m = (s[game] && s[game][mode]) || {};
+        const played = m.played || 0;
+        const won = m.won || 0;
+        const lost = m.lost || 0;
+        const abandoned = m.abandoned || 0;
+        const winPct = played > 0 ? Math.round(won / played * 100) : 0;
+        let extra = '';
+        if (game === 'shithead' && m.places) {
+            extra = '<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:4px">' +
+                ['1','2','3','4'].map(function(n,i){ return ['Gold','Silver','#cd7c3a','Gray'][i]+' '+n+': '+(m.places[i]||0); }).join('  ') + '</div>';
+        }
+        return '<div style="background:#1a3a2a;border-radius:8px;padding:10px;flex:1;min-width:140px">' +
+            '<div style="font-size:12px;color:#86efac;margin-bottom:6px">' + label + '</div>' +
+            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>שוחק</span><span>' + played + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>נצח</span><span style="color:#22c55e">' + won + ' (' + winPct + '%)</span></div>' +
+            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>הפסיד</span><span style="color:#ef4444">' + lost + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span>נטש</span><span style="color:#6b7280">' + abandoned + '</span></div>' +
+            extra + '</div>';
+    }
+    document.getElementById('statsModalTitle').textContent = 'Stats: ' + u;
+    document.getElementById('statsModalBody').innerHTML =
+        '<div style="margin-bottom:12px"><div style="color:#7dd3fc;font-size:13px;font-weight:700;margin-bottom:8px">Shithead</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' + modeHtml('shithead','bot','🤖 מול מחשב') + modeHtml('shithead','online','🌐 מול שחקנים') + '</div></div>' +
+        '<div><div style="color:#86efac;font-size:13px;font-weight:700;margin-bottom:8px">Basra</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' + modeHtml('basra','bot','🤖 מול מחשב') + modeHtml('basra','online','🌐 מול שחקנים') + '</div></div>';
+    document.getElementById('statsModal').style.display = 'flex';
 }
 </script>
 </head>
 <body>
 <h2>🃏 SHITHEAD — ניהול משתמשים</h2>
+
+<!-- Global stats -->
 <div class="stats">
-  <div class="stat"><span>${sorted.length}</span>סה"כ משתמשים</div>
-  <div class="stat"><span style="color:#22c55e">${connectedUsernames.size}</span>מחוברים כעת</div>
-  <div class="stat"><span>${sorted.reduce((s,u)=>s+(u.coins||0),0).toLocaleString()} 🪙</span>סה"כ מטבעות</div>
+  <div class="stat"><span>${totalUsers}</span>סה&quot;כ משתמשים</div>
+  <div class="stat"><span style="color:#22c55e">${connectedCount}</span>מחוברים כעת</div>
+  <div class="stat"><span>${totalCoins}</span>מטבעות</div>
 </div>
+
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+  <div class="stat-section" style="flex:1;min-width:220px">
+    <h3>🃏 Shithead — כלל המשתמשים</h3>
+    <div class="stat-row">
+      <div class="stat" style="flex:1">
+        <span>\${globalStats.shithead.bot.played}</span>🤖 משחקים מול מחשב
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.shithead.bot.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.shithead.bot.abandoned}</div>
+      </div>
+      <div class="stat" style="flex:1">
+        <span>\${globalStats.shithead.online.played}</span>🌐 משחקים ברשת
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.shithead.online.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.shithead.online.abandoned}</div>
+      </div>
+    </div>
+  </div>
+  <div class="stat-section" style="flex:1;min-width:220px">
+    <h3>🀄 Basra — כלל המשתמשים</h3>
+    <div class="stat-row">
+      <div class="stat" style="flex:1">
+        <span>\${globalStats.basra.bot.played}</span>🤖 משחקים מול מחשב
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.basra.bot.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.basra.bot.abandoned}</div>
+      </div>
+      <div class="stat" style="flex:1">
+        <span>\${globalStats.basra.online.played}</span>🌐 משחקים ברשת
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.basra.online.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.basra.online.abandoned}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <table>
 <tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>סטטוס</th><th>חדר</th><th>חיבור אחרון</th><th>מטבעות</th><th>פעולות</th></tr>
-${rows}
+\${rows}
 </table>
+
+<!-- Stats Modal -->
+<div id="statsModal" class="modal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-box">
+    <h3 id="statsModalTitle"></h3>
+    <div id="statsModalBody"></div>
+    <button onclick="document.getElementById('statsModal').style.display='none'" style="margin-top:16px;padding:6px 20px;background:#374151;border:none;color:#fff;border-radius:6px;cursor:pointer">✕ סגור</button>
+  </div>
+</div>
 </body></html>`);
     } catch(e) { res.json({ error: e.message }); }
 });
