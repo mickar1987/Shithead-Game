@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.192</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.193</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3546,6 +3546,7 @@ if (!onlineMode) return; // already left to menu
                 body: JSON.stringify({ username: authUser.username, token: authUser.token,
                     game: 'basra', mode: 'bot', result: won ? 'win' : 'lose' })
             }).catch(()=>{});
+            if (basraState) basraState._statsRecorded = true;
         }
     });
 
@@ -4424,11 +4425,14 @@ function refreshBasraPublicRooms() {
 }
 function basraLeave() {
     // Record abandon+lose for vs-bot games if mid-game
-    if (authUser?.username && authUser?.token && basraState && basraState.isBot && !basraState.gameOver) {
-        fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ username: authUser.username, token: authUser.token,
-                game: 'basra', mode: 'bot', result: 'abandon_lose' })
-        }).catch(()=>{});
+    if (authUser?.username && authUser?.token && basraState && basraState.isBot) {
+        // Only record abandon if game wasn't naturally completed
+        if (!basraState._statsRecorded) {
+            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ username: authUser.username, token: authUser.token,
+                    game: 'basra', mode: 'bot', result: 'abandon_lose' })
+            }).catch(()=>{});
+        }
     }
     const chatBtn = document.getElementById('basraChatToggleBtn');
     if (chatBtn) chatBtn.classList.remove('visible');
@@ -5260,17 +5264,18 @@ function leaveLobby() {
 function leaveToMenu() {
     // If mid-game vs AI — show results with abandon place
     if (!gameOver && players && players.some(p => p.isAI)) {
-        const abandonPlace = winnersOrder.length + 1;
+        // Human leaving = last available place (all unfinished AIs finish before human)
+        const realAbandonPlace = players.length; // leaving = always last place
         // Record stats
         if (authUser?.username && authUser?.token) {
             fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({ username: authUser.username, token: authUser.token,
-                    game: 'shithead', mode: 'bot', result: 'abandon', place: abandonPlace })
+                    game: 'shithead', mode: 'bot', result: 'abandon', place: realAbandonPlace })
             }).catch(()=>{});
         }
-        // Build winnersOrder: already-finished first, then human, then remaining AIs
+        // Build winnersOrder: already-finished first, then remaining AIs, then human LAST
+        players.forEach(p => { if (p.isAI && !p.finished && !winnersOrder.includes(p.id)) winnersOrder.push(p.id); });
         if (!winnersOrder.includes(0)) winnersOrder.push(0);
-        players.forEach(p => { if (!p.finished && !winnersOrder.includes(p.id)) winnersOrder.push(p.id); });
         // Mark ALL players as finished so showResults doesn't re-add anyone
         players.forEach(p => { p.finished = true; });
         gameOver = true;
@@ -5283,8 +5288,8 @@ function leaveToMenu() {
             const isLast = i === winnersOrder.length - 1;
             const medal = isLast ? '💩' : (medals[i] || '');
             const isHuman = pid === 0;
-            return `<div class="lb-row" style="${isHuman ? 'background:rgba(251,191,36,0.1);border-radius:8px;' : ''}">
-                <div class="lb-name">${name}${isHuman && i === abandonPlace-1 ? ' 🚪' : ''}</div>
+            return `<div class="lb-row">
+                <div class="lb-name">${name}${isHuman ? ' 🚪' : ''}</div>
                 <div class="lb-medal">${medal}</div>
                 <div class="lb-coins"></div>
             </div>`;
