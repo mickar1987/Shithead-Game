@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.186log</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.186</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2109,6 +2109,16 @@ function showResults() {
         fetch('/api/ping-stop', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ username: authUser.username, token: authUser.token }) }).catch(()=>{});
     }
+    // Record stats if vs AI (online games recorded server-side)
+    if (authUser?.username && authUser?.token && players.some(p => p.isAI)) {
+        const humanPlace = winnersOrder.indexOf(0) + 1;
+        if (humanPlace > 0) {
+            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ username: authUser.username, token: authUser.token,
+                    game: 'shithead', mode: 'bot', result: humanPlace === 1 ? 'win' : 'lose', place: humanPlace })
+            }).catch(()=>{});
+        }
+    }
     const list = document.getElementById('leaderboardList');
     list.innerHTML = winnersOrder.map((pid, i) => {
         const name = players[pid].name;
@@ -3527,6 +3537,16 @@ if (!onlineMode) return; // already left to menu
         overlay.style.display='flex';
         // Apply pending coins if already arrived
         if (pendingBasraCoins) { applyBasraCoins(pendingBasraCoins); pendingBasraCoins = null; }
+        // Record basra stats for vs-bot games
+        if (authUser?.username && authUser?.token && forfeitBy === undefined && !teams && slotOrder) {
+            const mySlotFinal = mySlot !== undefined ? mySlot : basraMySlot;
+            const pos = slotOrder.indexOf(mySlotFinal);
+            const won = pos === 0;
+            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ username: authUser.username, token: authUser.token,
+                    game: 'basra', mode: 'bot', result: won ? 'win' : 'lose' })
+            }).catch(()=>{});
+        }
     });
 
     let pendingBasraCoins = null;
