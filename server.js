@@ -480,7 +480,7 @@ app.get('/api/admin/users', async (req, res) => {
         // Aggregate global stats across all users
         const globalStats = {
             shithead:{ bot:{played:0,won:0,abandoned:0,places:[0,0,0,0]}, online:{played:0} },
-            basra:{ bot:{played:0,won:0,abandoned:0}, online:{played:0} }
+            basra:{ bot:{played:0,won:0,lost:0,abandoned:0}, online:{played:0} }
         };
         sorted.forEach(u => {
             if (!u.stats) return;
@@ -491,6 +491,7 @@ app.get('/api/admin/users', async (req, res) => {
                     globalStats[g][m].played += s.played||0;
                     if (m === 'bot') {
                         globalStats[g][m].won    = (globalStats[g][m].won||0) + (s.won||0);
+                        globalStats[g][m].lost   = (globalStats[g][m].lost||0) + (s.lost||0);
                         globalStats[g][m].abandoned = (globalStats[g][m].abandoned||0) + (s.abandoned||0);
                         if (g === 'shithead' && s.places) {
                             for (let i=0;i<4;i++) globalStats.shithead.bot.places[i] += s.places[i]||0;
@@ -640,8 +641,9 @@ async function showStats(u) {
     <div class="stat-row">
       <div class="stat" style="flex:1">
         <span>${globalStats.basra.bot.played}</span>🤖 מול מחשב
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.basra.bot.won}</div>
-        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.basra.bot.abandoned}</div>
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצח: ${globalStats.basra.bot.won}</div>
+        <div style="font-size:11px;color:#ef4444;margin-top:1px">הפסיד: ${globalStats.basra.bot.lost}</div>
+        <div style="font-size:11px;color:#6b7280">נטש: ${globalStats.basra.bot.abandoned}</div>
       </div>
       <div class="stat" style="flex:1">
         <span>${globalStats.basra.online.played}</span>🌐 ברשת
