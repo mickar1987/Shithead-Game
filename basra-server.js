@@ -171,46 +171,6 @@ function createBasraRoom(code, slots, bet = 0) {
         slots.forEach(s => s.hand.push(deck.shift()));
     }
 
-    // ── TEST MODE: force bot (slot 1) to have J + 7♦ ──
-    if (slots.length >= 2) {
-        const botSlot = slots[1];
-        const forceCards = ['Jh']; // J of hearts only (TEST)
-        forceCards.forEach(fc => {
-            // Find in deck first
-            let deckIdx = deck.indexOf(fc);
-            if (deckIdx !== -1) {
-                deck.splice(deckIdx, 1);
-                // Swap out a non-special card from bot hand
-                const swapIdx = botSlot.hand.findIndex(c => cardRank(c) !== 'J' && !is7D(c));
-                if (swapIdx !== -1) {
-                    deck.push(botSlot.hand[swapIdx]); // return to deck
-                    botSlot.hand[swapIdx] = fc;
-                } else {
-                    botSlot.hand.push(fc);
-                }
-            } else {
-                // Already in bot's hand or elsewhere — check bot hand
-                const inHand = botSlot.hand.includes(fc);
-                if (!inHand) {
-                    // Find in another slot and swap
-                    for (let si = 0; si < slots.length; si++) {
-                        if (si === 1) continue;
-                        const otherIdx = slots[si].hand.indexOf(fc);
-                        if (otherIdx !== -1) {
-                            const swapIdx = botSlot.hand.findIndex(c => cardRank(c) !== 'J' && !is7D(c));
-                            if (swapIdx !== -1) {
-                                slots[si].hand[otherIdx] = botSlot.hand[swapIdx];
-                                botSlot.hand[swapIdx] = fc;
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-    }
-    // ── END TEST MODE ──
-
     // Teams assigned externally after all players join
     let teams = null;
 
