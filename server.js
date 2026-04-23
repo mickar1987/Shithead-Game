@@ -645,10 +645,8 @@ async function recordShitheadStats(room) {
     try {
         const isBot = room.slots.some(s => s.isBot && !s.wasHuman);
         const mode = isBot ? 'bot' : 'online';
-        console.log(`[stats] recordShitheadStats called. mode=${mode} winnersOrder=${JSON.stringify(room.winnersOrder)} slots=${JSON.stringify(room.slots.map(s=>({u:s.username,bot:s.isBot})))}`);
         for (const slotIdx of room.winnersOrder) {
             const slot = room.slots[slotIdx];
-            console.log(`[stats] checking slot ${slotIdx}: username=${slot.username} isBot=${slot.isBot}`);
             if (!slot.username || (slot.isBot && !slot.wasHuman)) continue;
             const place = room.winnersOrder.indexOf(slotIdx) + 1;
             const u = await getUser(slot.username);
