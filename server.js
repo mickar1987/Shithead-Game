@@ -363,12 +363,15 @@ app.post('/api/stats/record', async (req, res) => {
         const stats = u.stats || {};
         const g = stats[game] || {};
         const m = g[mode] || { played: 0, won: 0, lost: 0, abandoned: 0, places: [0,0,0,0] };
-        if (result !== 'abandon') m.played = (m.played || 0) + 1; // abandon: played counted separately
-        if (result === 'abandon') {
+        m.played = (m.played || 0) + 1;
+        if (result === 'abandon_lose') {
+            // basra abandon: lose + abandoned in one call
+            m.lost = (m.lost || 0) + 1;
+            m.abandoned = (m.abandoned || 0) + 1;
+        } else if (result === 'abandon') {
             m.abandoned = (m.abandoned || 0) + 1;
             // For shithead abandon — also record place
             if (game === 'shithead' && place >= 1 && place <= 4) {
-                m.played = (m.played || 0) + 1;
                 m.places = m.places || [0,0,0,0];
                 m.places[place - 1]++;
                 m.lost = (m.lost || 0) + 1;
