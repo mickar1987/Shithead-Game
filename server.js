@@ -554,22 +554,34 @@ async function showStats(u) {
     function modeHtml(game, mode, label) {
         const m = (s[game] && s[game][mode]) || {};
         const played = m.played || 0;
-        const won = m.won || 0;
-        const lost = m.lost || 0;
         const abandoned = m.abandoned || 0;
-        const winPct = played > 0 ? Math.round(won / played * 100) : 0;
-        let extra = '';
-        if (game === 'shithead' && m.places) {
-            extra = '<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:4px">' +
-                ['1','2','3','4'].map(function(n,i){ return ['Gold','Silver','#cd7c3a','Gray'][i]+' '+n+': '+(m.places[i]||0); }).join('  ') + '</div>';
+        var rows = '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>שוחק</span><span>' + played + '</span></div>';
+        if (game === 'shithead') {
+            var places = m.places || [0,0,0,0];
+            var placeData = [
+                {label:'🥇 מקום 1', color:'#fbbf24', val: places[0]||0},
+                {label:'🥈 מקום 2', color:'#9ca3af', val: places[1]||0},
+                {label:'🥉 מקום 3', color:'#cd7c3a', val: places[2]||0},
+                {label:'💩 מקום 4', color:'#6b7280', val: places[3]||0}
+            ];
+            placeData.forEach(function(p, idx) {
+                var pct = played > 0 ? Math.round(p.val / played * 100) : 0;
+                var border = idx < 3 ? 'border-bottom:1px solid rgba(255,255,255,0.07);' : '';
+                rows += '<div style="' + border + 'padding:4px 0;font-size:12px">' +
+                    '<div style="display:flex;justify-content:space-between"><span style="color:' + p.color + '">' + p.label + '</span><span>' + p.val + ' <span style="color:rgba(255,255,255,0.35)">(' + pct + '%)</span></span></div>' +
+                    '<div style="background:rgba(255,255,255,0.07);border-radius:3px;height:4px;margin-top:2px"><div style="width:' + pct + '%;background:' + p.color + ';height:100%;border-radius:3px"></div></div>' +
+                '</div>';
+            });
+        } else {
+            var won = m.won || 0; var lost = m.lost || 0;
+            var winPct = played > 0 ? Math.round(won/played*100) : 0;
+            rows += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>נצח</span><span style="color:#22c55e">' + won + ' (' + winPct + '%)</span></div>';
+            rows += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>הפסיד</span><span style="color:#ef4444">' + lost + '</span></div>';
         }
-        return '<div style="background:#1a3a2a;border-radius:8px;padding:10px;flex:1;min-width:140px">' +
-            '<div style="font-size:12px;color:#86efac;margin-bottom:6px">' + label + '</div>' +
-            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>שוחק</span><span>' + played + '</span></div>' +
-            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>נצח</span><span style="color:#22c55e">' + won + ' (' + winPct + '%)</span></div>' +
-            '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>הפסיד</span><span style="color:#ef4444">' + lost + '</span></div>' +
-            '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span>נטש</span><span style="color:#6b7280">' + abandoned + '</span></div>' +
-            extra + '</div>';
+        rows += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:#6b7280"><span>🚪 נטש</span><span>' + abandoned + '</span></div>';
+        return '<div style="background:#1a3a2a;border-radius:8px;padding:10px;flex:1;min-width:160px">' +
+            '<div style="font-size:12px;color:#86efac;margin-bottom:6px;font-weight:700">' + label + '</div>' +
+            rows + '</div>';
     }
     document.getElementById('statsModalTitle').textContent = 'Stats: ' + u;
     document.getElementById('statsModalBody').innerHTML =
