@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.190</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.191</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2110,7 +2110,7 @@ function showResults() {
             body: JSON.stringify({ username: authUser.username, token: authUser.token }) }).catch(()=>{});
     }
     // Record stats if vs AI (online games recorded server-side)
-    if (authUser?.username && authUser?.token && players.some(p => p.isAI)) {
+    if (!window._suppressStatsRecord && authUser?.username && authUser?.token && players.some(p => p.isAI)) {
         const humanPlace = winnersOrder.indexOf(0) + 1;
         if (humanPlace > 0) {
             fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -5255,18 +5255,23 @@ function leaveLobby() {
 }
 
 function leaveToMenu() {
-    // If mid-game vs AI — show results first with abandon place
+    // If mid-game vs AI — show results with abandon place
     if (!gameOver && players && players.some(p => p.isAI)) {
         const abandonPlace = winnersOrder.length + 1;
-        if (!winnersOrder.includes(0)) winnersOrder.push(0);
-        players.forEach(p => { if (!p.finished && !winnersOrder.includes(p.id)) winnersOrder.push(p.id); });
+        // Record stats BEFORE showResults (which also records on finish)
         if (authUser?.username && authUser?.token) {
             fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({ username: authUser.username, token: authUser.token,
                     game: 'shithead', mode: 'bot', result: 'abandon', place: abandonPlace })
             }).catch(()=>{});
         }
+        // Mark human as finished at abandon place — fill remaining spots
+        if (!winnersOrder.includes(0)) winnersOrder.push(0);
+        players.forEach(p => { if (!p.finished && !winnersOrder.includes(p.id)) winnersOrder.push(p.id); });
+        // Show results but suppress stats recording inside showResults
+        window._suppressStatsRecord = true;
         showResults();
+        window._suppressStatsRecord = false;
         const leaveBtn = document.getElementById('leaveBtn');
         if (leaveBtn) { leaveBtn.onclick = function() { _doLeaveToMenu(); }; leaveBtn.textContent = '🚪 צא לתפריט'; }
         return;
