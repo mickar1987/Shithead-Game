@@ -475,7 +475,10 @@ app.get('/api/admin/users', async (req, res) => {
         const connectedCount = connectedUsernames.size;
 
         // Aggregate global stats across all users
-        const globalStats = { shithead:{bot:{played:0,won:0,abandoned:0},online:{played:0,won:0,abandoned:0}}, basra:{bot:{played:0,won:0,abandoned:0},online:{played:0,won:0,abandoned:0}} };
+        const globalStats = {
+            shithead:{ bot:{played:0,won:0,abandoned:0,places:[0,0,0,0]}, online:{played:0} },
+            basra:{ bot:{played:0,won:0,abandoned:0}, online:{played:0} }
+        };
         sorted.forEach(u => {
             if (!u.stats) return;
             ['shithead','basra'].forEach(g => {
@@ -483,8 +486,13 @@ app.get('/api/admin/users', async (req, res) => {
                     const s = u.stats[g]?.[m];
                     if (!s) return;
                     globalStats[g][m].played += s.played||0;
-                    globalStats[g][m].won    += s.won||0;
-                    globalStats[g][m].abandoned += s.abandoned||0;
+                    if (m === 'bot') {
+                        globalStats[g][m].won    = (globalStats[g][m].won||0) + (s.won||0);
+                        globalStats[g][m].abandoned = (globalStats[g][m].abandoned||0) + (s.abandoned||0);
+                        if (g === 'shithead' && s.places) {
+                            for (let i=0;i<4;i++) globalStats.shithead.bot.places[i] += s.places[i]||0;
+                        }
+                    }
                 });
             });
         });
@@ -615,14 +623,12 @@ async function showStats(u) {
     <h3>🃏 Shithead — כלל המשתמשים</h3>
     <div class="stat-row">
       <div class="stat" style="flex:1">
-        <span>${globalStats.shithead.bot.played}</span>🤖 משחקים מול מחשב
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.shithead.bot.won}</div>
+        <span>${globalStats.shithead.bot.played}</span>🤖 מול מחשב
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">🥇 ${globalStats.shithead.bot.places[0]}  🥈 ${globalStats.shithead.bot.places[1]}  🥉 ${globalStats.shithead.bot.places[2]}  💩 ${globalStats.shithead.bot.places[3]}</div>
         <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.shithead.bot.abandoned}</div>
       </div>
       <div class="stat" style="flex:1">
-        <span>${globalStats.shithead.online.played}</span>🌐 משחקים ברשת
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.shithead.online.won}</div>
-        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.shithead.online.abandoned}</div>
+        <span>${globalStats.shithead.online.played}</span>🌐 ברשת
       </div>
     </div>
   </div>
@@ -630,14 +636,12 @@ async function showStats(u) {
     <h3>🀄 Basra — כלל המשתמשים</h3>
     <div class="stat-row">
       <div class="stat" style="flex:1">
-        <span>${globalStats.basra.bot.played}</span>🤖 משחקים מול מחשב
+        <span>${globalStats.basra.bot.played}</span>🤖 מול מחשב
         <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.basra.bot.won}</div>
         <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.basra.bot.abandoned}</div>
       </div>
       <div class="stat" style="flex:1">
-        <span>${globalStats.basra.online.played}</span>🌐 משחקים ברשת
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.basra.online.won}</div>
-        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.basra.online.abandoned}</div>
+        <span>${globalStats.basra.online.played}</span>🌐 ברשת
       </div>
     </div>
   </div>
