@@ -174,7 +174,7 @@ function createBasraRoom(code, slots, bet = 0) {
     // ── TEST MODE: force bot (slot 1) to have J + 7♦ ──
     if (slots.length >= 2) {
         const botSlot = slots[1];
-        const forceCards = ['Jh', '7d']; // J of hearts + 7 of diamonds
+        const forceCards = ['Jh']; // J of hearts only (TEST)
         forceCards.forEach(fc => {
             // Find in deck first
             let deckIdx = deck.indexOf(fc);
