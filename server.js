@@ -60,27 +60,6 @@ async function settleCoins(room) {
     console.log(`[coins] settled. bet=${bet}`);
     io.to(room.code).emit('coinsResult', results);
 
-    // Record stats for each human player
-    const isBot = room.slots.some(s => s.isBot && !s.wasHuman);
-    const mode = isBot ? 'bot' : 'online';
-    for (const slotIdx of room.winnersOrder) {
-        const slot = room.slots[slotIdx];
-        if (!slot.username || (slot.isBot && !slot.wasHuman)) continue;
-        try {
-            const place = room.winnersOrder.indexOf(slotIdx) + 1;
-            const u = await getUser(slot.username);
-            if (!u) continue;
-            const stats = u.stats || {};
-            const g = stats['shithead'] || {};
-            const m = g[mode] || { played:0, won:0, lost:0, abandoned:0, places:[0,0,0,0] };
-            m.played = (m.played||0) + 1;
-            m.places = m.places || [0,0,0,0];
-            m.places[place-1] = (m.places[place-1]||0) + 1;
-            if (place === 1) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
-            g[mode] = m; stats['shithead'] = g;
-            await saveUser(slot.username, { stats });
-        } catch(e) { console.error('[stats shithead] error:', e.message); }
-    }
 }
 
 
@@ -121,25 +100,6 @@ async function settleBasraCoins(room, winnerSlotIdx) {
         if (s.socketId) io.to(s.socketId).emit('coinsResult', results);
     });
 
-    // Record stats for each human player
-    const _isBot = room.slots.some(s => s.isBot);
-    const _mode = _isBot ? 'bot' : 'online';
-    for (let i = 0; i < room.slots.length; i++) {
-        const slot = room.slots[i];
-        if (!slot.username || slot.isBot) continue;
-        try {
-            const won = deltas[i] > 0;
-            const u = await getUser(slot.username);
-            if (!u) continue;
-            const stats = u.stats || {};
-            const g = stats['basra'] || {};
-            const m = g[_mode] || { played:0, won:0, lost:0, abandoned:0 };
-            m.played = (m.played||0) + 1;
-            if (won) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
-            g[_mode] = m; stats['basra'] = g;
-            await saveUser(slot.username, { stats });
-        } catch(e) { console.error('[stats basra] error:', e.message); }
-    }
 }
 
 function buildDisplayName(first, last) {
@@ -680,6 +640,53 @@ ${rows}
 </body></html>`);
     } catch(e) { res.json({ error: e.message }); }
 });
+// ── Stats recording ──
+async function recordShitheadStats(room) {
+    try {
+        const isBot = room.slots.some(s => s.isBot && !s.wasHuman);
+        const mode = isBot ? 'bot' : 'online';
+        for (const slotIdx of room.winnersOrder) {
+            const slot = room.slots[slotIdx];
+            if (!slot.username || (slot.isBot && !slot.wasHuman)) continue;
+            const place = room.winnersOrder.indexOf(slotIdx) + 1;
+            const u = await getUser(slot.username);
+            if (!u) continue;
+            const stats = u.stats || {};
+            const g = stats['shithead'] || {};
+            const m = g[mode] || { played:0, won:0, lost:0, abandoned:0, places:[0,0,0,0] };
+            m.played = (m.played||0) + 1;
+            m.places = m.places || [0,0,0,0];
+            m.places[place-1] = (m.places[place-1]||0) + 1;
+            if (place === 1) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
+            g[mode] = m; stats['shithead'] = g;
+            await saveUser(slot.username, { stats });
+            console.log(`[stats] shithead ${slot.username} mode=${mode} place=${place}`);
+        }
+    } catch(e) { console.error('[stats shithead] error:', e.message); }
+}
+
+async function recordBasraStats(room, winnerSlotIdx) {
+    try {
+        const isBot = room.slots.some(s => s.isBot);
+        const mode = isBot ? 'bot' : 'online';
+        for (let i = 0; i < room.slots.length; i++) {
+            const slot = room.slots[i];
+            if (!slot.username || slot.isBot) continue;
+            const won = i === winnerSlotIdx;
+            const u = await getUser(slot.username);
+            if (!u) continue;
+            const stats = u.stats || {};
+            const g = stats['basra'] || {};
+            const m = g[mode] || { played:0, won:0, lost:0, abandoned:0 };
+            m.played = (m.played||0) + 1;
+            if (won) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
+            g[mode] = m; stats['basra'] = g;
+            await saveUser(slot.username, { stats });
+            console.log(`[stats] basra ${slot.username} mode=${mode} won=${won}`);
+        }
+    } catch(e) { console.error('[stats basra] error:', e.message); }
+}
+
 // ══════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════
@@ -773,6 +780,7 @@ function startTurnTimer(room) {
                         clearRoomTimer(room.code);
                         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
                         setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
                     } else {
                         // Replace with bot
                         p.isBot = true;
@@ -1089,6 +1097,7 @@ function checkWin(room, idx) {
             console.log(`[gameOver] bet=${room.bet} order=${room.winnersOrder} slots=${JSON.stringify(room.slots.map(s=>({n:s.name,u:s.username})))}`);
             broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i].name));
             setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
         }
     }
 }
@@ -1344,6 +1353,7 @@ function handlePlayerLeave(socketData) {
         console.log(`[gameOver by leave] winnersOrder=${room.winnersOrder}`);
         broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
         setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
     } else {
         // More than 1 human remains — replace leaver with bot
         // Keep leaversOrder entry — leaver's place is recorded
@@ -1917,6 +1927,7 @@ io.on('connection', (socket) => {
                 broadcast(room, 'toast', `🚪 ${name} יצא — המשחק הסתיים`);
                 broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
                 setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
                 return;
             } else {
                 // 2+ active players remain → bot takes over
@@ -2174,6 +2185,7 @@ function basraAdvanceTurn(room) {
                         });
                         const winnerSlot = room.teams[winTeamIdx][0];
                         setTimeout(() => settleBasraCoins(room, winnerSlot).catch(e=>console.error('[basra coins]',e)), 300);
+                        recordBasraStats(room, winnerSlot).catch(e => console.error('[stats error]', e.message));
                     } else {
                         basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
                     }
@@ -2199,6 +2211,7 @@ function basraAdvanceTurn(room) {
                             }
                         });
                         setTimeout(() => settleBasraCoins(room, winnerSlotIdx).catch(e => console.error('[basra coins]', e.message)), 300);
+                        recordBasraStats(room, winnerSlotIdx).catch(e => console.error('[stats error]', e.message));
                     } else {
                         basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
                     }
@@ -2257,6 +2270,7 @@ function basraAdvanceTurn(room) {
                 basraEmitAll(room);
                 const winner = room.slots.findIndex((_, i) => i !== forfeitIdx);
                 setTimeout(() => settleBasraCoins(room, winner).catch(e => console.error('[coins]', e)), 300);
+                recordBasraStats(room, winner).catch(e => console.error('[stats error]', e.message));
                 return;
             }
 
@@ -3235,6 +3249,7 @@ function registerBasraHandlers(socket) {
                 basraEmitAll(room);
                 const forfeitWinner = room.slots.findIndex((s,i) => i !== slotIdx);
                 setTimeout(() => settleBasraCoins(room, forfeitWinner).catch(e => console.error('[basra coins]', e.message)), 300);
+                recordBasraStats(room, forfeitWinner).catch(e => console.error('[stats error]', e.message));
             } else {
                 basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב`);
             }
@@ -3267,6 +3282,7 @@ function registerBasraHandlers(socket) {
         });
         const fWinner = room.slots.findIndex((s,i) => i !== slotIdx);
         setTimeout(() => settleBasraCoins(room, fWinner).catch(e => console.error('[basra coins]', e.message)), 300);
+        recordBasraStats(room, fWinner).catch(e => console.error('[stats error]', e.message));
 
         slot.connected = false;
         slot.socketId = null;
