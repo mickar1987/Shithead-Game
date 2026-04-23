@@ -2343,15 +2343,7 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE A2: J as second-to-last card — if only 0-1 cards on table, wait one more turn
-    if (bestCard.slice(0,-1) === 'J' && bestCapture.length === 0 &&
-        handSize === 2 && tableCards.length <= 1) {
-        const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
-        if (safeCards.length > 0) {
-            bestCard = safeCards[0];
-            bestCapture = [];
-        }
-    }
+    // RULE A2: handled after all other rules (see below)
 
     // RULE B: J/7d capture only if:
     //   - 3+ cards on table, OR
@@ -2394,22 +2386,58 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE C: J + 7d in hand — J ALWAYS goes first unless 7d makes REAL basra NOW
+    // RULE C: J + 7d in hand — play J only when J is actually good to play
+    // (3+ cards on table, OR second-to-last card) — don't force J as empty throw
     {
         const _hasJ2 = bot.hand.some(c => c.slice(0,-1) === 'J');
         const _has7d2 = bot.hand.includes('7d');
         if (_hasJ2 && _has7d2) {
             const _jackCard2 = bot.hand.find(c => c.slice(0,-1) === 'J');
-            // Use basra module to check if 7d capture is a REAL basra
             const _capturedCards = bestCapture.map(i => tableCards[i]).filter(Boolean);
             const _7dRealBasra = bestCard === '7d' && bestCapture.length > 0 &&
                 bestCapture.length === tableCards.length &&
                 basra.isBasra('7d', _capturedCards, tableCards);
-            if (!_7dRealBasra) {
-                // Force J first — 7d will capture later
-                bestCard = _jackCard2;
-                bestCapture = [];
+            // If 7d makes a real basra right now — let it go, J will follow next turn
+            if (_7dRealBasra) {
+                // keep bestCard = '7d'
+            } else if (bestCard !== _jackCard2) {
+                // Currently planning to play something else — check if J should go now instead
+                // J should go if: currently a throw (no capture) AND table has 3+ cards
+                // Otherwise keep the current plan (capture with another card, or safe throw)
+                const _jCaptures = basraBotFindCaptures(_jackCard2, tableCards);
+                const _jCanCapture = _jCaptures.length > 0;
+                if (_jCanCapture && tableCards.length >= 3 && bestCapture.length === 0) {
+                    // J can make a good capture now — use J
+                    const used = new Set(), combined = [];
+                    _jCaptures.sort((a,b)=>b.length-a.length).forEach(grp => {
+                        if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+                    });
+                    bestCard = _jackCard2; bestCapture = combined;
+                }
+                // else: keep current bestCard (could be a good capture or safe throw)
+            } else {
+                // bestCard is already J — only allow if table has 3+ cards or second-to-last
+                if (tableCards.length < 3 && handSize > 2 && bestCapture.length === 0) {
+                    // Switch to safe throw instead
+                    const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+                    if (safeCards.length > 0) {
+                        const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+                        safeCards.sort((a,b) => priority(a)-priority(b));
+                        bestCard = safeCards[0]; bestCapture = [];
+                    }
+                }
             }
+        }
+    }
+
+    // RULE A2 (final check): J as second-to-last card — if only 0-1 cards on table, wait
+    // This runs LAST so no other rule can override it
+    if (bestCard.slice(0,-1) === 'J' && bestCapture.length === 0 &&
+        handSize === 2 && tableCards.length <= 1) {
+        const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+        if (safeCards.length > 0) {
+            bestCard = safeCards[0];
+            bestCapture = [];
         }
     }
 
