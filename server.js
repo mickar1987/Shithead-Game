@@ -636,14 +636,14 @@ async function showStats(u) {
     <h3>🃏 Shithead — כלל המשתמשים</h3>
     <div class="stat-row">
       <div class="stat" style="flex:1">
-        <span>\${globalStats.shithead.bot.played}</span>🤖 משחקים מול מחשב
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.shithead.bot.won}</div>
-        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.shithead.bot.abandoned}</div>
+        <span>${globalStats.shithead.bot.played}</span>🤖 משחקים מול מחשב
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.shithead.bot.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.shithead.bot.abandoned}</div>
       </div>
       <div class="stat" style="flex:1">
-        <span>\${globalStats.shithead.online.played}</span>🌐 משחקים ברשת
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.shithead.online.won}</div>
-        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.shithead.online.abandoned}</div>
+        <span>${globalStats.shithead.online.played}</span>🌐 משחקים ברשת
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.shithead.online.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.shithead.online.abandoned}</div>
       </div>
     </div>
   </div>
@@ -651,14 +651,14 @@ async function showStats(u) {
     <h3>🀄 Basra — כלל המשתמשים</h3>
     <div class="stat-row">
       <div class="stat" style="flex:1">
-        <span>\${globalStats.basra.bot.played}</span>🤖 משחקים מול מחשב
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.basra.bot.won}</div>
-        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.basra.bot.abandoned}</div>
+        <span>${globalStats.basra.bot.played}</span>🤖 משחקים מול מחשב
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.basra.bot.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.basra.bot.abandoned}</div>
       </div>
       <div class="stat" style="flex:1">
-        <span>\${globalStats.basra.online.played}</span>🌐 משחקים ברשת
-        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: \${globalStats.basra.online.won}</div>
-        <div style="font-size:11px;color:#6b7280">נטשו: \${globalStats.basra.online.abandoned}</div>
+        <span>${globalStats.basra.online.played}</span>🌐 משחקים ברשת
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצחונות: ${globalStats.basra.online.won}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.basra.online.abandoned}</div>
       </div>
     </div>
   </div>
@@ -666,7 +666,7 @@ async function showStats(u) {
 
 <table>
 <tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>סטטוס</th><th>חדר</th><th>חיבור אחרון</th><th>מטבעות</th><th>פעולות</th></tr>
-\${rows}
+${rows}
 </table>
 
 <!-- Stats Modal -->
