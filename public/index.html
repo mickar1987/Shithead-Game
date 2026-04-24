@@ -586,11 +586,12 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.209</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.211</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')"><span class="back-txt">← Back</span></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;">SHITHEAD</div>
         <button onclick="showMenu('menuVsAI')" class="setup-btn" id="btn_vsComputer">vs Computer</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn" id="btn_online">Online</button>
         <button onclick="showHowToPlay()" id="btn_howToPlay" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
@@ -677,6 +678,7 @@
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;">BASRA</div>
         <button onclick="showMenu('menuBasraVsAI')" class="setup-btn" id="btn_basraVsAI">מול מחשב</button>
         <button onclick="showMenu('menuBasraOnline')" class="setup-btn" id="btn_basraOnline">מול רשת</button>
+        <button onclick="showHowToPlayBasra()" id="btn_howToPlayBasra" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ How to Play</button>
     </div>
     <div id="menuBasraOnline" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')"><span class="back-txt">← Back</span></div>
@@ -861,6 +863,49 @@
     </div>
 </div>
 
+<div id="howToPlayBasraModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;overflow-y:auto;padding:env(safe-area-inset-top,20px) 20px 20px;">
+    <div style="max-width:360px;margin:0 auto;padding-top:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div id="howToPlayBasraTitle" style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold);letter-spacing:3px;">How to Play Basra?</div>
+            <button onclick="document.getElementById('howToPlayBasraModal').style.display='none'" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:1.2rem;border-radius:50%;width:36px;height:36px;cursor:pointer;">✕</button>
+        </div>
+        <!-- Hebrew -->
+        <div id="howToPlayBasraHe" style="display:none;color:rgba(255,255,255,0.85);font-size:13px;line-height:1.7;direction:rtl;text-align:right;">
+            <p><strong style="color:var(--gold);">🎯 מטרת המשחק</strong><br>לאסוף כמה שיותר קלפים ונקודות. המנצח הוא השחקן שמגיע ראשון לניקוד הנדרש (ברירת מחדל: 120).</p>
+            <p><strong style="color:var(--gold);">🃏 תחילת המשחק</strong><br>4 קלפים מונחים על השולחן. כל שחקן מקבל 4 קלפים ביד.</p>
+            <p><strong style="color:var(--gold);">▶ כיצד משחקים</strong><br>בכל תור שמים קלף אחד. אם הקלף תואם לקלף על השולחן — אוספים אותו (ועוד קלפים נוספים בעלי אותו ערך). ניתן לאסוף גם קומבינציה שסכומה שווה לקלף המשוחק.</p>
+            <p><strong style="color:var(--gold);">⭐ בסרה!</strong><br>אם אספת את כל הקלפים מהשולחן — זו <strong>בסרה</strong>! שווה 10 נקודות נוספות.</p>
+            <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0;">
+            <p><strong style="color:var(--gold);">✨ קלפים מיוחדים</strong></p>
+            <p>🃏 <strong>J (ג'וקר)</strong> — אוסף את כל הקלפים מהשולחן תמיד. בסרה עם J שווה 20 נקודות!</p>
+            <p>🃏 <strong>7♦ (7 יהלומים)</strong> — אוסף כל קלף, ועושה בסרה תמיד כשהשולחן נקי.</p>
+            <p>🃏 <strong>A, 2, 10♣, J♠</strong> — קלפים בעלי ערך נקודתי מיוחד.</p>
+            <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0;">
+            <p><strong style="color:var(--gold);">🏆 ניקוד</strong></p>
+            <p>• רוב קלפים (27+): +3</p>
+            <p>• A♠: +3 | 2♣: +3 | 10♦: +3 | J♣: +3</p>
+            <p>• בסרה: +10 | בסרה עם J: +20</p>
+        </div>
+        <!-- English -->
+        <div id="howToPlayBasraEn" style="display:block;color:rgba(255,255,255,0.85);font-size:13px;line-height:1.7;direction:ltr;text-align:left;">
+            <p><strong style="color:var(--gold);">🎯 Goal</strong><br>Collect as many cards and points as possible. The winner is the first player to reach the target score (default: 120).</p>
+            <p><strong style="color:var(--gold);">🃏 Setup</strong><br>4 cards are placed on the table. Each player gets 4 cards in hand.</p>
+            <p><strong style="color:var(--gold);">▶ How to Play</strong><br>On your turn, play one card. If it matches a card on the table — capture it (and any other cards of the same rank). You can also capture a combination of cards that sums to your card's value.</p>
+            <p><strong style="color:var(--gold);">⭐ Basra!</strong><br>If you clear all cards from the table — that's a <strong>Basra</strong>! Worth 10 bonus points.</p>
+            <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0;">
+            <p><strong style="color:var(--gold);">✨ Special Cards</strong></p>
+            <p>🃏 <strong>J (Jack)</strong> — always captures all cards on the table. Basra with J is worth 20 points!</p>
+            <p>🃏 <strong>7♦ (7 of Diamonds)</strong> — captures any card, always makes Basra when table is cleared.</p>
+            <p>🃏 <strong>A, 2, 10♣, J♠</strong> — cards with special point values.</p>
+            <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0;">
+            <p><strong style="color:var(--gold);">🏆 Scoring</strong></p>
+            <p>• Card majority (27+): +3</p>
+            <p>• A♠: +3 | 2♣: +3 | 10♦: +3 | J♣: +3</p>
+            <p>• Basra: +10 | Basra with J: +20</p>
+        </div>
+    </div>
+</div>
+
 <!-- LOG -->
 <div id="logWindow"></div>
 <button onclick="toggleLog()" class="log-btn">📜 LOG</button>
@@ -904,8 +949,8 @@
         <div id="playerTable"></div>
         <div id="actionButtons" class="hidden">
             <button id="swapDoneBtn" onclick="endSwapPhase()" class="action-btn"><span id='btn_swapDone'>✅ Done Swapping</span></button>
-            <button id="playBtn" onclick="humanPlay()" class="action-btn"><span id='btn_playCard'>▶ Play Card</span></button>
-            <button id="takeBtn" onclick="humanTake()" class="action-btn"><span id='btn_take'>↙ Take</span></button>
+            <button id="takeBtn" onclick="humanTake()" class="action-btn" style="order:1;"><span id='btn_take'>↙ Take</span></button>
+            <button id="playBtn" onclick="humanPlay()" class="action-btn" style="order:2;"><span id='btn_playCard'>▶ Play Card</span></button>
             <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;"><span id='btn_interrupt'>⚡ Burst!</span></button>
         </div>
         <div id="gameTopBar" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:8px;display:none;gap:5px;z-index:1002;align-items:center;">
@@ -1108,6 +1153,7 @@ function applyLang() {
   _el('btn_take', H('↙ קח','↙ Take'));
   _el('btn_interrupt', H('⚡ התפרץ!','⚡ Burst!'));
   _el('btn_basraStart', H('▶ התחל משחק','▶ Start Game'));
+  _el('btn_howToPlayBasra', '❓ ' + H('איך משחקים','How to Play'));
   _el('lbl_deck2', H('קופה','Deck'));
 }
 
@@ -1709,10 +1755,10 @@ function _humanPlayAI() {
         const sel = selectedHandIndices.map(i => players[0].hand[i]);
         if (!sel.length) { showToast(t('mustSelectCard')); return; }
         if (!sel.every(c => c.slice(0,-1) === aiInterrupt.rank)) {
-            showToast('בחר קלפי ' + aiInterrupt.rank + ' בלבד'); return;
+            showToast(H('בחר קלפי ' + aiInterrupt.rank + ' בלבד', 'Select only ' + aiInterrupt.rank + ' cards')); return;
         }
         if (aiInterrupt.type === 'burn' && sel.length !== aiInterrupt.needed) {
-            showToast('בחר בדיוק ' + aiInterrupt.needed + ' קלפים לשריפה'); return;
+            showToast(H('בחר בדיוק ' + aiInterrupt.needed + ' קלפים לשריפה', 'Select exactly ' + aiInterrupt.needed + ' cards to burn')); return;
         }
         // Cancel AI timer
         clearTimeout(aiInterrupt.timer);
@@ -1726,7 +1772,7 @@ function _humanPlayAI() {
         const isBurned = topR === '10' || (pile.length >= 4 && pileStreak() >= 4);
         if (isBurned) {
             playSound('burn');
-            showToast('🔥 שרפת את הערימה!');
+            showToast(H('🔥 שרפת את הערימה!','🔥 You burned the pile!'));
             setTimeout(() => {
                 pile = [];
                 drawUpToThree(0);
@@ -1742,7 +1788,7 @@ function _humanPlayAI() {
                 }
             }, 600);
         } else {
-            showToast('⚡ התפרצת!');
+            showToast(H('⚡ התפרצת!','⚡ You burst!'));
             drawUpToThree(0);
             checkWin(0);
             if (gameOver) { render(); return; }
@@ -1798,8 +1844,8 @@ function _humanPlayAI() {
         if (isMixed) {
             // Validate faceUp selection
             const fuValid = selectedTableIndices.every(i => players[0].faceUp[i]?.slice(0,-1) === playRank);
-            if (!fuValid) { showToast('בחר קלפי ' + playRank + ' בלבד'); return; }
-            if (!canPlay(players[0].faceUp[selectedTableIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
+            if (!fuValid) { showToast(H('בחר קלפי ' + playRank + ' בלבד', 'Select only ' + playRank + ' cards')); return; }
+            if (!canPlay(players[0].faceUp[selectedTableIndices[0]])) { showToast(H('❌ מהלך לא חוקי!','❌ Invalid move!')); return; }
             // Take ALL hand cards + selected faceUp
             cards.push(...players[0].hand);
             players[0].hand = [];
@@ -1810,12 +1856,12 @@ function _humanPlayAI() {
         } else {
             // Normal hand play
             if (!hasHandSel) { showToast(t('mustSelectCard')); return; }
-            if (!canPlay(players[0].hand[selectedHandIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
+            if (!canPlay(players[0].hand[selectedHandIndices[0]])) { showToast(H('❌ מהלך לא חוקי!','❌ Invalid move!')); return; }
             selectedHandIndices.sort((a,b) => b - a).forEach(i => cards.push(players[0].hand.splice(i, 1)[0]));
         }
     } else {
         if (!selectedTableIndices.length) { showToast(t('mustSelectCard')); return; }
-        if (!canPlay(players[0].faceUp[selectedTableIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
+        if (!canPlay(players[0].faceUp[selectedTableIndices[0]])) { showToast(H('❌ מהלך לא חוקי!','❌ Invalid move!')); return; }
         selectedTableIndices.sort((a,b) => b - a).forEach(i => {
             cards.push(players[0].faceUp[i]);
             players[0].faceUp[i] = null;
@@ -1832,7 +1878,7 @@ function _humanTakeAI() {
     // faceUp phase: must select a faceUp card (or group) to take with pile
     if (players[0].hand.length === 0 && players[0].faceUp.some(c => c)) {
         if (selectedTableIndices.length === 0) {
-            showToast('בחר קלף מהשולחן לקחת עם הערימה');
+            showToast(H('בחר קלף מהשולחן לקחת עם הערימה','Select a card from table to take with pile'));
             return;
         }
         selectedTableIndices.sort((a,b) => b-a).forEach(i => {
@@ -1843,13 +1889,13 @@ function _humanTakeAI() {
         players[0].hand.push(...pile);
         pile = [];
         playSound('take');
-        showToast('↙ לקחת את הערימה');
+        showToast(H('↙ לקחת את הערימה','↙ Taking the pile'));
         nextTurn();
         return;
     }
     // Normal: take pile into hand
     playSound('take');
-    showToast('↙ לקחת את הערימה');
+    showToast(H('↙ לקחת את הערימה','↙ Taking the pile'));
     players[0].hand.push(...pile);
     pile = [];
     nextTurn();
@@ -1963,7 +2009,7 @@ function _doExecuteMove(played) {
 
     if (isBurned) {
         playSound('burn');
-        showToast('🔥 שריפה!');
+        showToast(H('🔥 שריפה!','🔥 Burn!'));
         log(H(`🔥 שריפה! תור נוסף ל-${players[currentPlayer].name}`,`🔥 Burn! Extra turn for ${players[currentPlayer].name}`));
         animating = true;
         _execMoveToken++;
@@ -2233,7 +2279,7 @@ function aiMove() {
                     const i = p.faceUp.indexOf(fc);
                     if (i !== -1) { p.faceUp[i] = null; p.hand.push(fc); }
                 });
-                log(`${p.name} אסף קלפים לידו: ${bestGroup.join(',')}`);
+                log(H(`${p.name} אסף קלפים לידו: ${bestGroup.join(',')}`,`${p.name} collected cards: ${bestGroup.join(',')}`));
             }
             render();
             nextTurn();
@@ -2507,7 +2553,7 @@ function loadAuth() {
                 } else {
                     console.log('[auth] token invalid — asking user to re-login');
                     // Don't clear immediately — show toast and redirect to auth menu
-                    showToast('⚠️ הסשן פג — התחבר מחדש');
+                    showToast(H('⚠️ הסשן פג — התחבר מחדש','⚠️ Session expired — please log in again'));
                     authUser = null;
                     localStorage.removeItem('shithead_auth');
                     localStorage.removeItem('shithead_coins');
@@ -2698,7 +2744,7 @@ async function claimDaily() {
         console.log('[daily] response:', data);
         if (!data.ok) {
             if (data.error === 'לא מחובר') {
-                showToast('⚠️ הסשן פג — התחבר מחדש');
+                showToast(H('⚠️ הסשן פג — התחבר מחדש','⚠️ Session expired — please log in again'));
                 authUser = null;
                 localStorage.removeItem('shithead_auth');
                 updateCoinsUI();
@@ -3005,7 +3051,7 @@ const overlay = document.getElementById('setupOverlay');
     socket.on('burn', ({ playerIdx } = {}) => {
         const burnerName = onlineState?.players?.[playerIdx]?.name || '';
         if (burnerName) log(H(`🔥 שריפה! תור נוסף ל-${burnerName}`,`🔥 Burn! Extra turn for ${burnerName}`));
-        showToast('🔥 שריפה!');
+        showToast(H('🔥 שריפה!','🔥 Burn!'));
         playSound('burn');
         const pileEl = document.getElementById('pile');
         // Scale up then burn
@@ -3835,6 +3881,14 @@ function showHowToPlay() {
     document.getElementById('howToPlayModal').style.display = 'block';
 }
 
+function showHowToPlayBasra() {
+    const isHe = _lang === 'he';
+    document.getElementById('howToPlayBasraHe').style.display = isHe ? 'block' : 'none';
+    document.getElementById('howToPlayBasraEn').style.display = isHe ? 'none' : 'block';
+    document.getElementById('howToPlayBasraTitle').textContent = isHe ? 'איך משחקים בסרה?' : 'How to Play Basra?';
+    document.getElementById('howToPlayBasraModal').style.display = 'block';
+}
+
 // ── Profile management ──
 // Build display name: "מיקה.ר." from first="מיקה" last="רובינשטיין"
 function buildDisplayName(first, last) {
@@ -4356,7 +4410,7 @@ function humanTake() {
         return;
     }
     if (s.myHand.length === 0 && s.myFaceUp.some(Boolean)) {
-        if (!selectedTableIndices.length) { showToast('בחר קלף מהשולחן לקחת עם הערימה'); return; }
+        if (!selectedTableIndices.length) { showToast(H('בחר קלף מהשולחן לקחת עם הערימה','Select a card from table to take with pile')); return; }
         const faceUpCards = selectedTableIndices.map(i => s.myFaceUp[i]).filter(Boolean);
         // Validate: all selected cards must be same rank
         if (faceUpCards.length > 1) {
@@ -4860,6 +4914,14 @@ function showHowToPlay() {
     document.getElementById('howToPlayModal').style.display = 'block';
 }
 
+function showHowToPlayBasra() {
+    const isHe = _lang === 'he';
+    document.getElementById('howToPlayBasraHe').style.display = isHe ? 'block' : 'none';
+    document.getElementById('howToPlayBasraEn').style.display = isHe ? 'none' : 'block';
+    document.getElementById('howToPlayBasraTitle').textContent = isHe ? 'איך משחקים בסרה?' : 'How to Play Basra?';
+    document.getElementById('howToPlayBasraModal').style.display = 'block';
+}
+
 // ── Profile management ──
 // Build display name: "מיקה.ר." from first="מיקה" last="רובינשטיין"
 function buildDisplayName(first, last) {
@@ -5381,7 +5443,7 @@ function humanTake() {
         return;
     }
     if (s.myHand.length === 0 && s.myFaceUp.some(Boolean)) {
-        if (!selectedTableIndices.length) { showToast('בחר קלף מהשולחן לקחת עם הערימה'); return; }
+        if (!selectedTableIndices.length) { showToast(H('בחר קלף מהשולחן לקחת עם הערימה','Select a card from table to take with pile')); return; }
         const faceUpCards = selectedTableIndices.map(i => s.myFaceUp[i]).filter(Boolean);
         // Validate: all selected cards must be same rank
         if (faceUpCards.length > 1) {
@@ -6296,7 +6358,7 @@ function basraRender(state) {
     } else if (!state.isMyTurn) {
         statusEl.textContent = 'תור של '+state.playerNames[state.currentPlayer];
     } else {
-        statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק קלף' : 'בחר קלף מהיד';
+        statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק קלף' : H('בחר קלף מהיד','Select a card from hand');
     }
 }
 
@@ -6307,7 +6369,7 @@ function basraIsAutoCapture(card) {
 }
 
 function basraPlaySelected() {
-    if (!basraSelectedCard) { showToast('בחר קלף מהיד'); return; }
+    if (!basraSelectedCard) { showToast(H('בחר קלף מהיד','Select a card from hand')); return; }
     const card = basraSelectedCard;
     const tableCards = basraState ? basraState.tableCards : [];
 
