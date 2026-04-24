@@ -586,7 +586,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.211</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.212</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1010,7 +1010,7 @@ const _txt = {
     back:'← חזור', cancel:'ביטול', confirm:'✅ אסוף', throwCard:'↓ זרוק קלף',
     results:'תוצאות', newGame:'🔄 משחק חדש', leaveMenu:'🚪 צא לתפריט',
     notYourTurn:'לא התורך', selectCard:'בחר קלף תחילה',
-    mustCapture:'חייב לאסוף! בחר קלפים מהשולחן',
+    mustCapture:H('חייב לאסוף! בחר קלפים מהשולחן','Must capture! Select cards from table'),
     selectSameRank:'בחר קלף זהה להתפרצות',
     noCoins:'אין מספיק מטבעות', loginRequired:'יש להתחבר כדי לשחק בהימורים',
     waiting:'ממתין לשחקנים...', noRooms:'אין חדרים פתוחים כרגע',
@@ -1066,6 +1066,30 @@ const _txt = {
 
 function T(k) { return (_txt[_lang]||_txt.he)[k]||k; }
 function H(he, en) { return _lang==='he' ? he : en; }
+
+function translateServerMsg(msg) {
+  if (!msg || !msg.includes('|')) return msg;
+  const parts = msg.split('|');
+  const name = parts[0];
+  const key = parts[1];
+  const extra = parts[2] || '';
+  const n = name ? name + ' ' : '';
+  switch(key) {
+    case 'autoCollect': return n + H('אסף אוטומטית (פג הזמן)', 'auto-collected (time out)');
+    case 'threw': return n + H(`זרק ${extra} (פג הזמן)`, `threw ${extra} (time out)`);
+    case 'newCards': return H('חולקו קלפים חדשים', 'New cards dealt');
+    case 'tie': return H('🔁 תיקו! משחק שובר שיוויון...', '🔁 Tie! Tiebreaker game...');
+    case 'disqualified': return n + H('פסל עצמו (פג הזמן פעמיים)', 'disqualified (double timeout)');
+    case 'captured': return n + H(`תפס ${extra} קלפים`, `captured ${extra} cards`);
+    case 'roundStart': return H(`סיבוב ${extra} מתחיל!`, `Round ${extra} starts!`);
+    case 'closedRoom': return (name||H('היוצר','Host')) + ' ' + H('סגר את החדר', 'closed the room');
+    case 'leftLost': return (name||H('שחקן','Player')) + ' ' + H('עזב — הוכרז כמפסיד', 'left — declared loser');
+    case 'left': return (name||H('שחקן','Player')) + ' ' + H('עזב', 'left');
+    case 'leftEnd': return (name||H('שחקן','Player')) + ' ' + H('עזב — המשחק הסתיים', 'left — game over');
+    case 'mustCapture': return H('חייב לאסוף!', 'Must capture!');
+    default: return msg;
+  }
+}
 
 function setLang(lang) {
   _lang = lang;
@@ -1154,6 +1178,10 @@ function applyLang() {
   _el('btn_interrupt', H('⚡ התפרץ!','⚡ Burst!'));
   _el('btn_basraStart', H('▶ התחל משחק','▶ Start Game'));
   _el('btn_howToPlayBasra', '❓ ' + H('איך משחקים','How to Play'));
+  _el('btn_basraCancel', H('✕ ביטול','✕ Cancel'));
+  _el('btn_basraThrow', H('↓ זרוק קלף','↓ Throw Card'));
+  _el('btn_basraConfirm', H('✅ אסוף','✅ Collect'));
+  _el('btn_basraPlay', H('▶ שחק','▶ Play Card'));
   _el('lbl_deck2', H('קופה','Deck'));
 }
 
@@ -1575,7 +1603,7 @@ function render() {
             playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
             playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
         } else {
-            playBtn.textContent = '⚡ התפרץ!';
+            playBtn.textContent = H('⚡ התפרץ!','⚡ Burst!');
             playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
             playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
         }
@@ -2374,7 +2402,7 @@ function showResults() {
     }).join('');
     // Show AI-mode buttons
     const newBtn = document.getElementById('newGameBtn');
-    newBtn.textContent = '🔄 משחק חדש';
+    newBtn.textContent = H('🔄 משחק חדש','🔄 New Game');
     newBtn.style.display = 'block';
     newBtn.disabled = false; newBtn.style.opacity = '1';
     document.getElementById('leaveBtn').style.display = 'block';
@@ -2608,14 +2636,14 @@ function updateCoinsUI() {
         const tabs = document.getElementById('authTabs');
         const form = document.querySelectorAll('#authUsername,#authPin,#authPin2,#authSubmitBtn');
         if (loggedIn) loggedIn.classList.remove('hidden');
-        if (coinsDisp) coinsDisp.textContent = '🪙 ' + authUser.coins.toLocaleString() + ' מטבעות';
+        if (coinsDisp) coinsDisp.textContent = '🪙 ' + authUser.coins.toLocaleString() + H(' מטבעות',' coins');
         if (tabs) tabs.style.display = 'none';
         form.forEach(el => el.classList.add('hidden'));
         // Check daily
         checkDailyAvailable();
     } else {
         if (bar) bar.style.display = 'none';
-        if (authBtn) authBtn.textContent = 'חשבון / התחבר';
+        if (authBtn) authBtn.textContent = H('👤 חשבון / התחבר','👤 Account / Login');
         const loggedIn = document.getElementById('authLoggedIn');
         const tabs = document.getElementById('authTabs');
         const form = document.querySelectorAll('#authUsername,#authPin,#authSubmitBtn');
@@ -2638,14 +2666,14 @@ function switchAuthTab(tab) {
         if (fname) fname.classList.add('hidden');
         if (lname) lname.classList.add('hidden');
         if (prev)  prev.textContent = '';
-        if (btn)   btn.textContent = '🔑 התחבר';
+        if (btn)   btn.textContent = T('login');
         if (t1)    t1.style.borderColor = 'var(--gold)';
         if (t2)    t2.style.borderColor = '';
     } else {
         if (pin2)  pin2.classList.remove('hidden');
         if (fname) fname.classList.remove('hidden');
         if (lname) lname.classList.remove('hidden');
-        if (btn)   btn.textContent = '✨ הרשם';
+        if (btn)   btn.textContent = T('register');
         if (t1)    t1.style.borderColor = '';
         if (t2)    t2.style.borderColor = 'var(--gold)';
     }
@@ -2753,7 +2781,7 @@ async function claimDaily() {
             }
             if (data.msLeft > 0) startDailyCountdown(data.msLeft);
             else setDailyBtnsState(false, '');
-            showToast('❌ ' + (data.error || 'שגיאה'));
+            showToast('❌ ' + (data.error || H('שגיאה','Error')));
             return;
         }
         authUser.coins = data.coins;
@@ -2839,7 +2867,7 @@ async function saveEditProfile() {
         const r = await fetch('/api/update-profile', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ username: authUser.username, token: authUser.token, firstName: first, lastName: last, newPin: newPin || null }) });
         const data = await r.json();
-        if (!data.ok) { errEl.textContent = data.error || 'שגיאה'; return; }
+        if (!data.ok) { errEl.textContent = data.error || H('שגיאה','Error'); return; }
         // Update local auth
         authUser.firstName = first;
         authUser.lastName  = last;
@@ -2850,7 +2878,7 @@ async function saveEditProfile() {
         saveAuthLocal();
         updateCoinsUI();
         closeEditProfile();
-        showToast(`✅ פרופיל עודכן! יוצג כ: ${authUser.displayName}`);
+        showToast(H(`✅ פרופיל עודכן! יוצג כ: ${authUser.displayName}`,`✅ Profile updated! Showing as: ${authUser.displayName}`));
     } catch(e) { errEl.textContent = H('שגיאת חיבור','Connection error'); }
 }
 
@@ -2862,7 +2890,7 @@ function logoutUser() {
     authUser = null;
     saveAuthLocal();
     updateCoinsUI();
-    showToast('👋 התנתקת');
+    showToast(H('👋 התנתקת','👋 Logged out'));
 }
 
 // ── Bet selection ──
@@ -2991,9 +3019,10 @@ const overlay = document.getElementById('setupOverlay');
         if (onlineMode) renderOnline(state);
     });
 
-    socket.on('toast', msg => {
+    socket.on('toast', rawMsg => {
+        const msg = translateServerMsg(rawMsg);
         showToast(msg, 800);
-        if (msg === 'חולקו קלפים חדשים') {
+        if (rawMsg === '|newCards') {
             const l = document.getElementById('logWindow');
             if (l) l.innerHTML = '';
         }
@@ -3192,7 +3221,7 @@ if (!onlineMode) return; // already left to menu
         document.getElementById('resultOverlay').style.display = 'none';
         document.getElementById('actionButtons').classList.remove('hidden');
         document.getElementById('gameTopBar').style.display = 'flex';
-        showToast('🔄 משחק חדש!');
+        showToast(H('🔄 משחק חדש!','🔄 New game!'));
     });
 
     socket.on('playerLeft', ({ name, newPlayerCount }) => {
@@ -3205,7 +3234,7 @@ if (!onlineMode) return; // already left to menu
         const code = document.getElementById('lobbyCode')?.textContent?.trim();
         const name = document.getElementById('playerNameInput')?.value?.trim();
         if (code && code.length === 4 && name) {
-            showToast('🔄 מתחבר מחדש...');
+            showToast(H('🔄 מתחבר מחדש...','🔄 Reconnecting...'));
             socket.emit('rejoinRoom', { code, name });
         }
     });
@@ -3488,7 +3517,7 @@ if (!onlineMode) return; // already left to menu
     });
 
     socket.on('basraRoomClosed', () => {
-        showToast('החדר נסגר על ידי היוצר');
+        showToast(H('החדר נסגר על ידי היוצר','Room closed by host'));
         document.getElementById('basraGame').style.display = 'none';
         showMenu('menuBasra');
     });
@@ -3520,7 +3549,7 @@ if (!onlineMode) return; // already left to menu
         basraSelectedCard = null;
         basraCommittedCard = null;
         basraPlayPhase = 'select';
-        showToast('המשחק התחיל!');
+        showToast(H('המשחק התחיל!','Game started!'));
     });
     socket.on('basraState', state => {
         basraMySlot=state.mySlotIdx;
@@ -3911,7 +3940,7 @@ function loadProfile() {
 }
 
 function showFirstTimeAuthPrompt() {
-    showToast('👋 ברוך הבא! התחבר או הירשם כדי להתחיל', 4000);
+    showToast(H('👋 ברוך הבא! התחבר או הירשם כדי להתחיל','👋 Welcome! Login or register to start'), 4000);
     showMenu('menuAuth');
 }
 
@@ -4026,7 +4055,7 @@ function setTimer(secs) {
 function createOnlineRoom(count) {
     const name = getMyName(); if (!name) return;
     if (selectedBet > 0 && !authUser) { showToast(t('loginToPlay')); showMenu('menuAuth'); return; }
-    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(`אין מספיק מטבעות`); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(H(`אין מספיק מטבעות`,`Not enough coins`)); return; }
     initSocket();
     socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
 }
@@ -4306,7 +4335,7 @@ function renderOnline(state) {
         playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else if (canAddInterrupt) {
-        playBtn.textContent = '⚡ התפרץ!';
+        playBtn.textContent = H('⚡ התפרץ!','⚡ Burst!');
         playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else {
@@ -4362,7 +4391,7 @@ function humanPlay() {
     if (myCanInterrupt) {
         if (!selectedHandIndices.length) { showToast(t('selectSameRank')); return; }
         const cards = selectedHandIndices.map(i => s.myHand[i]);
-        if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast('רק קלף ' + s.lastPlayedRank + ' להתפרצות'); return; }
+        if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast(H('רק קלף ' + s.lastPlayedRank + ' להתפרצות', 'Only ' + s.lastPlayedRank + ' cards for burst')); return; }
         selectedHandIndices = [];
         playSound('play');
         socket.emit('playCards', { cards, isInterrupt: true });
@@ -4416,7 +4445,7 @@ function humanTake() {
         if (faceUpCards.length > 1) {
             const rank = faceUpCards[0].slice(0,-1);
             if (!faceUpCards.every(c => c.slice(0,-1) === rank)) {
-                showToast('ניתן לקחת רק קלפים מאותו ערך');
+                showToast(H('ניתן לקחת רק קלפים מאותו ערך','Can only take cards of same rank'));
                 return;
             }
         }
@@ -4436,7 +4465,7 @@ function humanInterrupt() {
     if (!s.interruptWindow || s.lastPlayerIdx !== mySlotIdx) return;
     // Find matching cards in hand
     const matchCards = s.myHand.filter(c => c.slice(0,-1) === s.lastPlayedRank);
-    if (!matchCards.length) { showToast('אין קלף זהה להתפרצות'); return; }
+    if (!matchCards.length) { showToast(H('אין קלף זהה להתפרצות','No matching card for burst')); return; }
     // Use selected cards if they match, otherwise use first match
     let cards;
     if (selectedHandIndices.length > 0) {
@@ -4495,7 +4524,7 @@ function toggleEmojiPicker() {
 
 let reactionCooldown = false;
 function sendReaction(emoji) {
-    if (reactionCooldown) { showToast('המתן 10 שניות בין תגובות'); return; }
+    if (reactionCooldown) { showToast(H('המתן 10 שניות בין תגובות','Wait 10 seconds between reactions')); return; }
     reactionCooldown = true;
     // Start cooldown visual on emoji button
     const btn = document.getElementById('emojiToggleBtn');
@@ -4754,7 +4783,7 @@ function basraRenderCard(cardStr, faceUp, selected, clickFn) {
 // Phase 2: player selects which table cards to capture → clicks "אסוף" → server validates + collects
 // basraCommitCard merged into basraPlaySelected
 function basraConfirmCapture() {
-    if (basraSelectedCaptures.length === 0) { showToast('בחר קלפים לאיסוף'); return; }
+    if (basraSelectedCaptures.length === 0) { showToast(H('בחר קלפים לאיסוף','Select cards to collect')); return; }
     const captureIndices = basraSelectedCaptures.slice();
     const tableCards = basraState ? basraState.tableCards : [];
     const committedCard = basraCommittedCard;
@@ -4944,7 +4973,7 @@ function loadProfile() {
 }
 
 function showFirstTimeAuthPrompt() {
-    showToast('👋 ברוך הבא! התחבר או הירשם כדי להתחיל', 4000);
+    showToast(H('👋 ברוך הבא! התחבר או הירשם כדי להתחיל','👋 Welcome! Login or register to start'), 4000);
     showMenu('menuAuth');
 }
 
@@ -5059,7 +5088,7 @@ function setTimer(secs) {
 function createOnlineRoom(count) {
     const name = getMyName(); if (!name) return;
     if (selectedBet > 0 && !authUser) { showToast(t('loginToPlay')); showMenu('menuAuth'); return; }
-    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(`אין מספיק מטבעות`); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(H(`אין מספיק מטבעות`,`Not enough coins`)); return; }
     initSocket();
     socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
 }
@@ -5339,7 +5368,7 @@ function renderOnline(state) {
         playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else if (canAddInterrupt) {
-        playBtn.textContent = '⚡ התפרץ!';
+        playBtn.textContent = H('⚡ התפרץ!','⚡ Burst!');
         playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else {
@@ -5395,7 +5424,7 @@ function humanPlay() {
     if (myCanInterrupt) {
         if (!selectedHandIndices.length) { showToast(t('selectSameRank')); return; }
         const cards = selectedHandIndices.map(i => s.myHand[i]);
-        if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast('רק קלף ' + s.lastPlayedRank + ' להתפרצות'); return; }
+        if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast(H('רק קלף ' + s.lastPlayedRank + ' להתפרצות', 'Only ' + s.lastPlayedRank + ' cards for burst')); return; }
         selectedHandIndices = [];
         playSound('play');
         socket.emit('playCards', { cards, isInterrupt: true });
@@ -5449,7 +5478,7 @@ function humanTake() {
         if (faceUpCards.length > 1) {
             const rank = faceUpCards[0].slice(0,-1);
             if (!faceUpCards.every(c => c.slice(0,-1) === rank)) {
-                showToast('ניתן לקחת רק קלפים מאותו ערך');
+                showToast(H('ניתן לקחת רק קלפים מאותו ערך','Can only take cards of same rank'));
                 return;
             }
         }
@@ -5469,7 +5498,7 @@ function humanInterrupt() {
     if (!s.interruptWindow || s.lastPlayerIdx !== mySlotIdx) return;
     // Find matching cards in hand
     const matchCards = s.myHand.filter(c => c.slice(0,-1) === s.lastPlayedRank);
-    if (!matchCards.length) { showToast('אין קלף זהה להתפרצות'); return; }
+    if (!matchCards.length) { showToast(H('אין קלף זהה להתפרצות','No matching card for burst')); return; }
     // Use selected cards if they match, otherwise use first match
     let cards;
     if (selectedHandIndices.length > 0) {
@@ -5552,7 +5581,7 @@ function leaveToMenu() {
             </div>`;
         }).join('');
         const newBtn = document.getElementById('newGameBtn');
-        if (newBtn) { newBtn.textContent = '🔄 משחק חדש'; newBtn.style.display = 'block'; newBtn.disabled = false; newBtn.style.opacity = '1'; }
+        if (newBtn) { newBtn.textContent = H('🔄 משחק חדש','🔄 New Game'); newBtn.style.display = 'block'; newBtn.disabled = false; newBtn.style.opacity = '1'; }
         const leaveBtn = document.getElementById('leaveBtn');
         if (leaveBtn) { leaveBtn.style.display = 'block'; leaveBtn.textContent = '🚪 צא לתפריט'; leaveBtn.onclick = function() { _doLeaveToMenu(); }; }
         document.getElementById('waitingRestart') && (document.getElementById('waitingRestart').style.display = 'none');
@@ -5594,7 +5623,7 @@ function toggleEmojiPicker() {
 }
 
 function sendReaction(emoji) {
-    if (reactionCooldown) { showToast('המתן 10 שניות בין תגובות'); return; }
+    if (reactionCooldown) { showToast(H('המתן 10 שניות בין תגובות','Wait 10 seconds between reactions')); return; }
     reactionCooldown = true;
     // Start cooldown visual on emoji button
     const btn = document.getElementById('emojiToggleBtn');
@@ -6352,9 +6381,9 @@ function basraRender(state) {
         const possibleCaptures = basraFindValidCaptures(state.committedCard, state.tableCards);
         const canCapture = possibleCaptures.length > 0;
         statusEl.textContent = basraSelectedCaptures.length > 0
-            ? 'בחרת '+basraSelectedCaptures.length+' קלפים — לחץ ✅ אסוף'
+            ? H('בחרת '+basraSelectedCaptures.length+' קלפים — לחץ ✅ אסוף','Selected '+basraSelectedCaptures.length+' cards — press ✅ Collect')
             : canCapture ? t('mustCapture')
-            : state.tableCards.length > 0 ? 'אין קלף תואם — לחץ ↓ זרוק קלף' : 'לחץ ↓ זרוק קלף';
+            : state.tableCards.length > 0 ? H('אין קלף תואם — לחץ ↓ זרוק קלף','No match — press ↓ Throw Card') : H('לחץ ↓ זרוק קלף','↓ Throw Card');
     } else if (!state.isMyTurn) {
         statusEl.textContent = 'תור של '+state.playerNames[state.currentPlayer];
     } else {
@@ -6508,10 +6537,10 @@ function basraCancelSelection() {
             <div id="basraMyPile" style="flex-shrink:0;"></div>
         </div>
         <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
-            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;"><span id='btn_playCard'>▶ Play Card</span></button>
-            <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);">✅ אסוף</button>
-            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;">↓ זרוק קלף</button>
-            <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
+            <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);order:1;"><span id="btn_basraCancel">✕ Cancel</span></button>
+            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;order:1;"><span id="btn_basraThrow">↓ Throw Card</span></button>
+            <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);order:2;"><span id="btn_basraConfirm">✅ Collect</span></button>
+            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;order:2;"><span id='btn_basraPlay'>▶ Play Card</span></button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
     </div>
