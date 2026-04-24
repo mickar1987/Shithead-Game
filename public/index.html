@@ -586,7 +586,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.208</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.209</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -694,7 +694,7 @@
             <button onclick="setBasraAIWinScore(180)" id="basraAIWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraAIWinScore(220)" id="basraAIWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
-        <button onclick="startBasraVsAI()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;">▶ התחל משחק</button>
+        <button onclick="startBasraVsAI()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;" id="btn_basraStartGame"><span id="btn_basraStart">▶ Start Game</span></button>
     </div>
     <div id="menuBasraAccess" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')"><span class="back-txt">← Back</span></div>
@@ -903,14 +903,14 @@
     <div id="playerArea">
         <div id="playerTable"></div>
         <div id="actionButtons" class="hidden">
-            <button id="swapDoneBtn" onclick="endSwapPhase()" class="action-btn">✅ סיום החלפה</button>
-            <button id="playBtn" onclick="humanPlay()" class="action-btn">▶ שחק קלף</button>
-            <button id="takeBtn" onclick="humanTake()" class="action-btn">↙ קח</button>
-            <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;">⚡ התפרץ!</button>
+            <button id="swapDoneBtn" onclick="endSwapPhase()" class="action-btn"><span id='btn_swapDone'>✅ Done Swapping</span></button>
+            <button id="playBtn" onclick="humanPlay()" class="action-btn"><span id='btn_playCard'>▶ Play Card</span></button>
+            <button id="takeBtn" onclick="humanTake()" class="action-btn"><span id='btn_take'>↙ Take</span></button>
+            <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;"><span id='btn_interrupt'>⚡ Burst!</span></button>
         </div>
         <div id="gameTopBar" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:8px;display:none;gap:5px;z-index:1002;align-items:center;">
             <button onclick="toggleSound()" id="soundBtn" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;opacity:0.5;">🔇</button>
-            <button onclick="confirmLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;letter-spacing:0.5px;">EXIT</button>
+            <button onclick="confirmLeave()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;letter-spacing:0.5px;"><span id='btn_exit'>EXIT</span></button>
             <button id="emojiToggleBtn" onclick="toggleEmojiPicker()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:15px;cursor:pointer;">😊</button>
         </div>
         <div id="emojiPicker" style="display:none;position:fixed;top:calc(env(safe-area-inset-top) + 50px);right:8px;background:rgba(20,20,40,0.97);border:1px solid #444;border-radius:12px;padding:10px;z-index:1002;display:none;">
@@ -1020,6 +1020,7 @@ const _txt = {
 };
 
 function T(k) { return (_txt[_lang]||_txt.he)[k]||k; }
+function H(he, en) { return _lang==='he' ? he : en; }
 
 function setLang(lang) {
   _lang = lang;
@@ -1091,7 +1092,7 @@ function applyLang() {
   _el('result_title', _lang==='he'?'תוצאות':'Results');
   _el('btn_newGame', _lang==='he'?'🔄 משחק חדש באותו חדר':'🔄 New Game');
   _el('btn_leaveMain', _lang==='he'?'🚪 צא לתפריט הראשי':'🚪 Exit to Menu');
-  _el('lbl_deck', _lang==='he'?'קופה':'Deck');
+  _el('lbl_deck', _lang==='he'?H('קופה','Deck'):'Deck');
   // placeholders
   const ri = document.getElementById('roomCodeInput'); if(ri) ri.placeholder = _lang==='he'?'קוד חדר':'Room Code';
   const bi = document.getElementById('basraRoomCode'); if(bi) bi.placeholder = _lang==='he'?'קוד חדר':'Room Code';
@@ -1101,6 +1102,13 @@ function applyLang() {
   const ap2 = document.getElementById('authPin2'); if(ap2) ap2.placeholder = _lang==='he'?'אמת PIN':'Confirm PIN';
   const af = document.getElementById('authFirstName'); if(af) af.placeholder = _lang==='he'?'שם פרטי':'First Name';
   const al = document.getElementById('authLastName'); if(al) al.placeholder = _lang==='he'?'שם משפחה':'Last Name';
+  // In-game buttons
+  _el('btn_swapDone', H('✅ סיום החלפה','✅ Done Swapping'));
+  _el('btn_playCard', H('▶ שחק קלף','▶ Play Card'));
+  _el('btn_take', H('↙ קח','↙ Take'));
+  _el('btn_interrupt', H('⚡ התפרץ!','⚡ Burst!'));
+  _el('btn_basraStart', H('▶ התחל משחק','▶ Start Game'));
+  _el('lbl_deck2', H('קופה','Deck'));
 }
 
 // ══════════════════════════════════════════════════════
@@ -1510,14 +1518,14 @@ function render() {
     document.getElementById('drawCountDisplay').textContent = drawPile.length;
     document.getElementById('pileStatus').textContent = pile.length
         ? `עליון: ${getEffectiveTop()?.slice(0,-1) || '3'}`
-        : 'ריק';
+        : H('ריק','Empty');
     document.getElementById('swapDoneBtn').style.display = isSwapPhase ? 'block' : 'none';
     document.getElementById('playBtn').style.display = isSwapPhase ? 'none' : 'block';
     // AI interrupt UI
     const playBtn = document.getElementById('playBtn');
     if (!isSwapPhase && aiInterrupt) {
         if (aiInterrupt.type === 'burn') {
-            playBtn.textContent = '🔥 שרוף!';
+            playBtn.textContent = H('🔥 שרוף!','🔥 Burn!');
             playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
             playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
         } else {
@@ -1526,7 +1534,7 @@ function render() {
             playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
         }
     } else if (!isSwapPhase) {
-        playBtn.textContent = '▶ שחק';
+        playBtn.textContent = H('▶ שחק','▶ Play');
         playBtn.style.background = '';
         playBtn.style.animation = '';
     }
@@ -1664,7 +1672,7 @@ function _endSwapAI() {
         starter = withPair[Math.floor(Math.random() * withPair.length)].id;
     }
     currentPlayer = starter;
-    log(`🎮 התחלנו! ${players[starter].name} ראשון`);
+    log(H(`🎮 התחלנו! ${players[starter].name} ראשון`,`🎮 Game on! ${players[starter].name} goes first`));
     if (players[currentPlayer].isAI) setTimeout(aiMove, 300);
     render();
 }
@@ -1956,7 +1964,7 @@ function _doExecuteMove(played) {
     if (isBurned) {
         playSound('burn');
         showToast('🔥 שריפה!');
-        log(`🔥 שריפה! תור נוסף ל-${players[currentPlayer].name}`);
+        log(H(`🔥 שריפה! תור נוסף ל-${players[currentPlayer].name}`,`🔥 Burn! Extra turn for ${players[currentPlayer].name}`));
         animating = true;
         _execMoveToken++;
         // Render first so the played card appears ON the pile before burning
@@ -2160,7 +2168,7 @@ function aiMove() {
         window._aiStateHistory = [];
         aiStaleCount = 0;
         if (pile.length > 0) {
-            showToast(`${p.name} לוקח את הערימה`);
+            showToast(H(`${p.name} לוקח את הערימה`,`${p.name} takes the pile`));
             playSound('take');
             p.hand.push(...pile);
             pile = [];
@@ -2168,7 +2176,7 @@ function aiMove() {
             // Pile empty but stuck — force play lowest card or skip
             const anyCard = p.hand[0] || p.faceUp.find(Boolean);
             if (anyCard) {
-                showToast(`${p.name} מוכרח לשחק`);
+                showToast(H(`${p.name} מוכרח לשחק`,`${p.name} must play`));
                 if (p.hand.includes(anyCard)) p.hand.splice(p.hand.indexOf(anyCard), 1);
                 else p.faceUp.forEach((fc,i)=>{ if(fc===anyCard) p.faceUp[i]=null; });
                 pile.push(anyCard);
@@ -2211,7 +2219,7 @@ function aiMove() {
             }
         } else {
             // Can't play from faceUp — must take pile AND pick up a faceUp card/group
-            log(`${p.name} לא יכול לשחק - לוקח`);
+            log(H(`${p.name} לא יכול לשחק - לוקח`,`${p.name} can't play — takes pile`));
             p.hand.push(...pile);
             pile = [];
             // Must also pick up one faceUp card/group into hand
@@ -2240,7 +2248,7 @@ function aiMove() {
             if (canPlay(c)) {
                 toPlay = [c];
             } else {
-                log(`${p.name} הפך כסוי - לוקח`);
+                log(H(`${p.name} הפך כסוי - לוקח`,`${p.name} flipped face-down — takes pile`));
                 p.hand.push(c, ...pile);
                 pile = [];
                 nextTurn();
@@ -2255,12 +2263,12 @@ function aiMove() {
     } else {
         // No valid play — take pile (even if empty, just advance turn to prevent loop)
         if (pile.length > 0) {
-            log(`${p.name} לוקח את הערימה`);
+            log(H(`${p.name} לוקח את הערימה`,`${p.name} takes the pile`));
             playSound('take');
             p.hand.push(...pile);
             pile = [];
         } else {
-            log(`${p.name} אין מהלך - דולג`);
+            log(H(`${p.name} אין מהלך - דולג`,`${p.name} no move — skip`));
         }
         render();
         nextTurn();
@@ -2278,8 +2286,8 @@ function checkWin(idx) {
         p.faceDown.every(c => !c)) {
         p.finished = true;
         winnersOrder.push(p.id);
-        log(`🏁 ${p.name} סיים במקום ${winnersOrder.length}!`);
-        showToast(`🏁 ${p.name} סיים!`);
+        log(H(`🏁 ${p.name} סיים במקום ${winnersOrder.length}!`,`🏁 ${p.name} finished #${winnersOrder.length}!`));
+        showToast(H(`🏁 ${p.name} סיים!`,`🏁 ${p.name} finished!`));
         if (idx === 0) fastMode = true; // human finished → speed up AI
         if (winnersOrder.length >= players.length - 1) {
             setTimeout(showResults, 800);
@@ -2410,8 +2418,8 @@ function nextTurn(skips = 1) {
                     log(`${canBurnAI ? '🔥' : '⚡'} ${players[pi].name}: ${toPlay.join(', ')}`);
                     if (isBurned2) {
                         playSound('burn');
-                        showToast(`🔥 ${players[pi].name} שרף!`);
-                        log(`🔥 שריפה! תור נוסף ל-${players[pi].name}`);
+                        showToast(H(`🔥 ${players[pi].name} שרף!`,`🔥 ${players[pi].name} burned!`));
+                        log(H(`🔥 שריפה! תור נוסף ל-${players[pi].name}`,`🔥 Burn! Extra turn for ${players[pi].name}`));
                         animating = true;
                         _execMoveToken++;
                         const pileEl = document.getElementById('pile');
@@ -2437,7 +2445,7 @@ function nextTurn(skips = 1) {
                             }, 350);
                         }, 100);
                     } else {
-                        showToast(`⚡ ${players[pi].name} התפרץ!`);
+                        showToast(H(`⚡ ${players[pi].name} התפרץ!`,`⚡ ${players[pi].name} burst!`));
                         drawUpToThree(pi);
                         checkWin(pi);
                         render();
@@ -2602,7 +2610,7 @@ function updateAuthNamePreview() {
     const first = (document.getElementById('authFirstName')?.value || '').trim();
     const last  = (document.getElementById('authLastName')?.value  || '').trim();
     const prev  = document.getElementById('authNamePreview');
-    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
+    if (prev) prev.textContent = first ? H(`יוצג כ: ${buildDisplayName(first, last)}`,`Will show as: ${buildDisplayName(first, last)}`) : '';
 }
 
 async function submitAuth() {
@@ -2614,10 +2622,10 @@ async function submitAuth() {
     const firstName = (document.getElementById('authFirstName')?.value || '').trim();
     const lastName  = (document.getElementById('authLastName')?.value  || '').trim();
 
-    if (!username || !pin) { errEl.textContent = 'מלא שם משתמש ו-PIN'; return; }
-    if (pin.length !== 4)  { errEl.textContent = 'PIN חייב להיות 4 ספרות'; return; }
-    if (isRegister && pin2El.value !== pin) { errEl.textContent = 'הPIN לא תואם'; return; }
-    if (isRegister && !firstName) { errEl.textContent = 'חסר שם פרטי'; return; }
+    if (!username || !pin) { errEl.textContent = H('מלא שם משתמש ו-PIN','Enter username and PIN'); return; }
+    if (pin.length !== 4)  { errEl.textContent = H('PIN חייב להיות 4 ספרות','PIN must be 4 digits'); return; }
+    if (isRegister && pin2El.value !== pin) { errEl.textContent = H('הPIN לא תואם','PINs do not match'); return; }
+    if (isRegister && !firstName) { errEl.textContent = H('חסר שם פרטי','First name required'); return; }
 
     const endpoint = isRegister ? '/api/register' : '/api/login';
     try {
@@ -2634,8 +2642,8 @@ async function submitAuth() {
         saveAuthLocal();
         updateCoinsUI();
         errEl.textContent = '';
-        showToast(isRegister ? `✨ ברוך הבא ${authUser.displayName}! יש לך 🪙${data.coins}` : `👋 שלום ${authUser.displayName}! 🪙${data.coins}`);
-    } catch(e) { errEl.textContent = 'שגיאת חיבור לשרת'; }
+        showToast(isRegister ? H(`✨ ברוך הבא ${authUser.displayName}! יש לך 🪙${data.coins}`,`✨ Welcome ${authUser.displayName}! You have 🪙${data.coins}`) : H(`👋 שלום ${authUser.displayName}! 🪙${data.coins}`,`👋 Hi ${authUser.displayName}! 🪙${data.coins}`));
+    } catch(e) { errEl.textContent = H('שגיאת חיבור לשרת','Server connection error'); }
 }
 
 let dailyCountdownInterval = null;
@@ -2673,7 +2681,7 @@ function startDailyCountdown(msLeft) {
             setDailyBtnsState(false, '');
             return;
         }
-        setDailyBtnsState(true, `⏳ זמין בעוד ${formatCountdown(remaining)}`);
+        setDailyBtnsState(true, H(`⏳ זמין בעוד ${formatCountdown(remaining)}`,`⏳ Available in ${formatCountdown(remaining)}`));
         remaining -= 1000;
     }
     tick();
@@ -2705,10 +2713,10 @@ async function claimDaily() {
         authUser.coins = data.coins;
         saveAuthLocal();
         updateCoinsUI();
-        showToast(`🎁 קיבלת 200 מטבעות! סה"כ: 🪙${data.coins}`);
+        showToast(H(`🎁 קיבלת 200 מטבעות! סה"כ: 🪙${data.coins}`,`🎁 You got 200 coins! Total: 🪙${data.coins}`));
         startDailyCountdown(24 * 60 * 60 * 1000);
     } catch(e) {
-        showToast('שגיאת חיבור לשרת');
+        showToast(H('שגיאת חיבור לשרת','Server connection error'));
         setDailyBtnsState(false, '');
     }
 }
@@ -2750,12 +2758,12 @@ function closeEditProfile() {
 async function verifyEditPin() {
     const pin = document.getElementById('editProfilePin').value.trim();
     const errEl = document.getElementById('editProfilePinError');
-    if (pin.length !== 4) { errEl.textContent = 'PIN חייב להיות 4 ספרות'; return; }
+    if (pin.length !== 4) { errEl.textContent = H('PIN חייב להיות 4 ספרות','PIN must be 4 digits'); return; }
     try {
         const r = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ username: authUser.username, pin }) });
         const data = await r.json();
-        if (!data.ok) { errEl.textContent = 'PIN שגוי'; return; }
+        if (!data.ok) { errEl.textContent = H('PIN שגוי','Wrong PIN'); return; }
         // Show step 2
         document.getElementById('editProfileStep1').style.display = 'none';
         document.getElementById('editProfileStep2').style.display = '';
@@ -2764,14 +2772,14 @@ async function verifyEditPin() {
         document.getElementById('editNewPin').value = '';
         document.getElementById('editProfileError').textContent = '';
         updateEditPreview();
-    } catch(e) { errEl.textContent = 'שגיאת חיבור'; }
+    } catch(e) { errEl.textContent = H('שגיאת חיבור','Connection error'); }
 }
 
 function updateEditPreview() {
     const first = (document.getElementById('editFirstName')?.value || '').trim();
     const last  = (document.getElementById('editLastName')?.value  || '').trim();
     const prev  = document.getElementById('editPreview');
-    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
+    if (prev) prev.textContent = first ? H(`יוצג כ: ${buildDisplayName(first, last)}`,`Will show as: ${buildDisplayName(first, last)}`) : '';
 }
 
 async function saveEditProfile() {
@@ -2779,8 +2787,8 @@ async function saveEditProfile() {
     const last   = (document.getElementById('editLastName').value  || '').trim();
     const newPin = (document.getElementById('editNewPin').value    || '').trim();
     const errEl  = document.getElementById('editProfileError');
-    if (!first) { errEl.textContent = 'שם פרטי חובה'; return; }
-    if (newPin && newPin.length !== 4) { errEl.textContent = 'PIN חדש חייב להיות 4 ספרות'; return; }
+    if (!first) { errEl.textContent = H('שם פרטי חובה','First name is required'); return; }
+    if (newPin && newPin.length !== 4) { errEl.textContent = H('PIN חדש חייב להיות 4 ספרות','New PIN must be 4 digits'); return; }
     try {
         const r = await fetch('/api/update-profile', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ username: authUser.username, token: authUser.token, firstName: first, lastName: last, newPin: newPin || null }) });
@@ -2797,7 +2805,7 @@ async function saveEditProfile() {
         updateCoinsUI();
         closeEditProfile();
         showToast(`✅ פרופיל עודכן! יוצג כ: ${authUser.displayName}`);
-    } catch(e) { errEl.textContent = 'שגיאת חיבור'; }
+    } catch(e) { errEl.textContent = H('שגיאת חיבור','Connection error'); }
 }
 
 function confirmLogout() {
@@ -2824,7 +2832,7 @@ function setBet(amount) {
         return;
     }
     selectedBet = amount;
-    if (errEl) errEl.textContent = amount > 0 ? `הימור: 🪙${amount} למשחק` : '';
+    if (errEl) errEl.textContent = amount > 0 ? H(`הימור: 🪙${amount} למשחק`,`Bet: 🪙${amount} per game`) : '';
     ['0','50','100','200','500'].forEach(v => {
         const b = document.getElementById('betBtn' + v);
         if (b) b.style.borderColor = (parseInt(v) === amount) ? 'var(--gold)' : '';
@@ -2975,7 +2983,7 @@ const overlay = document.getElementById('setupOverlay');
     });
     socket.on('onlineStats', ({ online, inGame }) => {
         const el = document.getElementById('onlineStats');
-        if (el) el.textContent = `${online} משתמשים מחוברים • ${inGame} במשחק`;
+        if (el) el.textContent = H(`${online} משתמשים מחוברים • ${inGame} במשחק`,`${online} online • ${inGame} in game`);
     });
     socket.on('publicRooms', (rooms) => {
         const list = document.getElementById('publicRoomsList');
@@ -2996,7 +3004,7 @@ const overlay = document.getElementById('setupOverlay');
     });
     socket.on('burn', ({ playerIdx } = {}) => {
         const burnerName = onlineState?.players?.[playerIdx]?.name || '';
-        if (burnerName) log(`🔥 שריפה! תור נוסף ל-${burnerName}`);
+        if (burnerName) log(H(`🔥 שריפה! תור נוסף ל-${burnerName}`,`🔥 Burn! Extra turn for ${burnerName}`));
         showToast('🔥 שריפה!');
         playSound('burn');
         const pileEl = document.getElementById('pile');
@@ -3014,7 +3022,7 @@ const overlay = document.getElementById('setupOverlay');
     socket.on('cardPlayed', ({ playerIdx, cards, isInterrupt }) => {
         if (playerIdx !== mySlotIdx) playSound('play');
         if (onlineState) {
-            const pName = onlineState.players?.[playerIdx]?.name || `שחקן ${playerIdx+1}`;
+            const pName = onlineState.players?.[playerIdx]?.name || H(`שחקן ${playerIdx+1}`,`Player ${playerIdx+1}`);
             if (cards?.length) log(`${isInterrupt ? '⚡ ' : ''}${pName}: ${cards.join(', ')}`);
         }
         // Animate card flying from player position to pile
@@ -3125,7 +3133,7 @@ const overlay = document.getElementById('setupOverlay');
 
     socket.on('playerWantsRestart', ({ readyCount, totalCount }) => {
         document.getElementById('waitingCount').style.display = 'block';
-        document.getElementById('waitingCount').textContent = `${readyCount}/${totalCount} רוצים לשחק שוב`;
+        document.getElementById('waitingCount').textContent = H(`${readyCount}/${totalCount} רוצים לשחק שוב`,`${readyCount}/${totalCount} want to play again`);
     });
     socket.on('error', msg => showToast('❌ ' + msg));
 
@@ -3142,7 +3150,7 @@ if (!onlineMode) return; // already left to menu
     });
 
     socket.on('playerLeft', ({ name, newPlayerCount }) => {
-        showToast(`🚪 ${name} יצא — 🤖 ממשיך במקומו`);
+        showToast(H(`🚪 ${name} יצא — 🤖 ממשיך במקומו`,`🚪 ${name} left — 🤖 takes over`));
         // Server replaces leaving player with bot — stay in game
     });
 
@@ -3160,7 +3168,7 @@ if (!onlineMode) return; // already left to menu
     // ── Socket listeners ──
     socket.on('basraAccessVerified', ({ ok }) => {
         if (ok) { basraAccessVerified=true; showMenu(basraPendingAction==='join'?'menuBasraJoin':'menuBasraCreate'); }
-        else document.getElementById('basraAccessError').textContent = 'קוד שגוי';
+        else document.getElementById('basraAccessError').textContent = H('קוד שגוי','Wrong code');
     });
     socket.on('basraError', msg => {
         showToast(msg);
@@ -3567,10 +3575,10 @@ if (!onlineMode) return; // already left to menu
                 const regularBasras = teamBasras - teamJackBasras;
                 const prevScore = totalScores[team[0]] - rep.points;
                 let breakdown = [];
-                breakdown.push(`קלפים: ${teamCards}`);
-                if (rep.majorityPoints > 0) breakdown.push(`רוב (+${rep.majorityPoints})`);
-                if (regularBasras > 0) breakdown.push(`בסרה ×${regularBasras}: +${regularBasras*10}`);
-                if (teamJackBasras > 0) breakdown.push(`בסרה J ×${teamJackBasras}: +${teamJackBasras*20}`);
+                breakdown.push(H(`קלפים: ${teamCards}`,`Cards: ${teamCards}`));
+                if (rep.majorityPoints > 0) breakdown.push(H(`רוב (+${rep.majorityPoints})`,`Majority (+${rep.majorityPoints})`));
+                if (regularBasras > 0) breakdown.push(H(`בסרה ×${regularBasras}: +${regularBasras*10}`,`Basra ×${regularBasras}: +${regularBasras*10}`));
+                if (teamJackBasras > 0) breakdown.push(H(`בסרה J ×${teamJackBasras}: +${teamJackBasras*20}`,`Basra J ×${teamJackBasras}: +${teamJackBasras*20}`));
                 const breakdownHtml = `<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">${breakdown.join(' | ')}</div>`;
                 html+=`<div style="border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;">
                     <div style="display:flex;justify-content:space-between;gap:16px;font-size:13px;color:#fff;">
@@ -3593,10 +3601,10 @@ if (!onlineMode) return; // already left to menu
                 const jackBasras = sc.jackBasras||0;
                 const cardCount2p = cardCounts ? cardCounts[sc.slotIdx] : (sc.cards||0);
                 let breakdown = [];
-                breakdown.push(`קלפים: ${cardCount2p}`);
-                if (sc.majorityPoints > 0) breakdown.push(`רוב (+${sc.majorityPoints})`);
-                if (regularBasras > 0) breakdown.push(`בסרה ×${regularBasras}: +${regularBasras*10}`);
-                if (jackBasras > 0) breakdown.push(`בסרה J ×${jackBasras}: +${jackBasras*20}`);
+                breakdown.push(H(`קלפים: ${cardCount2p}`,`Cards: ${cardCount2p}`));
+                if (sc.majorityPoints > 0) breakdown.push(H(`רוב (+${sc.majorityPoints})`,`Majority (+${sc.majorityPoints})`));
+                if (regularBasras > 0) breakdown.push(H(`בסרה ×${regularBasras}: +${regularBasras*10}`,`Basra ×${regularBasras}: +${regularBasras*10}`));
+                if (jackBasras > 0) breakdown.push(H(`בסרה J ×${jackBasras}: +${jackBasras*20}`,`Basra J ×${jackBasras}: +${jackBasras*20}`));
                 const breakdownHtml = `<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">${breakdown.join(' | ')}</div>`;
                 const prevScore = totalScores[sc.slotIdx] - sc.points;
                 html+=`<div style="border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;">
@@ -3794,7 +3802,7 @@ function updateLobby(state) {
     if (state.openRoom) {
         // Open room — host controls start
         const count = state.players.length;
-        if (s) s.textContent = `${count} שחקנים מחוברים (עד 4)`;
+        if (s) s.textContent = H(`${count} שחקנים מחוברים (עד 4)`,`${count} players connected (up to 4)`);
         if (mySlotIdx === 0) {
             // I am host
             if (count >= 2) {
@@ -3814,7 +3822,7 @@ function updateLobby(state) {
         if (waitMore) waitMore.style.display = 'none';
         const joined = state.players.filter(p => p.connected).length;
         const total = state.players.length;
-        if (s) s.textContent = `${joined}/${total} שחקנים מחוברים`;
+        if (s) s.textContent = H(`${joined}/${total} שחקנים מחוברים`,`${joined}/${total} players connected`);
     }
 }
 
@@ -3861,11 +3869,11 @@ function showNameModal(firstTime = false) {
     const inpF  = document.getElementById('nameModalFirst');
     const inpL  = document.getElementById('nameModalLast');
     if (firstTime) {
-        sub.textContent = 'ברוך הבא! הכנס את שמך לפני שמתחילים 👋';
+        sub.textContent = H('ברוך הבא! הכנס את שמך לפני שמתחילים 👋','Welcome! Enter your name to start 👋');
         if (inpF) inpF.value = '';
         if (inpL) inpL.value = '';
     } else {
-        sub.textContent = 'עדכן את שמך';
+        sub.textContent = H('עדכן את שמך','Update your name');
         if (inpF) inpF.value = localStorage.getItem('shitheadFirstName') || '';
         if (inpL) inpL.value = localStorage.getItem('shitheadLastName')  || '';
     }
@@ -3878,7 +3886,7 @@ function updateNamePreview() {
     const first = (document.getElementById('nameModalFirst')?.value || '').trim();
     const last  = (document.getElementById('nameModalLast')?.value  || '').trim();
     const prev  = document.getElementById('namePreview');
-    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
+    if (prev) prev.textContent = first ? H(`יוצג כ: ${buildDisplayName(first, last)}`,`Will show as: ${buildDisplayName(first, last)}`) : '';
 }
 
 function saveProfileName() {
@@ -3921,7 +3929,7 @@ function fetchOnlineStats() {
     tmpSocket.once('connect', () => tmpSocket.emit('getOnlineStats'));
     tmpSocket.once('onlineStats', ({ online, inGame }) => {
         const el = document.getElementById('onlineStats');
-        if (el) el.textContent = `${online} משתמשים מחוברים • ${inGame} במשחק`;
+        if (el) el.textContent = H(`${online} משתמשים מחוברים • ${inGame} במשחק`,`${online} online • ${inGame} in game`);
         tmpSocket.disconnect();
     });
     setTimeout(() => { if (tmpSocket.connected) tmpSocket.disconnect(); }, 5000);
@@ -4009,7 +4017,7 @@ function renderOnline(state) {
     if (!state || !onlineMode) return;
     // Always reset playBtn at start — re-applied below if interrupt conditions met
     const _pb = document.getElementById('playBtn');
-    if (_pb) { _pb.textContent = '▶ שחק'; _pb.style.background = ''; _pb.style.animation = ''; }
+    if (_pb) { _pb.textContent = H('▶ שחק','▶ Play'); _pb.style.background = ''; _pb.style.animation = ''; }
     const n = state.players.length;
     const myIdx = mySlotIdx;
     const relMap = {2:{1:'pos-top'},3:{1:'pos-right',2:'pos-left'},4:{1:'pos-right',2:'pos-top',3:'pos-left'}};
@@ -4220,16 +4228,16 @@ function renderOnline(state) {
 
     document.getElementById('drawCountDisplay').textContent=state.drawPileCount;
     document.getElementById('pileStatus').textContent=state.pile.length
-        ?`עליון: ${(()=>{for(let i=state.pile.length-1;i>=0;i--) if(state.pile[i].slice(0,-1)!=='3') return state.pile[i].slice(0,-1); return '3';})()}`:'ריק';
+        ?`עליון: ${(()=>{for(let i=state.pile.length-1;i>=0;i--) if(state.pile[i].slice(0,-1)!=='3') return state.pile[i].slice(0,-1); return '3';})()}`:H('ריק','Empty');
 
     // Buttons
     const swapBtn=document.getElementById('swapDoneBtn');
     swapBtn.style.display=state.isSwapPhase?'block':'none';
     if (state.isSwapPhase && !mySwapDone) {
-        swapBtn.textContent='✅ סיום החלפה';
+        swapBtn.textContent=H(H('✅ סיום החלפה','✅ Done Swapping'),'✅ Done Swapping');
         swapBtn.disabled=false; swapBtn.style.opacity='1';
     } else if (state.isSwapPhase && mySwapDone) {
-        swapBtn.textContent='⏳ ממתין לשאר...';
+        swapBtn.textContent=H('⏳ ממתין לשאר...','⏳ Waiting for others...');
         swapBtn.disabled=true; swapBtn.style.opacity='0.4';
     }
     document.getElementById('playBtn').style.display=(state.isSwapPhase)?'none':'block';
@@ -4240,7 +4248,7 @@ function renderOnline(state) {
     // Flash playBtn for interrupts
     const playBtn = document.getElementById('playBtn');
     if (canBurnInterrupt) {
-        playBtn.textContent = '🔥 שרוף!';
+        playBtn.textContent = H('🔥 שרוף!','🔥 Burn!');
         playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else if (canAddInterrupt) {
@@ -4248,7 +4256,7 @@ function renderOnline(state) {
         playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else {
-        playBtn.textContent = '▶ שחק';
+        playBtn.textContent = H('▶ שחק','▶ Play');
         playBtn.style.background = '';
         playBtn.style.animation = '';
     }
@@ -4268,7 +4276,7 @@ function endSwapPhase() {
         if (mySwapDone) return; // already sent
         mySwapDone = true;
         const btn = document.getElementById('swapDoneBtn');
-        if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = '⏳ ממתין לשאר...'; }
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = H('⏳ ממתין לשאר...','⏳ Waiting for others...'); }
         socket.emit('endSwap');
         return;
     }
@@ -4284,10 +4292,10 @@ function humanPlay() {
     const myBurnInterrupt = !!(s.burnInterruptCount > 0 && s.currentPlayer !== mySlotIdx && !s.isSwapPhase && s.pileTopRank
         && s.myHand.filter(c=>c.slice(0,-1)===s.pileTopRank).length >= s.burnInterruptCount);
     if (myBurnInterrupt) {
-        if (!selectedHandIndices.length) { showToast(`בחר ${s.burnInterruptCount} קלפי ${s.pileTopRank} לשריפה`); return; }
+        if (!selectedHandIndices.length) { showToast(H(`בחר ${s.burnInterruptCount} קלפי ${s.pileTopRank} לשריפה`,`Select ${s.burnInterruptCount} ${s.pileTopRank} cards to burn`)); return; }
         const cards = selectedHandIndices.map(i => s.myHand[i]);
         if (cards.length !== s.burnInterruptCount || !cards.every(c=>c.slice(0,-1)===s.pileTopRank)) {
-            showToast(`צריך בדיוק ${s.burnInterruptCount} קלפי ${s.pileTopRank}`); return;
+            showToast(H(`צריך בדיוק ${s.burnInterruptCount} קלפי ${s.pileTopRank}`,`Need exactly ${s.burnInterruptCount} ${s.pileTopRank} cards`)); return;
         }
         selectedHandIndices = [];
         playSound('play');
@@ -4518,7 +4526,7 @@ function basraVerifyAccess() {
         basraAccessVerified = true;
         showMenu(basraPendingAction === 'join' ? 'menuBasraJoin' : 'menuBasraCreate');
     } else {
-        document.getElementById('basraAccessError').textContent = 'קוד שגוי';
+        document.getElementById('basraAccessError').textContent = H('קוד שגוי','Wrong code');
     }
 }
 function setBasraRoomType(type) {
@@ -4819,7 +4827,7 @@ function updateLobby(state) {
     if (state.openRoom) {
         // Open room — host controls start
         const count = state.players.length;
-        if (s) s.textContent = `${count} שחקנים מחוברים (עד 4)`;
+        if (s) s.textContent = H(`${count} שחקנים מחוברים (עד 4)`,`${count} players connected (up to 4)`);
         if (mySlotIdx === 0) {
             // I am host
             if (count >= 2) {
@@ -4839,7 +4847,7 @@ function updateLobby(state) {
         if (waitMore) waitMore.style.display = 'none';
         const joined = state.players.filter(p => p.connected).length;
         const total = state.players.length;
-        if (s) s.textContent = `${joined}/${total} שחקנים מחוברים`;
+        if (s) s.textContent = H(`${joined}/${total} שחקנים מחוברים`,`${joined}/${total} players connected`);
     }
 }
 
@@ -4886,11 +4894,11 @@ function showNameModal(firstTime = false) {
     const inpF  = document.getElementById('nameModalFirst');
     const inpL  = document.getElementById('nameModalLast');
     if (firstTime) {
-        sub.textContent = 'ברוך הבא! הכנס את שמך לפני שמתחילים 👋';
+        sub.textContent = H('ברוך הבא! הכנס את שמך לפני שמתחילים 👋','Welcome! Enter your name to start 👋');
         if (inpF) inpF.value = '';
         if (inpL) inpL.value = '';
     } else {
-        sub.textContent = 'עדכן את שמך';
+        sub.textContent = H('עדכן את שמך','Update your name');
         if (inpF) inpF.value = localStorage.getItem('shitheadFirstName') || '';
         if (inpL) inpL.value = localStorage.getItem('shitheadLastName')  || '';
     }
@@ -4903,7 +4911,7 @@ function updateNamePreview() {
     const first = (document.getElementById('nameModalFirst')?.value || '').trim();
     const last  = (document.getElementById('nameModalLast')?.value  || '').trim();
     const prev  = document.getElementById('namePreview');
-    if (prev) prev.textContent = first ? `יוצג כ: ${buildDisplayName(first, last)}` : '';
+    if (prev) prev.textContent = first ? H(`יוצג כ: ${buildDisplayName(first, last)}`,`Will show as: ${buildDisplayName(first, last)}`) : '';
 }
 
 function saveProfileName() {
@@ -4946,7 +4954,7 @@ function fetchOnlineStats() {
     tmpSocket.once('connect', () => tmpSocket.emit('getOnlineStats'));
     tmpSocket.once('onlineStats', ({ online, inGame }) => {
         const el = document.getElementById('onlineStats');
-        if (el) el.textContent = `${online} משתמשים מחוברים • ${inGame} במשחק`;
+        if (el) el.textContent = H(`${online} משתמשים מחוברים • ${inGame} במשחק`,`${online} online • ${inGame} in game`);
         tmpSocket.disconnect();
     });
     setTimeout(() => { if (tmpSocket.connected) tmpSocket.disconnect(); }, 5000);
@@ -5034,7 +5042,7 @@ function renderOnline(state) {
     if (!state || !onlineMode) return;
     // Always reset playBtn at start — re-applied below if interrupt conditions met
     const _pb = document.getElementById('playBtn');
-    if (_pb) { _pb.textContent = '▶ שחק'; _pb.style.background = ''; _pb.style.animation = ''; }
+    if (_pb) { _pb.textContent = H('▶ שחק','▶ Play'); _pb.style.background = ''; _pb.style.animation = ''; }
     const n = state.players.length;
     const myIdx = mySlotIdx;
     const relMap = {2:{1:'pos-top'},3:{1:'pos-right',2:'pos-left'},4:{1:'pos-right',2:'pos-top',3:'pos-left'}};
@@ -5245,16 +5253,16 @@ function renderOnline(state) {
 
     document.getElementById('drawCountDisplay').textContent=state.drawPileCount;
     document.getElementById('pileStatus').textContent=state.pile.length
-        ?`עליון: ${(()=>{for(let i=state.pile.length-1;i>=0;i--) if(state.pile[i].slice(0,-1)!=='3') return state.pile[i].slice(0,-1); return '3';})()}`:'ריק';
+        ?`עליון: ${(()=>{for(let i=state.pile.length-1;i>=0;i--) if(state.pile[i].slice(0,-1)!=='3') return state.pile[i].slice(0,-1); return '3';})()}`:H('ריק','Empty');
 
     // Buttons
     const swapBtn=document.getElementById('swapDoneBtn');
     swapBtn.style.display=state.isSwapPhase?'block':'none';
     if (state.isSwapPhase && !mySwapDone) {
-        swapBtn.textContent='✅ סיום החלפה';
+        swapBtn.textContent=H(H('✅ סיום החלפה','✅ Done Swapping'),'✅ Done Swapping');
         swapBtn.disabled=false; swapBtn.style.opacity='1';
     } else if (state.isSwapPhase && mySwapDone) {
-        swapBtn.textContent='⏳ ממתין לשאר...';
+        swapBtn.textContent=H('⏳ ממתין לשאר...','⏳ Waiting for others...');
         swapBtn.disabled=true; swapBtn.style.opacity='0.4';
     }
     document.getElementById('playBtn').style.display=(state.isSwapPhase)?'none':'block';
@@ -5265,7 +5273,7 @@ function renderOnline(state) {
     // Flash playBtn for interrupts
     const playBtn = document.getElementById('playBtn');
     if (canBurnInterrupt) {
-        playBtn.textContent = '🔥 שרוף!';
+        playBtn.textContent = H('🔥 שרוף!','🔥 Burn!');
         playBtn.style.background = 'linear-gradient(135deg,#dc2626,#991b1b)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else if (canAddInterrupt) {
@@ -5273,7 +5281,7 @@ function renderOnline(state) {
         playBtn.style.background = 'linear-gradient(135deg,#b45309,#78350f)';
         playBtn.style.animation = 'pulse-red 1s ease-in-out infinite';
     } else {
-        playBtn.textContent = '▶ שחק';
+        playBtn.textContent = H('▶ שחק','▶ Play');
         playBtn.style.background = '';
         playBtn.style.animation = '';
     }
@@ -5293,7 +5301,7 @@ function endSwapPhase() {
         if (mySwapDone) return; // already sent
         mySwapDone = true;
         const btn = document.getElementById('swapDoneBtn');
-        if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = '⏳ ממתין לשאר...'; }
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = H('⏳ ממתין לשאר...','⏳ Waiting for others...'); }
         socket.emit('endSwap');
         return;
     }
@@ -5309,10 +5317,10 @@ function humanPlay() {
     const myBurnInterrupt = !!(s.burnInterruptCount > 0 && s.currentPlayer !== mySlotIdx && !s.isSwapPhase && s.pileTopRank
         && s.myHand.filter(c=>c.slice(0,-1)===s.pileTopRank).length >= s.burnInterruptCount);
     if (myBurnInterrupt) {
-        if (!selectedHandIndices.length) { showToast(`בחר ${s.burnInterruptCount} קלפי ${s.pileTopRank} לשריפה`); return; }
+        if (!selectedHandIndices.length) { showToast(H(`בחר ${s.burnInterruptCount} קלפי ${s.pileTopRank} לשריפה`,`Select ${s.burnInterruptCount} ${s.pileTopRank} cards to burn`)); return; }
         const cards = selectedHandIndices.map(i => s.myHand[i]);
         if (cards.length !== s.burnInterruptCount || !cards.every(c=>c.slice(0,-1)===s.pileTopRank)) {
-            showToast(`צריך בדיוק ${s.burnInterruptCount} קלפי ${s.pileTopRank}`); return;
+            showToast(H(`צריך בדיוק ${s.burnInterruptCount} קלפי ${s.pileTopRank}`,`Need exactly ${s.burnInterruptCount} ${s.pileTopRank} cards`)); return;
         }
         selectedHandIndices = [];
         playSound('play');
@@ -5600,7 +5608,7 @@ function basraVerifyAccess() {
         basraAccessVerified = true;
         showMenu(basraPendingAction === 'join' ? 'menuBasraJoin' : 'menuBasraCreate');
     } else {
-        document.getElementById('basraAccessError').textContent = 'קוד שגוי';
+        document.getElementById('basraAccessError').textContent = H('קוד שגוי','Wrong code');
     }
 }
 function setBasraRoomType(type) {
@@ -6205,7 +6213,7 @@ function basraRender(state) {
             basraSelectedCaptures = newSel;
             const statusEl = document.getElementById('basraStatusMsg');
             if (!valid && newSel.length > 0 && statusEl) {
-                statusEl.textContent = '⚠️ בחירה לא חוקית';
+                statusEl.textContent = H('⚠️ בחירה לא חוקית','⚠️ Invalid selection');
                 statusEl.style.color = '#f87171';
             } else if (statusEl) { statusEl.style.color = ''; }
             basraRender(state);
@@ -6381,7 +6389,7 @@ function basraCancelSelection() {
         <div id="basraScoreBar" style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.6);letter-spacing:1.5px;"></div>
         <div style="display:flex;gap:6px;align-items:center;">
             <button onclick="toggleLog()" style="background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:9px;padding:4px 8px;border-radius:4px;cursor:pointer;">📜 LOG</button>
-            <button onclick="basraConfirmExit()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;">EXIT</button>
+            <button onclick="basraConfirmExit()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;"><span id='btn_exit'>EXIT</span></button>
         </div>
     </div>
 
@@ -6414,7 +6422,7 @@ function basraCancelSelection() {
     <!-- Deck — fixed top-right corner -->
     <div id="basraDeckArea" style="position:fixed;top:calc(env(safe-area-inset-top) + 56px);left:12px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:502;">
         <div id="basraDeckDisplay" style="width:34px;height:48px;border-radius:5px;background:linear-gradient(135deg,#1a3a5c 0%,#0d2240 50%,#1a3a5c 100%);border:1px solid #2a4a6c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.5);"><span id="basraDeckNum"></span><span style="font-size:6px;letter-spacing:0.5px;line-height:1;margin-top:1px;opacity:0.6;">סיבובים</span></div>
-        <div style="font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:1px;">קופה</div>
+        <div style="font-size:8px;color:rgba(255,255,255,0.25);letter-spacing:1px;" class='pile-label' id='lbl_deck2'>Deck</div>
     </div>
 
     <!-- Table (center) -->
@@ -6438,7 +6446,7 @@ function basraCancelSelection() {
             <div id="basraMyPile" style="flex-shrink:0;"></div>
         </div>
         <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
-            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;">▶ שחק קלף</button>
+            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;"><span id='btn_playCard'>▶ Play Card</span></button>
             <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);">✅ אסוף</button>
             <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;">↓ זרוק קלף</button>
             <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
