@@ -578,7 +578,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.195</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.196</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3538,15 +3538,27 @@ if (!onlineMode) return; // already left to menu
         // Apply pending coins if already arrived
         if (pendingBasraCoins) { applyBasraCoins(pendingBasraCoins); pendingBasraCoins = null; }
         // Record basra stats for vs-bot games
-        if (authUser?.username && authUser?.token && forfeitBy === undefined && !teams && slotOrder) {
-            const mySlotFinal = mySlot !== undefined ? mySlot : basraMySlot;
-            const pos = slotOrder.indexOf(mySlotFinal);
-            const won = pos === 0;
-            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ username: authUser.username, token: authUser.token,
-                    game: 'basra', mode: 'bot', result: won ? 'win' : 'abandon_lose' })
-            }).catch(()=>{});
-            window._basraStatsRecorded = true;
+        // Record for vs-bot: any natural game end (not forfeit by opponent)
+        if (authUser?.username && authUser?.token) {
+            const isVsBot = basraState && basraState.isBot;
+            if (isVsBot) {
+                let result;
+                if (forfeitBy !== undefined && forfeitBy !== (mySlot !== undefined ? mySlot : basraMySlot)) {
+                    // Opponent forfeited = we win
+                    result = 'win';
+                } else if (slotOrder) {
+                    const mySlotFinal = mySlot !== undefined ? mySlot : basraMySlot;
+                    const pos = slotOrder.indexOf(mySlotFinal);
+                    result = pos === 0 ? 'win' : 'abandon_lose';
+                }
+                if (result) {
+                    fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({ username: authUser.username, token: authUser.token,
+                            game: 'basra', mode: 'bot', result })
+                    }).catch(()=>{});
+                    window._basraStatsRecorded = true;
+                }
+            }
         }
 
     });
