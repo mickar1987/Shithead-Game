@@ -1,11 +1,11 @@
 {
-  "name": "שיט-הד",
-  "short_name": "שיט-הד",
-  "description": "משחק קלפים שיט-הד",
+  "name": "BasrHead",
+  "short_name": "BasrHead",
+  "description": "BasrHead — Basra & Shithead card games",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#1a1a2e",
+  "background_color": "#0a1208",
+  "theme_color": "#0a1208",
   "orientation": "portrait",
   "icons": [
     {
