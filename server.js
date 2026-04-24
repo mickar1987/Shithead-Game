@@ -2155,21 +2155,21 @@ function basraStartTimer(room) {
                 room.committedCard = null; room.committedBy = null;
                 const result = basra.playCard(room, room.currentPlayer, thrown, minGroup, true);
                 if (result.ok) {
-                    basraBroadcast(room, 'toast', `${p.name} אסף אוטומטית (פג הזמן)`);
+                    basraBroadcast(room, 'toast', `${p.name}|autoCollect`);
                 } else {
                     room.tableCards.push(thrown);
-                    basraBroadcast(room, 'toast', `${p.name} זרק ${thrown} (פג הזמן)`);
+                    basraBroadcast(room, 'toast', `${p.name}|threw|${thrown}`);
                 }
             } else {
                 room.tableCards.push(thrown); room.committedCard = null; room.committedBy = null;
-                basraBroadcast(room, 'toast', `${p.name} זרק ${thrown} (פג הזמן)`);
+                basraBroadcast(room, 'toast', `${p.name}|threw|${thrown}`);
             }
             basraAdvanceTurn(room);
         } else if (p.hand.length > 0) {
             const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
             p.hand.splice(p.hand.indexOf(randomCard), 1);
             room.tableCards.push(randomCard); room.committedCard = null; room.committedBy = null;
-            basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
+            basraBroadcast(room, 'toast', `${p.name}|threw|${randomCard}`);
             basraAdvanceTurn(room);
         }
     }, room.turnTimer * 1000);
@@ -2193,7 +2193,7 @@ function basraAdvanceTurn(room) {
                 const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
                 room.dealerIdx = dealerIdx2;
                 basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
-                basraBroadcast(room, 'toast', 'חולקו קלפים חדשים');
+                basraBroadcast(room, 'toast', '|newCards');
                 setTimeout(() => basraEmitAll(room), 80);
             }, 2000);
         } else {
@@ -2232,7 +2232,7 @@ function basraAdvanceTurn(room) {
                         setTimeout(() => settleBasraCoins(room, winnerSlot).catch(e=>console.error('[basra coins]',e)), 300);
                         recordBasraStats(room, winnerSlot).catch(e => console.error('[stats error]', e.message));
                     } else {
-                        basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
+                        basraBroadcast(room, 'toast', '|tie');
                     }
                 }
             } else {
@@ -2258,7 +2258,7 @@ function basraAdvanceTurn(room) {
                         setTimeout(() => settleBasraCoins(room, winnerSlotIdx).catch(e => console.error('[basra coins]', e.message)), 300);
                         recordBasraStats(room, winnerSlotIdx).catch(e => console.error('[stats error]', e.message));
                     } else {
-                        basraBroadcast(room, 'toast', '🔁 תיקו! משחק שובר שיוויון...');
+                        basraBroadcast(room, 'toast', '|tie');
                     }
                 }
             }
@@ -2301,7 +2301,7 @@ function basraAdvanceTurn(room) {
                 room.gameOver = true;
                 basraClearBasraTimer(room);
                 const forfeitIdx = room.currentPlayer;
-                basraBroadcast(room, 'toast', `${p.name} פסל עצמו (פג הזמן פעמיים)`);
+                basraBroadcast(room, 'toast', `${p.name}|disqualified`);
                 basraBroadcast(room, 'basraGameOver', {
                     names: room.slots.map(s => s.name),
                     scores: room.slots.map(s => s.score || 0),
@@ -2325,7 +2325,7 @@ function basraAdvanceTurn(room) {
                 room.tableCards.push(thrownCard);
                 room.committedCard = null;
                 room.committedBy = null;
-                basraBroadcast(room, 'toast', `${p.name} זרק ${thrownCard} (פג הזמן - אזהרה!)`);
+                basraBroadcast(room, 'toast', `${p.name}|threw|${thrownCard}`);
                 basraAdvanceTurn(room);
             } else {
                 const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
@@ -2333,7 +2333,7 @@ function basraAdvanceTurn(room) {
                 room.tableCards.push(randomCard);
                 room.committedCard = null;
                 room.committedBy = null;
-                basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן - אזהרה!)`);
+                basraBroadcast(room, 'toast', `${p.name}|threw|${randomCard}`);
                 basraAdvanceTurn(room);
             }
         }, room.turnTimer * 1000);
@@ -2759,7 +2759,7 @@ function basraBotMove(room) {
                 const p = room.slots[1];
                 if (result.capturedCards.length > 0) {
                     basraBroadcast(room, 'toast', result.basra
-                        ? `⚡ BASRA! ${p.name}` : `${p.name} תפס ${result.capturedCards.length} קלפים`);
+                        ? `⚡ BASRA! ${p.name}` : `${p.name}|captured|${result.capturedCards.length}`);
                     if (result.basra) basraBroadcast(room, 'basraEvent', { type: 'basra', player: 1, name: p.name });
                 }
                 basraEmitAll(room);
@@ -3032,7 +3032,7 @@ function registerBasraHandlers(socket) {
 
         const p = room.slots[slotIdx];
         if (result.capturedCards.length > 0) {
-            basraBroadcast(room, 'toast', result.basra ? `⚡ BASRA! ${p.name}` : `${p.name} תפס ${result.capturedCards.length} קלפים`);
+            basraBroadcast(room, 'toast', result.basra ? `⚡ BASRA! ${p.name}` : `${p.name}|captured|${result.capturedCards.length}`);
             if (result.basra) basraBroadcast(room, 'basraEvent', { type: 'basra', player: slotIdx, name: p.name });
         }
 
@@ -3047,7 +3047,7 @@ function registerBasraHandlers(socket) {
         basraClearBasraTimer(room);
         room._consecutiveTimeouts = {};
         basra.resetRound(room);
-        basraBroadcast(room, 'toast', `סיבוב ${room.roundNum + 1} מתחיל!`);
+        basraBroadcast(room, 'toast', `|roundStart|${room.roundNum + 1}`);
         const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
         room.dealerIdx = dealerIdxNR;
         basraClearBasraTimer(room); // stop timer during deal animation
@@ -3075,14 +3075,14 @@ function registerBasraHandlers(socket) {
                     const thrown = room.committedCard;
                     room.tableCards.push(thrown);
                     room.committedCard = null; room.committedBy = null;
-                    basraBroadcast(room, 'toast', `${p.name} זרק ${thrown} (פג הזמן)`);
+                    basraBroadcast(room, 'toast', `${p.name}|threw|${thrown}`);
                     basraAdvanceTurn(room);
                 } else {
                     const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
                     p.hand.splice(p.hand.indexOf(randomCard), 1);
                     room.tableCards.push(randomCard);
                     room.committedCard = null; room.committedBy = null;
-                    basraBroadcast(room, 'toast', `${p.name} זרק ${randomCard} (פג הזמן)`);
+                    basraBroadcast(room, 'toast', `${p.name}|threw|${randomCard}`);
                     basraAdvanceTurn(room);
                 }
             }, room.turnTimer * 1000);
@@ -3258,7 +3258,7 @@ function registerBasraHandlers(socket) {
             if (slotIdx === 0) {
                 basraClearBasraTimer(room);
                 room.gameOver = true;
-                basraBroadcastExcept(room, socket.id, 'toast', `${slot?.name || 'היוצר'} סגר את החדר`);
+                basraBroadcastExcept(room, socket.id, 'toast', `${slot?.name || ''}|closedRoom`);
                 basraBroadcastExcept(room, socket.id, 'basraRoomClosed', {});
                 delete basraRooms[code];
                 socket.data.basraRoom = null;
@@ -3277,7 +3277,7 @@ function registerBasraHandlers(socket) {
             if (room.gameStarted && !room.gameOver) {
                 basraClearBasraTimer(room);
                 room.gameOver = true;
-                basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב — הוכרז כמפסיד`);
+                basraBroadcast(room, 'toast', `${slot?.name || ''}|leftLost`);
                 basraBroadcast(room, 'basraGameOver', {
                     names: room.slots.map(s => s.name),
                     scores: room.slots.map(s => s.score || 0),
@@ -3289,7 +3289,7 @@ function registerBasraHandlers(socket) {
                 setTimeout(() => settleBasraCoins(room, forfeitWinner).catch(e => console.error('[basra coins]', e.message)), 300);
                 recordBasraStats(room, forfeitWinner).catch(e => console.error('[stats error]', e.message));
             } else {
-                basraBroadcast(room, 'toast', `${slot?.name || 'שחקן'} עזב`);
+                basraBroadcast(room, 'toast', `${slot?.name || ''}|left`);
             }
         }
         socket.data.basraRoom = null;
@@ -3311,7 +3311,7 @@ function registerBasraHandlers(socket) {
         const winners = room.slots.filter((s, i) => i !== slotIdx);
         const loserName = slot.name;
 
-        basraBroadcast(room, 'toast', `${loserName} עזב — המשחק הסתיים`);
+        basraBroadcast(room, 'toast', `${loserName}|leftEnd`);
         basraBroadcast(room, 'basraGameOver', {
             names: room.slots.map(s => s.name),
             scores: room.slots.map(s => s.score || 0),
