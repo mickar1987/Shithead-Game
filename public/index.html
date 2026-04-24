@@ -552,15 +552,6 @@
         <div id="authNamePreview" style="font-size:11px;color:rgba(255,200,50,0.7);min-height:16px;"></div>
         <div id="authError" style="font-size:11px;color:#f87171;min-height:16px;"></div>
         <button onclick="submitAuth()" id="authSubmitBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">🔑 התחבר</button>
-        <div style="width:100%;max-width:280px;margin-top:8px;">
-            <button onclick="toggleLangMenu()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:space-between;width:100%;">
-              <span>🌐 Language</span><span id="currentLangLabel2" style="color:var(--gold);font-size:0.8rem;letter-spacing:1px;"></span>
-            </button>
-            <div id="langMenu2" style="display:none;width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:8px;overflow:hidden;margin-top:-4px;">
-              <button onclick="setLang('en')" class="setup-btn" style="border-radius:0;border:none;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.9rem;padding:10px;">🇬🇧 English</button>
-              <button onclick="setLang('he')" class="setup-btn" style="border-radius:0;border:none;font-size:0.9rem;padding:10px;">🇮🇱 עברית</button>
-            </div>
-        </div>
         <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
             <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
             <div id="dailyCountdown" style="display:none;"></div>
@@ -595,7 +586,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.206</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.207</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1003,15 +994,12 @@ function setLang(lang) {
   document.documentElement.lang = lang;
   // Close lang menus
   const lm = document.getElementById('langMenu'); if(lm) lm.style.display='none';
-  const lm2 = document.getElementById('langMenu2'); if(lm2) lm2.style.display='none';
   applyLang();
 }
 
 function toggleLangMenu() {
-  ['langMenu','langMenu2'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-  });
+  const lm = document.getElementById('langMenu');
+  if(lm) lm.style.display = lm.style.display==='none' ? 'block' : 'none';
 }
 
 function _el(id, txt) { const e=document.getElementById(id); if(e) e.textContent=txt; }
@@ -1034,7 +1022,6 @@ function applyLang() {
   _el('langToggleBtn',T('lang'));
   const _langLabel = _lang==='he'?'עברית':'English';
   _el('currentLangLabel', _langLabel);
-  _el('currentLangLabel2', _langLabel);
   // Highlight active lang button
   ['en','he'].forEach(l => {
     const b = document.getElementById('langBtn_'+l);
