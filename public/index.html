@@ -552,10 +552,26 @@
         <div id="authNamePreview" style="font-size:11px;color:rgba(255,200,50,0.7);min-height:16px;"></div>
         <div id="authError" style="font-size:11px;color:#f87171;min-height:16px;"></div>
         <button onclick="submitAuth()" id="authSubmitBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">🔑 התחבר</button>
+        <div style="width:100%;max-width:280px;margin-top:8px;">
+            <button onclick="toggleLangMenu()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:space-between;width:100%;">
+              <span>🌐 Language</span><span id="currentLangLabel2" style="color:var(--gold);font-size:0.8rem;letter-spacing:1px;"></span>
+            </button>
+            <div id="langMenu2" style="display:none;width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:8px;overflow:hidden;margin-top:-4px;">
+              <button onclick="setLang('en')" class="setup-btn" style="border-radius:0;border:none;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.9rem;padding:10px;">🇬🇧 English</button>
+              <button onclick="setLang('he')" class="setup-btn" style="border-radius:0;border:none;font-size:0.9rem;padding:10px;">🇮🇱 עברית</button>
+            </div>
+        </div>
         <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
             <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
             <div id="dailyCountdown" style="display:none;"></div>
             <button onclick="showEditProfile()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);">✏️ עריכת פרופיל</button>
+            <button onclick="toggleLangMenu()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:space-between;">
+              <span>🌐 Language</span><span id="currentLangLabel" style="color:var(--gold);font-size:0.8rem;letter-spacing:1px;"></span>
+            </button>
+            <div id="langMenu" style="display:none;width:100%;max-width:280px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:8px;overflow:hidden;margin-top:-4px;">
+              <button onclick="setLang('en')" id="langBtn_en" class="setup-btn" style="border-radius:0;border:none;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.9rem;padding:10px;">🇬🇧 English</button>
+              <button onclick="setLang('he')" id="langBtn_he" class="setup-btn" style="border-radius:0;border:none;font-size:0.9rem;padding:10px;">🇮🇱 עברית</button>
+            </div>
             <div style="flex:1;min-height:40px;"></div>
             <button onclick="confirmLogout()" class="setup-btn" style="font-size:0.8rem;padding:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.35);margin-top:16px;">התנתק</button>
         </div>
@@ -578,9 +594,8 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
-        <button id="langToggleBtn" onclick="setLang(_lang==='he'?'en':'he')" class="setup-btn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:0.85rem;padding:8px;letter-spacing:2px;">EN</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.205</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.206</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -922,7 +937,7 @@
 // ══════════════════════════════════════════════════════
 //  i18n
 // ══════════════════════════════════════════════════════
-let _lang = localStorage.getItem('lang') || 'he';
+let _lang = localStorage.getItem('lang') || 'en';
 
 const _txt = {
   he: {
@@ -986,7 +1001,17 @@ function setLang(lang) {
   localStorage.setItem('lang', lang);
   document.documentElement.dir = lang==='he'?'rtl':'ltr';
   document.documentElement.lang = lang;
+  // Close lang menus
+  const lm = document.getElementById('langMenu'); if(lm) lm.style.display='none';
+  const lm2 = document.getElementById('langMenu2'); if(lm2) lm2.style.display='none';
   applyLang();
+}
+
+function toggleLangMenu() {
+  ['langMenu','langMenu2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  });
 }
 
 function _el(id, txt) { const e=document.getElementById(id); if(e) e.textContent=txt; }
@@ -1007,6 +1032,14 @@ function applyLang() {
   _el('btn_basraJoinPublic',T('joinPublic'));
   _el('lbl_basraVsAI',T('basraVsAIlbl')); _el('lbl_aiWinScore',T('aiWinScore'));
   _el('langToggleBtn',T('lang'));
+  const _langLabel = _lang==='he'?'עברית':'English';
+  _el('currentLangLabel', _langLabel);
+  _el('currentLangLabel2', _langLabel);
+  // Highlight active lang button
+  ['en','he'].forEach(l => {
+    const b = document.getElementById('langBtn_'+l);
+    if(b) b.style.borderColor = l===_lang ? 'var(--gold)' : '';
+  });
   ['playerBtn2','playerBtn3','playerBtn4'].forEach((id,i)=>_el(id,T(['p2','p3','p4'][i])));
   const rtPub=document.getElementById('roomTypePublic'); if(rtPub) rtPub.textContent=T('pub');
   const rtPrv=document.getElementById('roomTypePrivate'); if(rtPrv) rtPrv.textContent='🔒 '+T('prv');
