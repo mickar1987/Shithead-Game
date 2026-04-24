@@ -707,7 +707,12 @@ async function recordBasraStats(room, winnerSlotIdx) {
             const g = stats['basra'] || {};
             const m = g[mode] || { played:0, won:0, lost:0, abandoned:0 };
             m.played = (m.played||0) + 1;
-            if (won) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
+            if (won) {
+                m.won = (m.won||0) + 1;
+            } else {
+                m.lost = (m.lost||0) + 1;
+                m.abandoned = (m.abandoned||0) + 1; // losing = always abandoning in vs-bot
+            }
             g[mode] = m; stats['basra'] = g;
             await saveUser(slot.username, { stats });
             console.log(`[stats] basra ${slot.username} mode=${mode} won=${won}`);
