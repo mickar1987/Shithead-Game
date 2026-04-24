@@ -622,7 +622,9 @@ async function showStats(u) {
 </script>
 </head>
 <body>
-<h2>🃏 SHITHEAD — ניהול משתמשים</h2>
+<h2>🃏 SHITHEAD — ניהול משתמשים 
+  <button onclick="if(confirm('למחוק את כל הסטטיסטיקה?')){fetch('/api/admin/reset-all-stats?key='+KEY).then(r=>r.json()).then(d=>{ alert(d.ok ? 'אופס! ' + d.modified + ' משתמשים אופסו' : 'שגיאה: '+d.error); if(d.ok)location.reload(); })}" style="font-size:13px;padding:4px 12px;background:#7c3aed;border:none;color:#fff;border-radius:6px;cursor:pointer;margin-right:12px">🗑 איפוס סטטיסטיקה</button>
+</h2>
 
 <!-- Global stats -->
 <div class="stats">
@@ -2466,19 +2468,12 @@ function basraBotMove(room) {
                 score -= 500; // strongly prefer to wait
             }
 
-            // Rule 2: J/7d minimum threshold
+            // Rule 2: J/7d — only play when table has 3+ cards OR it's a basra OR last 2 cards
             if (isJackCard && !isBasra) {
                 const handSizeAfter = handSize - 1;
-                const minCards = 3;
-                if (tableCards.length < minCards) {
-                    if (handSizeAfter <= 1) {
-                        // Last 2 cards — J burn risk, use it
-                        score -= 50;
-                    } else {
-                        score -= 400; // too few cards on table
-                    }
-                } else {
-                    score -= (4 - tableCards.length) * 10;
+                if (tableCards.length < 3 && handSizeAfter > 1) {
+                    // Skip this option entirely — not enough cards on table
+                    return; // continue forEach
                 }
             }
 
