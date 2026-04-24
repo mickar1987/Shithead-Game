@@ -538,11 +538,11 @@
 
     <!-- AUTH MENU -->
     <div id="menuAuth" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuMain')" data-i18n="back">← חזור</div>
         <div id="authUserInfo" style="font-size:13px;color:var(--gold);letter-spacing:1px;margin-bottom:4px;"></div>
         <div id="authTabs" style="display:flex;gap:8px;width:100%;max-width:280px;margin-bottom:4px;">
-            <button onclick="switchAuthTab('login')" id="tabLogin" class="setup-btn" style="flex:1;font-size:0.85rem;padding:8px 4px;border-color:var(--gold);">🔑 התחבר</button>
-            <button onclick="switchAuthTab('register')" id="tabRegister" class="setup-btn" style="flex:1;font-size:0.85rem;padding:8px 4px;">✨ הרשם</button>
+            <button onclick="switchAuthTab('login')" id="tabLogin" class="setup-btn" style="flex:1;font-size:0.85rem;padding:8px 4px;border-color:var(--gold);" data-i18n="login">🔑 התחבר</button>
+            <button onclick="switchAuthTab('register')" id="tabRegister" class="setup-btn" style="flex:1;font-size:0.85rem;padding:8px 4px;" data-i18n="register">✨ הרשם</button>
         </div>
         <input id="authUsername" type="text" placeholder="שם משתמש" maxlength="16" class="setup-input" style="ime-mode:inactive;"/>
         <input id="authPin" type="password" placeholder="PIN (4 ספרות)" maxlength="4" inputmode="numeric" class="setup-input"/>
@@ -551,11 +551,11 @@
         <input id="authLastName" type="text" placeholder="שם משפחה" oninput="updateAuthNamePreview()" maxlength="16" class="setup-input hidden" style="margin-top:0;"/>
         <div id="authNamePreview" style="font-size:11px;color:rgba(255,200,50,0.7);min-height:16px;"></div>
         <div id="authError" style="font-size:11px;color:#f87171;min-height:16px;"></div>
-        <button onclick="submitAuth()" id="authSubmitBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">🔑 התחבר</button>
+        <button onclick="submitAuth()" id="authSubmitBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);" data-i18n="login">🔑 התחבר</button>
         <div id="authLoggedIn" class="hidden" style="width:100%;max-width:280px;">
             <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
             <div id="dailyCountdown" style="display:none;"></div>
-            <button onclick="showEditProfile()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);">✏️ עריכת פרופיל</button>
+            <button onclick="showEditProfile()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);" data-i18n="editProfile">✏️ עריכת פרופיל</button>
             <div style="flex:1;min-height:40px;"></div>
             <button onclick="confirmLogout()" class="setup-btn" style="font-size:0.8rem;padding:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.35);margin-top:16px;">התנתק</button>
         </div>
@@ -569,61 +569,62 @@
                 <span id="mainCoinsAmount" style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:2px;"></span>
                 <span id="mainUsername" style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"></span>
             </div>
-            <button onclick="claimDaily()" id="mainDailyBtn" class="setup-btn" style="font-size:0.8rem;padding:6px 12px;background:linear-gradient(135deg,#b45309,#78350f);width:100%;margin-top:4px;">🎁 קבל 200 מטבעות יומיים</button>
+            <button onclick="claimDaily()" id="mainDailyBtn" class="setup-btn" style="font-size:0.8rem;padding:6px 12px;background:linear-gradient(135deg,#b45309,#78350f);width:100%;margin-top:4px;" data-i18n="dailyCoins">🎁 קבל 200 מטבעות יומיים</button>
             <div id="mainDailyCountdown" style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;min-height:14px;text-align:center;"></div>
         </div>
         <!-- Game selection -->
         <div style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-bottom:2px;">בחר משחק</div>
-        <button onclick="showMenu('menuShithead')" class="setup-btn" style="font-size:1.1rem;padding:14px;">Shithead</button>
-        <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;">Basra</button>
+        <button onclick="showMenu('menuShithead')" class="setup-btn" style="font-size:1.1rem;padding:14px;" data-i18n="shithead">Shithead</button>
+        <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" data-i18n="basra">Basra</button>
         <!-- Account button -->
-        <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
+        <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;" data-i18n="account">חשבון / התחבר</button>
+        <button id="langToggleBtn" onclick="setLang(_lang==='he'?'en':'he')" class="setup-btn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:0.85rem;padding:8px;letter-spacing:2px;">EN</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.204</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.205</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuMain')" data-i18n="back">← חזור</div>
         <button onclick="showMenu('menuVsAI')" class="setup-btn">vs Computer</button>
         <button onclick="showMenu('menuOnline')" class="setup-btn">Online</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
 
     <div id="menuVsAI" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuShithead')">← חזור</div>
-        <button onclick="startGame(2)" class="setup-btn">2 Players</button>
-        <button onclick="startGame(3)" class="setup-btn">3 Players</button>
-        <button onclick="startGame(4)" class="setup-btn">4 Players</button>
+        <div class="setup-back" onclick="showMenu('menuShithead')" data-i18n="back">← חזור</div>
+        <button onclick="startGame(2)" class="setup-btn" data-i18n="players2">2 Players</button>
+        <button onclick="startGame(3)" class="setup-btn" data-i18n="players3">3 Players</button>
+        <button onclick="startGame(4)" class="setup-btn" data-i18n="players4">4 Players</button>
     </div>
     <div id="menuOnline" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuShithead')">← חזור</div>
-        <button onclick="showMenu('menuCreate')" class="setup-btn">צור חדר</button>
-        <button onclick="showMenu('menuJoin')" class="setup-btn">הצטרף לחדר</button>
+        <div class="setup-back" onclick="showMenu('menuShithead')" data-i18n="back">← חזור</div>
+        <button onclick="showMenu('menuCreate')" class="setup-btn" data-i18n="createRoom">צור חדר</button>
+        <button onclick="showMenu('menuJoin')" class="setup-btn" data-i18n="joinRoom">הצטרף לחדר</button>
     </div>
     <div id="menuCreate" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
+        <div class="setup-back" onclick="showMenu('menuOnline')" data-i18n="back">← חזור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;" data-i18n="roomType">סוג חדר</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
-            <button onclick="setRoomType('public')"  id="roomTypePublic"  class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">ציבורי</button>
+            <button onclick="setRoomType('public')"  id="roomTypePublic"  class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);" data-i18n="publicRoom">ציבורי</button>
             <button onclick="setRoomType('private')" id="roomTypePrivate" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;">🔒 פרטי</button>
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;" data-i18n="turnTimer">זמן לתור</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setTimer(10)" id="timerBtn10" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">10s</button>
             <button onclick="setTimer(20)" id="timerBtn20" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">20s</button>
             <button onclick="setTimer(40)" id="timerBtn40" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40s</button>
             <button onclick="setTimer(0)"  id="timerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">♾</button>
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">הימור למשחק</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;" data-i18n="bet">הימור למשחק</div>
         <div style="display:flex;gap:6px;justify-content:center;width:100%;max-width:280px;flex-wrap:wrap;">
-            <button onclick="setBet(0)"   id="betBtn0"   class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);">ללא</button>
+            <button onclick="setBet(0)"   id="betBtn0"   class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);" data-i18n="noBet">ללא</button>
             <button onclick="setBet(50)"  id="betBtn50"  class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>50</button>
             <button onclick="setBet(100)" id="betBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>100</button>
             <button onclick="setBet(200)" id="betBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>200</button>
             <button onclick="setBet(500)" id="betBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>500</button>
         </div>
         <div id="betWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">ניקוד לניצחון</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;" data-i18n="winScore">ניקוד לניצחון</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraWinScore(40)"  id="basraWinBtn40"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40</button>
             <button onclick="setBasraWinScore(80)"  id="basraWinBtn80"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">80</button>
@@ -631,55 +632,55 @@
             <button onclick="setBasraWinScore(180)" id="basraWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraWinScore(220)" id="basraWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
-        <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">קבע המשך</button>
-        <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">2 Players</button>
-        <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">3 Players</button>
-        <button onclick="createOnlineRoom(4)" id="playerBtn4" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">4 Players</button>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;" data-i18n="howManyPlayers">כמה שחקנים?</div>
+        <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;" data-i18n="openRoom">קבע המשך</button>
+        <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;" data-i18n="players2">2 Players</button>
+        <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;" data-i18n="players3">3 Players</button>
+        <button onclick="createOnlineRoom(4)" id="playerBtn4" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;" data-i18n="players4">4 Players</button>
     </div>
     <div id="menuJoin" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
-        <button onclick="showMenu('menuJoinPublic')" class="setup-btn">הצטרף לחדר ציבורי פנוי</button>
-        <button onclick="showMenu('menuJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
+        <div class="setup-back" onclick="showMenu('menuOnline')" data-i18n="back">← חזור</div>
+        <button onclick="showMenu('menuJoinPublic')" class="setup-btn" data-i18n="joinPublicRoom">הצטרף לחדר ציבורי פנוי</button>
+        <button onclick="showMenu('menuJoinPrivate')" class="setup-btn" data-i18n="privateRoomCode">🔒 חדר פרטי</button>
     </div>
     <div id="menuJoinPublic" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuJoin')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuJoin')" data-i18n="back">← חזור</div>
         <div style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-bottom:4px;">חדרים ציבוריים פתוחים</div>
         <div id="publicRoomsList" style="width:100%;max-width:280px;"></div>
-        <button onclick="refreshPublicRooms()" class="setup-btn" style="font-size:0.8rem;margin-top:4px;">🔄 רענן</button>
+        <button onclick="refreshPublicRooms()" class="setup-btn" style="font-size:0.8rem;margin-top:4px;" data-i18n="refresh">🔄 רענן</button>
     </div>
     <div id="menuJoinPrivate" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuJoin')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuJoin')" data-i18n="back">← חזור</div>
         <input id="roomCodeInput" type="text" placeholder="קוד חדר" maxlength="4" class="setup-input" style="font-size:1.6rem;letter-spacing:8px;text-transform:uppercase;"/>
         <button onclick="joinOnlineRoom()" class="setup-btn">הצטרף ▶</button>
     </div>
     <div id="menuLobby" class="setup-grid hidden">
-        <div class="setup-back" onclick="leaveLobby()">← חזור</div>
+        <div class="setup-back" onclick="leaveLobby()" data-i18n="back">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:2px;">קוד החדר</div>
         <div id="lobbyCode" style="font-family:'Bebas Neue',sans-serif;font-size:4rem;color:var(--gold);letter-spacing:8px;"></div>
         <div id="lobbyBetInfo" style="font-size:12px;color:rgba(255,200,50,0.8);letter-spacing:1px;min-height:16px;"></div>
         <div id="lobbyStatus" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-bottom:8px;"></div>
         <div id="lobbyPlayers" style="width:100%;max-width:280px;"></div>
-        <button id="startOpenBtn" onclick="hostStartGame()" class="setup-btn hidden" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;">▶ התחל משחק</button>
+        <button id="startOpenBtn" onclick="hostStartGame()" class="setup-btn hidden" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;" data-i18n="startGame">▶ התחל משחק</button>
         <div id="waitingMore" style="display:none;font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;">ממתין לשחקן נוסף לפחות...</div>
     </div>
 
     <!-- BASRA MENUS -->
     <div id="menuBasra" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuMain')" data-i18n="back">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;">BASRA</div>
-        <button onclick="showMenu('menuBasraVsAI')" class="setup-btn">מול מחשב</button>
-        <button onclick="showMenu('menuBasraOnline')" class="setup-btn">מול רשת</button>
+        <button onclick="showMenu('menuBasraVsAI')" class="setup-btn" data-i18n="vsComputer" data-i18n="vsComputer">מול מחשב</button>
+        <button onclick="showMenu('menuBasraOnline')" class="setup-btn" data-i18n="online">מול רשת</button>
     </div>
     <div id="menuBasraOnline" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
-        <button onclick="showBasraCreate()" class="setup-btn">צור חדר</button>
-        <button onclick="showBasraJoin()" class="setup-btn">הצטרף לחדר</button>
+        <div class="setup-back" onclick="showMenu('menuBasra')" data-i18n="back">← חזור</div>
+        <button onclick="showBasraCreate()" class="setup-btn" data-i18n="createRoom">צור חדר</button>
+        <button onclick="showBasraJoin()" class="setup-btn" data-i18n="joinRoom">הצטרף לחדר</button>
     </div>
     <div id="menuBasraVsAI" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--gold);letter-spacing:2px;">בסרה מול מחשב</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">ניקוד לניצחון</div>
+        <div class="setup-back" onclick="showMenu('menuBasra')" data-i18n="back">← חזור</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--gold);letter-spacing:2px;" data-i18n="basraVsComputer">בסרה מול מחשב</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;" data-i18n="winScore">ניקוד לניצחון</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraAIWinScore(40)"  id="basraAIWinBtn40"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40</button>
             <button onclick="setBasraAIWinScore(80)"  id="basraAIWinBtn80"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">80</button>
@@ -687,40 +688,40 @@
             <button onclick="setBasraAIWinScore(180)" id="basraAIWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraAIWinScore(220)" id="basraAIWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
-        <button onclick="startBasraVsAI()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;">▶ התחל משחק</button>
+        <button onclick="startBasraVsAI()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;" data-i18n="startGame">▶ התחל משחק</button>
     </div>
     <div id="menuBasraAccess" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuBasra')" data-i18n="back">← חזור</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">קוד גישה לבסרה</div>
         <input id="basraAccessCode" type="password" placeholder="קוד גישה" maxlength="6" class="setup-input" inputmode="numeric"
             onkeydown="if(event.key==='Enter') basraVerifyAccess()"/>
         <div id="basraAccessError" style="font-size:11px;color:#f87171;min-height:14px;"></div>
-        <button onclick="basraVerifyAccess()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">✅ אמת</button>
+        <button onclick="basraVerifyAccess()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);" data-i18n="verify">✅ אמת</button>
     </div>
     <div id="menuBasraCreate" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasraOnline')">← חזור</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
+        <div class="setup-back" onclick="showMenu('menuBasraOnline')" data-i18n="back">← חזור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;" data-i18n="roomType">סוג חדר</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
-            <button onclick="setBasraRoomType('public')" id="basraRoomTypePublic" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">ציבורי</button>
+            <button onclick="setBasraRoomType('public')" id="basraRoomTypePublic" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);" data-i18n="publicRoom">ציבורי</button>
             <button onclick="setBasraRoomType('private')" id="basraRoomTypePrivate" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;">🔒 פרטי</button>
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">הימור למשחק</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;" data-i18n="bet">הימור למשחק</div>
         <div style="display:flex;gap:6px;justify-content:center;width:100%;max-width:280px;flex-wrap:wrap;">
-            <button onclick="setBasraBet(0)"   id="basraBetBtn0"   class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);">ללא</button>
+            <button onclick="setBasraBet(0)"   id="basraBetBtn0"   class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);" data-i18n="noBet">ללא</button>
             <button onclick="setBasraBet(50)"  id="basraBetBtn50"  class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>50</button>
             <button onclick="setBasraBet(100)" id="basraBetBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>100</button>
             <button onclick="setBasraBet(200)" id="basraBetBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>200</button>
             <button onclick="setBasraBet(500)" id="basraBetBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>500</button>
         </div>
         <div id="basraBetWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;" data-i18n="turnTimer">זמן לתור</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraTimer(15)" id="basraTimerBtn15" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">15s</button>
             <button onclick="setBasraTimer(30)" id="basraTimerBtn30" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;border-color:var(--gold);">30s</button>
             <button onclick="setBasraTimer(60)" id="basraTimerBtn60" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">60s</button>
             <button onclick="setBasraTimer(0)"  id="basraTimerBtn0"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">♾</button>
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">ניקוד לניצחון</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;" data-i18n="winScore">ניקוד לניצחון</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
             <button onclick="setBasraWinScore(40)"  id="basraWinBtn40"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">40</button>
             <button onclick="setBasraWinScore(80)"  id="basraWinBtn80"  class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">80</button>
@@ -728,27 +729,27 @@
             <button onclick="setBasraWinScore(180)" id="basraWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraWinScore(220)" id="basraWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;" data-i18n="howManyPlayers">כמה שחקנים?</div>
         <div style="display:flex;gap:8px;width:100%;max-width:280px;">
-            <button onclick="selectBasraCount(2)" id="basraCount2" class="setup-btn" style="flex:1;border-color:var(--gold);">2 Players</button>
-            <button onclick="selectBasraCount(4)" id="basraCount4" class="setup-btn" style="flex:1;">4 Players</button>
+            <button onclick="selectBasraCount(2)" id="basraCount2" class="setup-btn" style="flex:1;border-color:var(--gold);" data-i18n="players2">2 Players</button>
+            <button onclick="selectBasraCount(4)" id="basraCount4" class="setup-btn" style="flex:1;" data-i18n="players4">4 Players</button>
         </div>
         <div id="basraCreateError" style="font-size:11px;color:#f87171;min-height:14px;"></div>
         <button onclick="basraCreate()" id="basraCreateBtn" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">▶ צור חדר</button>
     </div>
     <div id="menuBasraJoin" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasraOnline')">← חזור</div>
-        <button onclick="showMenu('menuBasraJoinPublic')" class="setup-btn">הצטרף לחדר ציבורי</button>
-        <button onclick="showMenu('menuBasraJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
+        <div class="setup-back" onclick="showMenu('menuBasraOnline')" data-i18n="back">← חזור</div>
+        <button onclick="showMenu('menuBasraJoinPublic')" class="setup-btn" data-i18n="joinPublicRoom">הצטרף לחדר ציבורי</button>
+        <button onclick="showMenu('menuBasraJoinPrivate')" class="setup-btn" data-i18n="privateRoomCode">🔒 חדר פרטי</button>
     </div>
     <div id="menuBasraJoinPublic" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasraJoin')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuBasraJoin')" data-i18n="back">← חזור</div>
         <div style="font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:1px;margin-bottom:4px;">חדרים ציבוריים פתוחים</div>
         <div id="basraPublicRoomsList" style="width:100%;max-width:280px;"></div>
-        <button onclick="refreshBasraPublicRooms()" class="setup-btn" style="font-size:0.8rem;margin-top:4px;">🔄 רענן</button>
+        <button onclick="refreshBasraPublicRooms()" class="setup-btn" style="font-size:0.8rem;margin-top:4px;" data-i18n="refresh">🔄 רענן</button>
     </div>
     <div id="menuBasraJoinPrivate" class="setup-grid hidden">
-        <div class="setup-back" onclick="showMenu('menuBasraJoin')">← חזור</div>
+        <div class="setup-back" onclick="showMenu('menuBasraJoin')" data-i18n="back">← חזור</div>
         <input id="basraRoomCode" type="text" placeholder="קוד חדר" maxlength="4" class="setup-input"
             style="font-size:1.6rem;letter-spacing:8px;text-transform:uppercase;"
             onkeydown="if(event.key==='Enter') basraJoin()"/>
@@ -756,7 +757,7 @@
         <button onclick="basraJoin()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);">הצטרף ▶</button>
     </div>
     <div id="menuBasraLobby" class="setup-grid hidden">
-        <div class="setup-back" onclick="basraLeave()">← חזור</div>
+        <div class="setup-back" onclick="basraLeave()" data-i18n="back">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);letter-spacing:2px;">קוד החדר</div>
         <div id="basraLobbyCode" style="font-family:'Bebas Neue',sans-serif;font-size:4rem;color:var(--gold);letter-spacing:8px;"></div>
         <div id="basraLobbyBetInfo" style="font-size:12px;color:rgba(255,200,50,0.8);letter-spacing:1px;min-height:16px;"></div>
@@ -796,7 +797,7 @@
                 style="width:100%;box-sizing:border-box;padding:12px;font-size:1.1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;outline:none;"
                 onkeydown="if(event.key==='Enter') verifyEditPin()"/>
             <div id="editProfilePinError" style="font-size:11px;color:#f87171;min-height:16px;margin-top:6px;"></div>
-            <button onclick="verifyEditPin()" class="setup-btn" style="margin-top:12px;width:100%;background:linear-gradient(135deg,#16a34a,#064e1e);">✅ אמת PIN</button>
+            <button onclick="verifyEditPin()" class="setup-btn" style="margin-top:12px;width:100%;background:linear-gradient(135deg,#16a34a,#064e1e);" data-i18n="verifyPin">✅ אמת PIN</button>
         </div>
         <div id="editProfileStep2" style="display:none;">
             <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:16px;">עדכן פרטים</div>
@@ -808,9 +809,9 @@
                 style="width:100%;box-sizing:border-box;padding:12px;font-size:1rem;text-align:center;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;outline:none;margin-bottom:6px;"/>
             <div id="editPreview" style="font-size:12px;color:rgba(255,200,50,0.7);min-height:16px;margin-bottom:6px;"></div>
             <div id="editProfileError" style="font-size:11px;color:#f87171;min-height:16px;"></div>
-            <button onclick="saveEditProfile()" class="setup-btn" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#16a34a,#064e1e);">💾 שמור שינויים</button>
+            <button onclick="saveEditProfile()" class="setup-btn" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#16a34a,#064e1e);" data-i18n="saveChanges">💾 שמור שינויים</button>
         </div>
-        <button onclick="closeEditProfile()" style="margin-top:12px;width:100%;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:rgba(255,255,255,0.4);font-size:0.85rem;cursor:pointer;">ביטול</button>
+        <button onclick="closeEditProfile()" style="margin-top:12px;width:100%;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:rgba(255,255,255,0.4);font-size:0.85rem;cursor:pointer;" data-i18n="cancel">ביטול</button>
     </div>
 </div>
 
@@ -818,7 +819,7 @@
 <div id="howToPlayModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;overflow-y:auto;padding:env(safe-area-inset-top,20px) 20px 20px;">
     <div style="max-width:360px;margin:0 auto;padding-top:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold);letter-spacing:3px;">איך משחקים?</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold);letter-spacing:3px;" data-i18n="howToPlay">איך משחקים?</div>
             <button onclick="document.getElementById('howToPlayModal').style.display='none'" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:1.2rem;border-radius:50%;width:36px;height:36px;cursor:pointer;">✕</button>
         </div>
         <div style="color:rgba(255,255,255,0.85);font-size:13px;line-height:1.7;direction:rtl;text-align:right;">
@@ -848,7 +849,7 @@
 
 <!-- RESULT -->
 <div id="resultOverlay" style="display:none;">
-    <div class="result-title">תוצאות</div>
+    <div class="result-title" data-i18n="results">תוצאות</div>
     <div class="leaderboard-card" id="leaderboardList"></div>
     <div id="endGameBtns" style="display:flex;flex-direction:column;gap:10px;align-items:center;width:100%;margin-top:8px;">
         <button onclick="requestNewGame()" class="new-game-btn" id="newGameBtn" style="width:240px;">🔄 משחק חדש באותו חדר</button>
@@ -916,6 +917,179 @@
 
 <script>
 'use strict';
+
+// ══════════════════════════════════════════════════════
+//  i18n — Internationalization
+// ══════════════════════════════════════════════════════
+let _lang = localStorage.getItem('lang') || 'he';
+
+const _i18n = {
+  he: {
+    // ── תפריט ראשי ──
+    shithead: 'Shithead', basra: 'Basra',
+    vsComputer: 'מול מחשב', online: 'מול רשת',
+    account: 'חשבון / התחבר',
+    howToPlay: 'איך משחקים?',
+    // ── שחקנים ──
+    players2: '2 שחקנים', players3: '3 שחקנים', players4: '4 שחקנים',
+    openRoom: 'קבע המשך',
+    createRoom: 'צור חדר', joinRoom: 'הצטרף לחדר',
+    joinPublicRoom: 'הצטרף לחדר ציבורי פנוי',
+    // ── סוג חדר ──
+    roomType: 'סוג חדר', publicRoom: 'ציבורי', privateRoom: 'פרטי',
+    // ── טיימר ──
+    turnTimer: 'זמן לתור', noLimit: '∞',
+    // ── הימור ──
+    bet: 'הימור למשחק', noBet: 'ללא',
+    // ── בסרה ──
+    winScore: 'ניקוד לניצחון',
+    startGame: 'התחל משחק ▶',
+    // ── כמה שחקנים ──
+    howManyPlayers: 'כמה שחקנים?',
+    // ── לובי ──
+    waitingForPlayers: t('waitingForPlayers'),
+    waitingForHost: 'ממתין למארח להתחיל...',
+    startNow: 'התחל עכשיו',
+    roomCode: 'קוד חדר',
+    // ── משחק ──
+    yourTurn: 'התור שלך',
+    play: 'שחק ▶',
+    exit: 'EXIT',
+    back: '← חזור',
+    cancel: 'ביטול',
+    confirm: '✅ אסוף',
+    throwCard: '↓ זרוק קלף',
+    // ── תוצאות ──
+    results: 'תוצאות',
+    newGame: '🔄 משחק חדש',
+    leaveMenu: '🚪 צא לתפריט',
+    // ── הודעות משחק ──
+    notYourTurn: t('notYourTurn'),
+    mustSelectCard: t('mustSelectCard'),
+    mustCapture: t('mustCapture'),
+    selectSameRank: t('selectSameRank'),
+    noValidPlay: 'אין מהלך - דולג',
+    notEnoughCoins: t('notEnoughCoins'),
+    loginToPlay: t('loginToPlay'),
+    // ── חשבון ──
+    login: '🔑 התחבר', register: '✨ הרשם',
+    username: 'שם משתמש', password: 'סיסמה',
+    firstName: 'שם פרטי', lastName: 'שם משפחה',
+    saveChanges: '💾 שמור שינויים',
+    dailyCoins: '🎁 קבל 200 מטבעות יומיים',
+    editProfile: '✏️ עריכת פרופיל',
+    logout: 'התנתק',
+    // ── שפה ──
+    language: 'שפה', langHe: 'עברית', langEn: 'English',
+    // ── כללי ──
+    connected: 'מחוברים', inGame: 'במשחק',
+    noOpenRooms: t('noOpenRooms'),
+    refresh: '🔄 רענן',
+    verify: '✅ אמת',
+    privateRoomCode: '🔒 חדר פרטי',
+    verifyPin: '✅ אמת PIN',
+    // ── הוראות שיטהד ──
+    howPlayShithead: 'איך משחקים Shithead?',
+    // ── בסרה vs AI ──
+    basraVsComputer: 'בסרה מול מחשב',
+  },
+  en: {
+    // ── Main Menu ──
+    shithead: 'Shithead', basra: 'Basra',
+    vsComputer: 'vs Computer', online: 'Online',
+    account: 'Account / Login',
+    howToPlay: 'How to Play?',
+    // ── Players ──
+    players2: '2 Players', players3: '3 Players', players4: '4 Players',
+    openRoom: 'Open Room',
+    createRoom: 'Create Room', joinRoom: 'Join Room',
+    joinPublicRoom: 'Join Open Public Room',
+    // ── Room Type ──
+    roomType: 'Room Type', publicRoom: 'Public', privateRoom: 'Private',
+    // ── Timer ──
+    turnTimer: 'Turn Timer', noLimit: '∞',
+    // ── Bet ──
+    bet: 'Game Bet', noBet: 'None',
+    // ── Basra ──
+    winScore: 'Win Score',
+    startGame: 'Start Game ▶',
+    // ── How Many ──
+    howManyPlayers: 'How many players?',
+    // ── Lobby ──
+    waitingForPlayers: 'Waiting for players...',
+    waitingForHost: 'Waiting for host...',
+    startNow: 'Start Now',
+    roomCode: 'Room Code',
+    // ── Game ──
+    yourTurn: 'Your Turn',
+    play: 'Play ▶',
+    exit: 'EXIT',
+    back: '← Back',
+    cancel: 'Cancel',
+    confirm: '✅ Collect',
+    throwCard: '↓ Throw Card',
+    // ── Results ──
+    results: 'Results',
+    newGame: '🔄 New Game',
+    leaveMenu: '🚪 Exit to Menu',
+    // ── Game Messages ──
+    notYourTurn: 'Not your turn',
+    mustSelectCard: 'Select a card first',
+    mustCapture: 'Must capture! Select cards from table',
+    selectSameRank: 'Select matching card for burst',
+    noValidPlay: 'No valid move — skipping',
+    notEnoughCoins: 'Not enough coins',
+    loginToPlay: 'Login required for betting',
+    // ── Account ──
+    login: '🔑 Login', register: '✨ Register',
+    username: 'Username', password: 'Password',
+    firstName: 'First Name', lastName: 'Last Name',
+    saveChanges: '💾 Save Changes',
+    dailyCoins: '🎁 Get 200 Daily Coins',
+    editProfile: '✏️ Edit Profile',
+    logout: 'Logout',
+    // ── Language ──
+    language: 'Language', langHe: 'עברית', langEn: 'English',
+    // ── General ──
+    connected: 'connected', inGame: 'in game',
+    noOpenRooms: 'No open rooms right now',
+    refresh: '🔄 Refresh',
+    verify: '✅ Verify',
+    privateRoomCode: '🔒 Private Room',
+    verifyPin: '✅ Verify PIN',
+    // ── Shithead Instructions ──
+    howPlayShithead: 'How to Play Shithead?',
+    // ── Basra vs AI ──
+    basraVsComputer: 'Basra vs Computer',
+  }
+};
+
+function t(key) { return (_i18n[_lang] || _i18n.he)[key] || key; }
+
+function setLang(lang) {
+  _lang = lang;
+  localStorage.setItem('lang', lang);
+  applyLang();
+}
+
+function applyLang() {
+  // dir/lang on html element
+  document.documentElement.lang = _lang;
+  document.documentElement.dir = _lang === 'he' ? 'rtl' : 'ltr';
+  // Update all data-i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+  // Update placeholders
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-ph'));
+  });
+  // Update language toggle button
+  const langBtn = document.getElementById('langToggleBtn');
+  if (langBtn) langBtn.textContent = _lang === 'he' ? 'EN' : 'עב';
+}
+
 // ══════════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════════
@@ -1512,7 +1686,7 @@ function _humanPlayAI() {
     if (aiInterrupt) {
 
         const sel = selectedHandIndices.map(i => players[0].hand[i]);
-        if (!sel.length) { showToast('בחר קלף תחילה'); return; }
+        if (!sel.length) { showToast(t('mustSelectCard')); return; }
         if (!sel.every(c => c.slice(0,-1) === aiInterrupt.rank)) {
             showToast('בחר קלפי ' + aiInterrupt.rank + ' בלבד'); return;
         }
@@ -1592,9 +1766,9 @@ function _humanPlayAI() {
         let playRank = null;
         if (hasHandSel) playRank = players[0].hand[selectedHandIndices[0]]?.slice(0,-1);
         else if (hasFuSel) playRank = players[0].faceUp[selectedTableIndices[0]]?.slice(0,-1);
-        else { showToast('בחר קלף תחילה'); return; }
+        else { showToast(t('mustSelectCard')); return; }
 
-        if (!playRank) { showToast('בחר קלף תחילה'); return; }
+        if (!playRank) { showToast(t('mustSelectCard')); return; }
 
         // Mixed play: allowed when drawPile empty AND all hand cards are same rank
         const allHandSameRank = players[0].hand.every(c => c.slice(0,-1) === playRank);
@@ -1614,12 +1788,12 @@ function _humanPlayAI() {
             });
         } else {
             // Normal hand play
-            if (!hasHandSel) { showToast('בחר קלף תחילה'); return; }
+            if (!hasHandSel) { showToast(t('mustSelectCard')); return; }
             if (!canPlay(players[0].hand[selectedHandIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
             selectedHandIndices.sort((a,b) => b - a).forEach(i => cards.push(players[0].hand.splice(i, 1)[0]));
         }
     } else {
-        if (!selectedTableIndices.length) { showToast('בחר קלף תחילה'); return; }
+        if (!selectedTableIndices.length) { showToast(t('mustSelectCard')); return; }
         if (!canPlay(players[0].faceUp[selectedTableIndices[0]])) { showToast('❌ מהלך לא חוקי!'); return; }
         selectedTableIndices.sort((a,b) => b - a).forEach(i => {
             cards.push(players[0].faceUp[i]);
@@ -2628,7 +2802,7 @@ function logoutUser() {
 function setBet(amount) {
     const errEl = document.getElementById('betWarning');
     if (amount > 0 && !authUser) {
-        if (errEl) errEl.textContent = 'יש להתחבר כדי לשחק בהימורים';
+        if (errEl) errEl.textContent = t('loginToPlay');
         showMenu('menuAuth');
         return;
     }
@@ -2645,6 +2819,7 @@ function setBet(amount) {
 }
 
 function showMenu(id) {
+    setTimeout(applyLang, 5);
     if (id === 'menuBasraVsAI') setTimeout(() => setBasraAIWinScore(basraAIWinScore || 120), 10);
 
     fetchOnlineStats();
@@ -2716,7 +2891,7 @@ function initSocket() {
     socket.on('roomCreated', ({ code, slotIdx }) => {
         mySlotIdx = slotIdx;
         document.getElementById('lobbyCode').textContent = code;
-        document.getElementById('lobbyStatus').textContent = 'ממתין לשחקנים...';
+        document.getElementById('lobbyStatus').textContent = t('waitingForPlayers');
         showMenu('menuLobby');
     });
     socket.on('openRoomCreated', ({ code, slotIdx }) => {
@@ -3534,7 +3709,7 @@ if (!onlineMode) return; // already left to menu
         html += '</div>';
         html += '<div id="basraCoinsResult" style="margin-top:10px;"></div>';
         document.getElementById('basraRoundScores').innerHTML = html;
-        document.getElementById('basraRoundBtns').innerHTML='<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 צא לתפריט</button>';
+        document.getElementById('basraRoundBtns').innerHTML='<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;" data-i18n="leaveMenu">🚪 צא לתפריט</button>';
         overlay.style.display='flex';
         // Apply pending coins if already arrived
         if (pendingBasraCoins) { applyBasraCoins(pendingBasraCoins); pendingBasraCoins = null; }
@@ -3772,7 +3947,7 @@ function setTimer(secs) {
 
 function createOnlineRoom(count) {
     const name = getMyName(); if (!name) return;
-    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && !authUser) { showToast(t('loginToPlay')); showMenu('menuAuth'); return; }
     if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(`אין מספיק מטבעות`); return; }
     initSocket();
     socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
@@ -3780,8 +3955,8 @@ function createOnlineRoom(count) {
 
 function createOpenRoom() {
     const name = getMyName(); if (!name) return;
-    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
-    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast('אין מספיק מטבעות'); return; }
+    if (selectedBet > 0 && !authUser) { showToast(t('loginToPlay')); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(t('notEnoughCoins')); return; }
     initSocket();
     socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
 }
@@ -4107,7 +4282,7 @@ function humanPlay() {
     // Add-on interrupt (same player who just played)
     const myCanInterrupt = s.interruptWindow && s.lastPlayerIdx === mySlotIdx && s.currentPlayer !== mySlotIdx;
     if (myCanInterrupt) {
-        if (!selectedHandIndices.length) { showToast('בחר קלף זהה להתפרצות'); return; }
+        if (!selectedHandIndices.length) { showToast(t('selectSameRank')); return; }
         const cards = selectedHandIndices.map(i => s.myHand[i]);
         if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast('רק קלף ' + s.lastPlayedRank + ' להתפרצות'); return; }
         selectedHandIndices = [];
@@ -4126,7 +4301,7 @@ function humanPlay() {
     }
     let cards = [];
     if (s.myHand.length > 0) {
-        if (!selectedHandIndices.length) { showToast('בחר קלף תחילה'); return; }
+        if (!selectedHandIndices.length) { showToast(t('mustSelectCard')); return; }
         cards = selectedHandIndices.map(i => s.myHand[i]);
         // Also include selected faceUp cards if same rank
         if (selectedTableIndices.length > 0) {
@@ -4135,7 +4310,7 @@ function humanPlay() {
             cards = [...cards, ...fuCards];
         }
     } else {
-        if (!selectedTableIndices.length) { showToast('בחר קלף תחילה'); return; }
+        if (!selectedTableIndices.length) { showToast(t('mustSelectCard')); return; }
         cards = selectedTableIndices.map(i => s.myFaceUp[i]);
     }
     selectedHandIndices = []; selectedTableIndices = [];
@@ -4342,7 +4517,7 @@ function setBasraBet(val) {
     });
     const warn = document.getElementById('basraBetWarning');
     if (warn && val > 0 && authUser && authUser.coins < val) {
-        warn.textContent = 'אין מספיק מטבעות'; return;
+        warn.textContent = t('notEnoughCoins'); return;
     }
     if (warn) warn.textContent = '';
 }
@@ -4350,6 +4525,7 @@ let selectedBasraWinScore = 120;
 
 // Init default selections visually
 document.addEventListener('DOMContentLoaded', () => {
+    applyLang();
     // Run after DOM ready to highlight correct defaults
     setTimeout(() => {
         setBasraRoomType('public');
@@ -4392,7 +4568,7 @@ function basraCreate() {
     if (!socket) initSocket();
     const warn = document.getElementById('basraBetWarning');
     if (selectedBasraBet > 0 && authUser && authUser.coins < selectedBasraBet) {
-        if (warn) warn.textContent = 'אין מספיק מטבעות'; return;
+        if (warn) warn.textContent = t('notEnoughCoins'); return;
     }
     document.getElementById('basraCreateError').textContent = '';
     socket.emit('basraCreate', {
@@ -4585,7 +4761,7 @@ function basraThrowCard() {
     if (basraCommittedCard && tableCards.length > 0) {
         const caps = basraFindValidCaptures(basraCommittedCard, tableCards);
         if (caps.length > 0) {
-            showToast('חייב לאסוף! בחר קלפים מהשולחן');
+            showToast(t('mustCapture'));
             // Auto-select minimum capture to guide the player
             if (basraSelectedCaptures.length === 0) {
                 const minGroup = caps.sort((a,b) => a.length - b.length)[0];
@@ -4792,7 +4968,7 @@ function setTimer(secs) {
 
 function createOnlineRoom(count) {
     const name = getMyName(); if (!name) return;
-    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && !authUser) { showToast(t('loginToPlay')); showMenu('menuAuth'); return; }
     if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(`אין מספיק מטבעות`); return; }
     initSocket();
     socket.emit('createRoom', { name, playerCount: count, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
@@ -4800,8 +4976,8 @@ function createOnlineRoom(count) {
 
 function createOpenRoom() {
     const name = getMyName(); if (!name) return;
-    if (selectedBet > 0 && !authUser) { showToast('יש להתחבר כדי לשחק בהימורים'); showMenu('menuAuth'); return; }
-    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast('אין מספיק מטבעות'); return; }
+    if (selectedBet > 0 && !authUser) { showToast(t('loginToPlay')); showMenu('menuAuth'); return; }
+    if (selectedBet > 0 && authUser && authUser.coins < selectedBet) { showToast(t('notEnoughCoins')); return; }
     initSocket();
     socket.emit('createOpenRoom', { name, turnTimer: selectedTimer, isPublic: selectedRoomType === 'public', bet: selectedBet, username: authUser?.username, token: authUser?.token });
 }
@@ -5127,7 +5303,7 @@ function humanPlay() {
     // Add-on interrupt (same player who just played)
     const myCanInterrupt = s.interruptWindow && s.lastPlayerIdx === mySlotIdx && s.currentPlayer !== mySlotIdx;
     if (myCanInterrupt) {
-        if (!selectedHandIndices.length) { showToast('בחר קלף זהה להתפרצות'); return; }
+        if (!selectedHandIndices.length) { showToast(t('selectSameRank')); return; }
         const cards = selectedHandIndices.map(i => s.myHand[i]);
         if (!cards.every(c => c.slice(0,-1) === s.lastPlayedRank)) { showToast('רק קלף ' + s.lastPlayedRank + ' להתפרצות'); return; }
         selectedHandIndices = [];
@@ -5146,7 +5322,7 @@ function humanPlay() {
     }
     let cards = [];
     if (s.myHand.length > 0) {
-        if (!selectedHandIndices.length) { showToast('בחר קלף תחילה'); return; }
+        if (!selectedHandIndices.length) { showToast(t('mustSelectCard')); return; }
         cards = selectedHandIndices.map(i => s.myHand[i]);
         // Also include selected faceUp cards if same rank
         if (selectedTableIndices.length > 0) {
@@ -5155,7 +5331,7 @@ function humanPlay() {
             cards = [...cards, ...fuCards];
         }
     } else {
-        if (!selectedTableIndices.length) { showToast('בחר קלף תחילה'); return; }
+        if (!selectedTableIndices.length) { showToast(t('mustSelectCard')); return; }
         cards = selectedTableIndices.map(i => s.myFaceUp[i]);
     }
     selectedHandIndices = []; selectedTableIndices = [];
@@ -5419,7 +5595,7 @@ function setBasraBet(val) {
     });
     const warn = document.getElementById('basraBetWarning');
     if (warn && val > 0 && authUser && authUser.coins < val) {
-        warn.textContent = 'אין מספיק מטבעות'; return;
+        warn.textContent = t('notEnoughCoins'); return;
     }
     if (warn) warn.textContent = '';
 }
@@ -5441,7 +5617,7 @@ function basraCreate() {
     if (!socket) initSocket();
     const warn = document.getElementById('basraBetWarning');
     if (selectedBasraBet > 0 && authUser && authUser.coins < selectedBasraBet) {
-        if (warn) warn.textContent = 'אין מספיק מטבעות'; return;
+        if (warn) warn.textContent = t('notEnoughCoins'); return;
     }
     document.getElementById('basraCreateError').textContent = '';
     socket.emit('basraCreate', {
@@ -6087,7 +6263,7 @@ function basraRender(state) {
         const canCapture = possibleCaptures.length > 0;
         statusEl.textContent = basraSelectedCaptures.length > 0
             ? 'בחרת '+basraSelectedCaptures.length+' קלפים — לחץ ✅ אסוף'
-            : canCapture ? 'חייב לאסוף! בחר קלפים מהשולחן'
+            : canCapture ? t('mustCapture')
             : state.tableCards.length > 0 ? 'אין קלף תואם — לחץ ↓ זרוק קלף' : 'לחץ ↓ זרוק קלף';
     } else if (!state.isMyTurn) {
         statusEl.textContent = 'תור של '+state.playerNames[state.currentPlayer];
@@ -6243,8 +6419,8 @@ function basraCancelSelection() {
         </div>
         <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
             <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;">▶ שחק קלף</button>
-            <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);">✅ אסוף</button>
-            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;">↓ זרוק קלף</button>
+            <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);" data-i18n="confirm">✅ אסוף</button>
+            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;" data-i18n="throwCard">↓ זרוק קלף</button>
             <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);">✕ ביטול</button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
