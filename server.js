@@ -403,6 +403,15 @@ app.get('/api/stats/user', async (req, res) => {
     } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
+app.get('/api/admin/reset-all-stats', async (req, res) => {
+    try {
+        const { key } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const result = await usersCol.updateMany({}, { $unset: { stats: '' } });
+        res.json({ ok: true, modified: result.modifiedCount });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.get('/api/admin/set-coins', async (req, res) => {
     try {
         const { key, u, coins } = req.query;
