@@ -574,37 +574,37 @@
         </div>
         <!-- Game selection -->
         <div style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-bottom:2px;">בחר משחק</div>
-        <button onclick="showMenu('menuShithead')" class="setup-btn" style="font-size:1.1rem;padding:14px;">🃏 Shithead</button>
-        <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;">🀄 Basra</button>
+        <button onclick="showMenu('menuShithead')" class="setup-btn" style="font-size:1.1rem;padding:14px;">Shithead</button>
+        <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;">Basra</button>
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.202</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.203</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
-        <button onclick="showMenu('menuVsAI')" class="setup-btn">🤖 vs Computer</button>
-        <button onclick="showMenu('menuOnline')" class="setup-btn">🌐 Online</button>
+        <button onclick="showMenu('menuVsAI')" class="setup-btn">vs Computer</button>
+        <button onclick="showMenu('menuOnline')" class="setup-btn">Online</button>
         <button onclick="showHowToPlay()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:20px;padding:6px 18px;font-size:12px;cursor:pointer;letter-spacing:1px;margin-top:4px;">❓ איך משחקים</button>
     </div>
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuShithead')">← חזור</div>
         <button onclick="startGame(2)" class="setup-btn">⚔️ 2 Players</button>
-        <button onclick="startGame(3)" class="setup-btn">🃏 3 Players</button>
+        <button onclick="startGame(3)" class="setup-btn">3 Players</button>
         <button onclick="startGame(4)" class="setup-btn">🏆 4 Players</button>
     </div>
     <div id="menuOnline" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuShithead')">← חזור</div>
-        <button onclick="showMenu('menuCreate')" class="setup-btn">➕ צור חדר</button>
-        <button onclick="showMenu('menuJoin')" class="setup-btn">🔗 הצטרף לחדר</button>
+        <button onclick="showMenu('menuCreate')" class="setup-btn">צור חדר</button>
+        <button onclick="showMenu('menuJoin')" class="setup-btn">הצטרף לחדר</button>
     </div>
     <div id="menuCreate" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
-            <button onclick="setRoomType('public')"  id="roomTypePublic"  class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">🌐 ציבורי</button>
+            <button onclick="setRoomType('public')"  id="roomTypePublic"  class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">ציבורי</button>
             <button onclick="setRoomType('private')" id="roomTypePrivate" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;">🔒 פרטי</button>
         </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">זמן לתור</div>
@@ -634,12 +634,12 @@
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:4px;">כמה שחקנים?</div>
         <button onclick="createOpenRoom()" id="playerBtnOpen" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🎲 קבע המשך</button>
         <button onclick="createOnlineRoom(2)" id="playerBtn2" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">⚔️ 2 Players</button>
-        <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🃏 3 Players</button>
+        <button onclick="createOnlineRoom(3)" id="playerBtn3" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">3 Players</button>
         <button onclick="createOnlineRoom(4)" id="playerBtn4" class="setup-btn" disabled style="opacity:0.35;cursor:not-allowed;">🏆 4 Players</button>
     </div>
     <div id="menuJoin" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuOnline')">← חזור</div>
-        <button onclick="showMenu('menuJoinPublic')" class="setup-btn">🌐 הצטרף לחדר ציבורי פנוי</button>
+        <button onclick="showMenu('menuJoinPublic')" class="setup-btn">הצטרף לחדר ציבורי פנוי</button>
         <button onclick="showMenu('menuJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
     </div>
     <div id="menuJoinPublic" class="setup-grid hidden">
@@ -668,13 +668,13 @@
     <div id="menuBasra" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuMain')">← חזור</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:3px;">🀄 BASRA</div>
-        <button onclick="showMenu('menuBasraVsAI')" class="setup-btn">🤖 מול מחשב</button>
-        <button onclick="showMenu('menuBasraOnline')" class="setup-btn">🌐 מול רשת</button>
+        <button onclick="showMenu('menuBasraVsAI')" class="setup-btn">מול מחשב</button>
+        <button onclick="showMenu('menuBasraOnline')" class="setup-btn">מול רשת</button>
     </div>
     <div id="menuBasraOnline" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
-        <button onclick="showBasraCreate()" class="setup-btn">➕ צור חדר</button>
-        <button onclick="showBasraJoin()" class="setup-btn">🔗 הצטרף לחדר</button>
+        <button onclick="showBasraCreate()" class="setup-btn">צור חדר</button>
+        <button onclick="showBasraJoin()" class="setup-btn">הצטרף לחדר</button>
     </div>
     <div id="menuBasraVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasra')">← חזור</div>
@@ -701,7 +701,7 @@
         <div class="setup-back" onclick="showMenu('menuBasraOnline')">← חזור</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">סוג חדר</div>
         <div style="display:flex;gap:8px;justify-content:center;width:100%;max-width:280px;">
-            <button onclick="setBasraRoomType('public')" id="basraRoomTypePublic" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">🌐 ציבורי</button>
+            <button onclick="setBasraRoomType('public')" id="basraRoomTypePublic" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;border-color:var(--gold);">ציבורי</button>
             <button onclick="setBasraRoomType('private')" id="basraRoomTypePrivate" class="setup-btn" style="flex:1;font-size:0.85rem;padding:10px 4px;">🔒 פרטי</button>
         </div>
         <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;margin-top:8px;">הימור למשחק</div>
@@ -738,7 +738,7 @@
     </div>
     <div id="menuBasraJoin" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuBasraOnline')">← חזור</div>
-        <button onclick="showMenu('menuBasraJoinPublic')" class="setup-btn">🌐 הצטרף לחדר ציבורי</button>
+        <button onclick="showMenu('menuBasraJoinPublic')" class="setup-btn">הצטרף לחדר ציבורי</button>
         <button onclick="showMenu('menuBasraJoinPrivate')" class="setup-btn">🔒 חדר פרטי</button>
     </div>
     <div id="menuBasraJoinPublic" class="setup-grid hidden">
