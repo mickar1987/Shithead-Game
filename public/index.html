@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.217</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.218</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1194,6 +1194,10 @@ function applyLang() {
   _el('chat_6', H('🙌 תרים..','🙌 Lift it'));
   _el('chat_7', H('🤝 טוב שותף..!!','🤝 Good partner!'));
   _el('lbl_roundResults', H('תוצאות סיבוב','Round Results'));
+  _el('lbl_exitTitle', H('לצאת מהמשחק?','Exit Game?'));
+  _el('lbl_exitSub', H('היציאה תיחשב כהפסד','Leaving counts as a loss'));
+  _el('btn_exitYes', H('כן, צא','Yes, Exit'));
+  _el('btn_exitNo', H('המשך משחק','Continue'));
   _el('lbl_deck2', H('קופה','Deck'));
 }
 
@@ -2896,7 +2900,7 @@ async function saveEditProfile() {
 }
 
 function confirmLogout() {
-    if (confirm('להתנתק מהחשבון?')) logoutUser();
+    if (confirm(H('להתנתק מהחשבון?','Log out of account?'))) logoutUser();
 }
 
 function logoutUser() {
@@ -5627,7 +5631,7 @@ function _doLeaveToMenu() {
 }
 
 function confirmLeave() {
-    if (confirm('לצאת למסך הראשי?')) leaveToMenu();
+    if (confirm(H('לצאת למסך הראשי?','Exit to main menu?'))) leaveToMenu();
 }
 
 function toggleEmojiPicker() {
@@ -6561,11 +6565,11 @@ function basraCancelSelection() {
 
 <!-- BASRA EXIT CONFIRM -->
 <div id="basraExitConfirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:700;align-items:center;justify-content:center;flex-direction:column;gap:20px;">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:#fff;letter-spacing:2px;">לצאת מהמשחק?</div>
-    <div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;">היציאה תיחשב כהפסד</div>
+    <div id="lbl_exitTitle" style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:#fff;letter-spacing:2px;">Exit Game?</div>
+    <div id="lbl_exitSub" style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;">Leaving counts as a loss</div>
     <div style="display:flex;gap:12px;">
-        <button onclick="basraForfeit()" style="background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">כן, צא</button>
-        <button onclick="document.getElementById('basraExitConfirm').style.display='none'" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">המשך משחק</button>
+        <button onclick="basraForfeit()" id="btn_exitYes" style="background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">Yes, Exit</button>
+        <button onclick="document.getElementById('basraExitConfirm').style.display='none'" id="btn_exitNo" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">Continue</button>
     </div>
 </div>
 
