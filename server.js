@@ -2468,12 +2468,18 @@ function basraBotMove(room) {
                 score -= 500; // strongly prefer to wait
             }
 
-            // Rule 2: J/7d — only play when table has 3+ cards OR it's a basra OR last 2 cards
+            // Rule 2: J/7d — only play when table has 3+ cards OR it's a real basra OR last card
             if (isJackCard && !isBasra) {
                 const handSizeAfter = handSize - 1;
                 if (tableCards.length < 3 && handSizeAfter > 1) {
-                    // Skip this option entirely — not enough cards on table
+                    // Skip this option entirely — not enough cards on table and no basra
                     return; // continue forEach
+                }
+            }
+            // Rule 2b: 7d capture (non-basra) — same restriction as J
+            if (is7d && combined.length > 0 && !isBasra) {
+                if (tableCards.length < 3 && handSize > 1) {
+                    return; // skip 7d capture when <3 cards and no basra
                 }
             }
 
@@ -2599,8 +2605,11 @@ function basraBotMove(room) {
     // 7d basra: always allowed (7d is special)
     // J basra with <3 cards: only if ≤2 cards in hand
     const _jackBasraOnFewCards = _isJ && _isBasraCapture && tableCards.length < 3 && handSize > 2;
+    // 7d basra = real basra only (not just any capture)
+    const _7dRealBasra_ruleB = _is7d && _isBasraCapture && basra.isBasra('7d', bestCapture.map(i=>tableCards[i]).filter(Boolean), tableCards);
     if ((_isJ || _is7d) && bestCapture.length > 0 &&
-        (!_isBasraCapture || _jackBasraOnFewCards)) {
+        (!_isBasraCapture || _jackBasraOnFewCards) &&
+        !_7dRealBasra_ruleB) {
         // Need 3+ cards on table (except burn risk)
         if (tableCards.length < 3 && handSize > 2) {
             // Find alternative capture with non-J/7d card
@@ -2673,14 +2682,19 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE A2 (final check): J as second-to-last card — if only 0-1 cards on table, wait
+    // RULE A2 (final check): J as second-to-last card — wait if table has <3 cards (no basra possible)
     // This runs LAST so no other rule can override it
-    if (bestCard.slice(0,-1) === 'J' && bestCapture.length === 0 &&
-        handSize === 2 && tableCards.length <= 1) {
-        const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
-        if (safeCards.length > 0) {
-            bestCard = safeCards[0];
-            bestCapture = [];
+    if (bestCard.slice(0,-1) === 'J' && handSize <= 2) {
+        const _jIsBasra = bestCapture.length === tableCards.length && tableCards.length > 0;
+        // Only allow J if it makes a real basra OR table has 3+ cards
+        if (!_jIsBasra && tableCards.length < 3) {
+            const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+            if (safeCards.length > 0) {
+                const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+                safeCards.sort((a,b) => priority(a)-priority(b));
+                bestCard = safeCards[0];
+                bestCapture = [];
+            }
         }
     }
 
