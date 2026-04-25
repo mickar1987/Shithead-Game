@@ -586,7 +586,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.212</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.213</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1182,6 +1182,14 @@ function applyLang() {
   _el('btn_basraThrow', H('↓ זרוק קלף','↓ Throw Card'));
   _el('btn_basraConfirm', H('✅ אסוף','✅ Collect'));
   _el('btn_basraPlay', H('▶ שחק','▶ Play Card'));
+  // Chat messages
+  _el('chat_1', H('🎉 כל הכבוד!','🎉 Well done!'));
+  _el('chat_2', H('⚡ בסרה!','⚡ Basra!'));
+  _el('chat_3', H('💪 אדיר..!!','💪 Amazing!'));
+  _el('chat_4', H('🚪 צא..!!','🚪 Get out!'));
+  _el('chat_5', H('⚠️ אל תסכן..','⚠️ Don\'t risk it'));
+  _el('chat_6', H('🙌 תרים..','🙌 Lift it'));
+  _el('chat_7', H('🤝 טוב שותף..!!','🤝 Good partner!'));
   _el('lbl_deck2', H('קופה','Deck'));
 }
 
@@ -2360,8 +2368,9 @@ function checkWin(idx) {
         p.faceDown.every(c => !c)) {
         p.finished = true;
         winnersOrder.push(p.id);
-        log(H(`🏁 ${p.name} סיים במקום ${winnersOrder.length}!`,`🏁 ${p.name} finished #${winnersOrder.length}!`));
-        showToast(H(`🏁 ${p.name} סיים!`,`🏁 ${p.name} finished!`));
+        const _pFinName = (idx===0) ? H('אתה','You') : p.name;
+        log(H(`🏁 ${_pFinName} סיים במקום ${winnersOrder.length}!`,`🏁 ${_pFinName} finished #${winnersOrder.length}!`));
+        showToast(H(`🏁 ${_pFinName} סיים!`,`🏁 ${_pFinName} finished!`));
         if (idx === 0) fastMode = true; // human finished → speed up AI
         if (winnersOrder.length >= players.length - 1) {
             setTimeout(showResults, 800);
@@ -3265,7 +3274,7 @@ if (!onlineMode) return; // already left to menu
         basraRoomCode=code; basraMySlot=slotIdx;
         const lc=document.getElementById('basraLobbyCode'); if(lc) lc.textContent=code;
         const lb=document.getElementById('basraLobbyBetInfo');
-        if(lb) lb.textContent = bet>0 ? '💰 הימור: '+bet+' מטבעות' : '';
+        if(lb) lb.textContent = bet>0 ? H('💰 הימור: ','💰 Bet: ')+bet+H(' מטבעות',' coins') : '';
         showMenu('menuBasraLobby');
     });
     socket.on('basraLobbyUpdate', ({players}) => {
@@ -3273,7 +3282,7 @@ if (!onlineMode) return; // already left to menu
         el.innerHTML=players.map(p=>`<div style="padding:6px 0;font-size:13px;color:${p.connected?'#fff':'rgba(255,255,255,0.3)'};letter-spacing:1px;">${p.connected?'✅':'⏳'} ${p.name}</div>`).join('');
         const ls=document.getElementById('basraLobbyStatus');
         const connected=players.filter(p=>p.connected).length;
-        if(ls) ls.textContent=connected+'/'+players.length+' שחקנים';
+        if(ls) ls.textContent=connected+'/'+players.length+H(' שחקנים',' players');
     });
     socket.on('basraPublicRooms', (rooms) => {
         const el=document.getElementById('basraPublicRoomsList'); if(!el) return;
@@ -3697,14 +3706,14 @@ if (!onlineMode) return; // already left to menu
                 </div>`;
             });
         }
-        if (pendingMajority>0) html+=`<div style="font-size:11px;color:rgba(255,200,50,0.5);">⏳ ${pendingMajority} נק' רוב עברו לסיבוב הבא</div>`;
+        if (pendingMajority>0) html+=`<div style="font-size:11px;color:rgba(255,200,50,0.5);">${H(`⏳ ${pendingMajority} נק' רוב עברו לסיבוב הבא`,`⏳ ${pendingMajority} pts majority carry over`)}</div>`;
         html+='</div>';
         scoresEl.innerHTML=html;
         // Show win score target
         const winScoreTarget = (basraState && basraState.winScore) ? basraState.winScore : '—';
-        scoresEl.innerHTML += `<div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:8px;letter-spacing:1px;">יעד: ${winScoreTarget} נקודות</div>`;
+        scoresEl.innerHTML += `<div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:8px;letter-spacing:1px;">${H(`יעד: ${winScoreTarget} נקודות`,`Target: ${winScoreTarget} pts`)}</div>`;
         let _countdown = 7;
-        btnsEl.innerHTML=`<div id="basraNextCountdown" style="font-size:13px;color:rgba(255,255,255,0.5);">סיבוב הבא בעוד ${_countdown}...</div>`;
+        btnsEl.innerHTML=`<div id="basraNextCountdown" style="font-size:13px;color:rgba(255,255,255,0.5);">${H('סיבוב הבא בעוד ','Next round in ')}${_countdown}...</div>`;
         if (window._basraRoundTimer) clearInterval(window._basraRoundTimer);
         window._basraRoundTimer = setInterval(() => {
             _countdown--;
@@ -3714,7 +3723,7 @@ if (!onlineMode) return; // already left to menu
                 window._basraRoundTimer = null;
                 basraNextRound();
             } else if (el) {
-                el.textContent = 'סיבוב הבא בעוד ' + _countdown + '...';
+                el.textContent = H('סיבוב הבא בעוד ','Next round in ') + _countdown + '...';
             }
         }, 1000);
         overlay.style.display='flex';
@@ -3759,9 +3768,9 @@ if (!onlineMode) return; // already left to menu
         let html = '';
         if (forfeitName !== undefined) {
             const iMeLost = forfeitBy === basraMySlot;
-            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iMeLost?'#ef4444':'#22c55e'};letter-spacing:3px;text-align:center;margin-bottom:8px;">${iMeLost ? '😞 הפסדת' : '🏆 ניצחת!'}</div>`;
+            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iMeLost?'#ef4444':'#22c55e'};letter-spacing:3px;text-align:center;margin-bottom:8px;">${iMeLost ? H('😞 הפסדת','😞 You lost') : H('🏆 ניצחת!','🏆 You won!')}</div>`;
             if (!iMeLost) basraFireworks();
-            html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:12px;">${forfeitName} עזב/פסל עצמו</div>`;
+            html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:12px;">${forfeitName} ${H('עזב/פסל עצמו','left/disqualified')}</div>`;
         } else if (!teams) {
             // 2p: determine winner
             // slotOrder[i] = original slot index of position i in sorted list
@@ -3775,14 +3784,14 @@ if (!onlineMode) return; // already left to menu
                 if (basraMySlot === 1) myPositionInSorted = scores[1] > scores[0] ? 0 : 1;
             }
             const iWon = myPositionInSorted === 0; // position 0 = winner (sorted descending)
-            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon ? '🏆 ניצחת!' : '😞 הפסדת'}</div>`;
+            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon ? H('🏆 ניצחת!','🏆 You won!') : H('😞 הפסדת','😞 You lost')}</div>`;
             if (iWon) basraFireworks();
         } else {
             // 4p team with no forfeit
             const winTeamIdx2 = teamScores ? (teamScores[0] >= teamScores[1] ? 0 : 1) : 0;
             const myTeamIdx = teams ? teams.findIndex(t => t.includes(basraMySlot)) : -1;
             const iWon4 = myTeamIdx === winTeamIdx2;
-            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon4?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon4 ? '🏆 ניצחתם!' : '😞 הפסדתם'}</div>`;
+            html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon4?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon4 ? H('🏆 ניצחתם!','🏆 You won!') : H('😞 הפסדתם','😞 You lost')}</div>`;
             if (iWon4) basraFireworks();
         }
         html += '<div style="display:flex;flex-direction:column;gap:8px;">';
@@ -3795,16 +3804,16 @@ if (!onlineMode) return; // already left to menu
                 const medal = ti === winTeamIdx ? '🥇' : '🥈';
                 html += `<div style="display:flex;justify-content:space-between;gap:16px;font-size:14px;color:#fff;padding:4px 0;">
                     <span style="color:${teamColors[ti]};font-weight:700;">${medal} ${teamNames}</span>
-                    <span style="color:var(--gold);">${teamScores[ti]} נק'</span>
+                    <span style="color:var(--gold);">${teamScores[ti]} ${_lang==='he'?"נק'":'pts'}</span>
                 </div>`;
             });
         } else {
-            html += names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;" id="basra-go-row-${i}"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} נק'</span></div>`).join('');
+            html += names.map((n,i)=>`<div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#fff;" id="basra-go-row-${i}"><span>${['🥇','🥈','🥉'][i]||''} ${n}</span><span style="color:var(--gold);">${scores[i]} ${_lang==='he'?"נק'":'pts'}</span></div>`).join('');
         }
         html += '</div>';
         html += '<div id="basraCoinsResult" style="margin-top:10px;"></div>';
         document.getElementById('basraRoundScores').innerHTML = html;
-        document.getElementById('basraRoundBtns').innerHTML='<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 צא לתפריט</button>';
+        document.getElementById('basraRoundBtns').innerHTML=H('<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 צא לתפריט</button>','<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 Exit to Menu</button>');
         overlay.style.display='flex';
         // Apply pending coins if already arrived
         if (pendingBasraCoins) { applyBasraCoins(pendingBasraCoins); pendingBasraCoins = null; }
@@ -5583,7 +5592,7 @@ function leaveToMenu() {
         const newBtn = document.getElementById('newGameBtn');
         if (newBtn) { newBtn.textContent = H('🔄 משחק חדש','🔄 New Game'); newBtn.style.display = 'block'; newBtn.disabled = false; newBtn.style.opacity = '1'; }
         const leaveBtn = document.getElementById('leaveBtn');
-        if (leaveBtn) { leaveBtn.style.display = 'block'; leaveBtn.textContent = '🚪 צא לתפריט'; leaveBtn.onclick = function() { _doLeaveToMenu(); }; }
+        if (leaveBtn) { leaveBtn.style.display = 'block'; leaveBtn.textContent = H('🚪 צא לתפריט','🚪 Exit to Menu'); leaveBtn.onclick = function() { _doLeaveToMenu(); }; }
         document.getElementById('waitingRestart') && (document.getElementById('waitingRestart').style.display = 'none');
         document.getElementById('waitingCount') && (document.getElementById('waitingCount').style.display = 'none');
         document.getElementById('resultOverlay').style.display = 'flex';
@@ -6385,7 +6394,7 @@ function basraRender(state) {
             : canCapture ? t('mustCapture')
             : state.tableCards.length > 0 ? H('אין קלף תואם — לחץ ↓ זרוק קלף','No match — press ↓ Throw Card') : H('לחץ ↓ זרוק קלף','↓ Throw Card');
     } else if (!state.isMyTurn) {
-        statusEl.textContent = 'תור של '+state.playerNames[state.currentPlayer];
+        statusEl.textContent = H('תור של ','Turn: ')+state.playerNames[state.currentPlayer];
     } else {
         statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק קלף' : H('בחר קלף מהיד','Select a card from hand');
     }
@@ -6574,13 +6583,13 @@ function basraCancelSelection() {
             <span onclick="basraSendChat('👌')">👌</span>
             <span onclick="basraSendChat('🫶')">🫶</span>
         </div>
-        <div class="basra-chat-msg" onclick="basraSendChat('🎉 כל הכבוד!')">🎉 כל הכבוד!</div>
-        <div class="basra-chat-msg" onclick="basraSendChat('⚡ בסרה!')">⚡ בסרה!</div>
-        <div class="basra-chat-msg" onclick="basraSendChat('💪 אדיר..!!')">💪 אדיר..!!</div>
-        <div class="basra-chat-msg" onclick="basraSendChat('🚪 צא..!!')">🚪 צא..!!</div>
-        <div class="basra-chat-msg" onclick="basraSendChat('⚠️ אל תסכן..')">⚠️ אל תסכן..</div>
-        <div class="basra-chat-msg" onclick="basraSendChat('🙌 תרים..')">🙌 תרים..</div>
-        <div class="basra-chat-msg" onclick="basraSendChat('🤝 טוב שותף..!!')">🤝 טוב שותף..!!</div>
+        <div class="basra-chat-msg" id="chat_1" onclick="basraSendChat(H('🎉 כל הכבוד!','🎉 Well done!'))">🎉 Well done!</div>
+        <div class="basra-chat-msg" id="chat_2" onclick="basraSendChat('⚡ Basra!')">⚡ Basra!</div>
+        <div class="basra-chat-msg" id="chat_3" onclick="basraSendChat(H('💪 אדיר..!!','💪 Amazing!'))">💪 Amazing!</div>
+        <div class="basra-chat-msg" id="chat_4" onclick="basraSendChat(H('🚪 צא..!!','🚪 Get out!'))">🚪 Get out!</div>
+        <div class="basra-chat-msg" id="chat_5" onclick="basraSendChat(H('⚠️ אל תסכן..','⚠️ Don\'t risk it'))">⚠️ Don't risk it</div>
+        <div class="basra-chat-msg" id="chat_6" onclick="basraSendChat(H('🙌 תרים..','🙌 Lift it'))">🙌 Lift it</div>
+        <div class="basra-chat-msg" id="chat_7" onclick="basraSendChat(H('🤝 טוב שותף..!!','🤝 Good partner!'))">🤝 Good partner!</div>
     </div>
 </body>
 </html>
