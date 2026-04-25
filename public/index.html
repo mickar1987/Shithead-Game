@@ -324,7 +324,7 @@
 
         /* ── ACTION BUTTONS ── */
         #actionButtons {
-            display: flex; gap: 10px; margin-bottom: 8px;
+            display: flex; flex-direction: row-reverse; gap: 10px; margin-bottom: 8px; direction: ltr;
         }
         .action-btn {
             padding: 9px 20px; border-radius: 4px; border: none;
@@ -586,7 +586,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.214</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.215</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -949,8 +949,8 @@
         <div id="playerTable"></div>
         <div id="actionButtons" class="hidden">
             <button id="swapDoneBtn" onclick="endSwapPhase()" class="action-btn"><span id='btn_swapDone'>✅ Done Swapping</span></button>
-            <button id="takeBtn" onclick="humanTake()" class="action-btn" style="order:1;"><span id='btn_take'>↙ Take</span></button>
-            <button id="playBtn" onclick="humanPlay()" class="action-btn" style="order:2;"><span id='btn_playCard'>▶ Play Card</span></button>
+            <button id="takeBtn" onclick="humanTake()" class="action-btn"><span id='btn_take'>↙ Take</span></button>
+            <button id="playBtn" onclick="humanPlay()" class="action-btn"><span id='btn_playCard'>▶ Play Card</span></button>
             <button id="interruptBtn" onclick="humanInterrupt()" class="action-btn hidden" style="background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulse-red 1s ease-in-out infinite;"><span id='btn_interrupt'>⚡ Burst!</span></button>
         </div>
         <div id="gameTopBar" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:8px;display:none;gap:5px;z-index:1002;align-items:center;">
@@ -6546,11 +6546,11 @@ function basraCancelSelection() {
             <div id="basraMyHand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;flex:1;"></div>
             <div id="basraMyPile" style="flex-shrink:0;"></div>
         </div>
-        <div id="basraActionBtns" style="display:flex;gap:8px;margin-top:4px;">
-            <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);order:1;"><span id="btn_basraCancel">✕ Cancel</span></button>
-            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;order:1;"><span id="btn_basraThrow">↓ Throw Card</span></button>
-            <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);order:2;"><span id="btn_basraConfirm">✅ Collect</span></button>
-            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;order:2;"><span id='btn_basraPlay'>▶ Play Card</span></button>
+        <div id="basraActionBtns" style="display:flex;flex-direction:row-reverse;gap:8px;margin-top:4px;direction:ltr;">
+            <button id="basraCancelBtn" onclick="basraCancelSelection()" class="action-btn" style="display:none;background:rgba(255,255,255,0.1);"><span id="btn_basraCancel">✕ Cancel</span></button>
+            <button id="basraThrowBtn" onclick="basraThrowCard()" class="action-btn" style="display:none;background:linear-gradient(135deg,#7f1d1d,#450a0a);border-color:rgba(239,68,68,0.5);color:#fca5a5;"><span id="btn_basraThrow">↓ Throw Card</span></button>
+            <button id="basraConfirmBtn" onclick="basraConfirmCapture()" class="action-btn" style="display:none;background:linear-gradient(135deg,#d97706,#92400e);"><span id="btn_basraConfirm">✅ Collect</span></button>
+            <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;"><span id='btn_basraPlay'>▶ Play Card</span></button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
     </div>
