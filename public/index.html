@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.218</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.219</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2900,7 +2900,16 @@ async function saveEditProfile() {
 }
 
 function confirmLogout() {
-    if (confirm(H('להתנתק מהחשבון?','Log out of account?'))) logoutUser();
+    const _lo = document.createElement('div');
+    _lo.id = 'logoutOverlay';
+    _lo.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;';
+    _lo.innerHTML = `
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:#fff;letter-spacing:2px;">${H('להתנתק מהחשבון?','Log out of account?')}</div>
+        <div style="display:flex;gap:12px;">
+            <button onclick="document.getElementById('logoutOverlay').remove()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:10px 24px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">${H('ביטול','Cancel')}</button>
+            <button onclick="document.getElementById('logoutOverlay').remove();logoutUser();" style="background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;color:#fff;border-radius:10px;padding:10px 24px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">${H('התנתק','Logout')}</button>
+        </div>`;
+    document.body.appendChild(_lo);
 }
 
 function logoutUser() {
@@ -3366,7 +3375,7 @@ if (!onlineMode) return; // already left to menu
         const color = (isJack||!isRed(card.slice(-1))) ? '#fbbf24' : '#ef4444';
         overlay.innerHTML =
             `<div style="font-family:Bebas Neue,sans-serif;font-size:2rem;color:${color};letter-spacing:3px;">${display}</div>`+
-            `<div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:5px;letter-spacing:1px;">עובר לסוף החבילה</div>`;
+            `<div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:5px;letter-spacing:1px;">${H("עובר לסוף החבילה","moved to bottom of deck")}</div>`;
         document.body.appendChild(overlay);
 
         function makeCardDiv(cardStr, faceUp) {
@@ -5631,7 +5640,16 @@ function _doLeaveToMenu() {
 }
 
 function confirmLeave() {
-    if (confirm(H('לצאת למסך הראשי?','Exit to main menu?'))) leaveToMenu();
+    const overlay = document.createElement('div');
+    overlay.id = 'shitheadExitOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;';
+    overlay.innerHTML = `
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:#fff;letter-spacing:2px;">${H('לצאת למסך הראשי?','Exit to main menu?')}</div>
+        <div style="display:flex;gap:12px;">
+            <button onclick="document.getElementById('shitheadExitOverlay').remove()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">${H('המשך','Continue')}</button>
+            <button onclick="document.getElementById('shitheadExitOverlay').remove();leaveToMenu();" style="background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;color:#fff;border-radius:10px;padding:12px 28px;font-size:1rem;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;cursor:pointer;">${H('כן, צא','Yes, Exit')}</button>
+        </div>`;
+    document.body.appendChild(overlay);
 }
 
 function toggleEmojiPicker() {
