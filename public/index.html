@@ -586,7 +586,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.213</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.214</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1190,6 +1190,7 @@ function applyLang() {
   _el('chat_5', H('⚠️ אל תסכן..','⚠️ Don\'t risk it'));
   _el('chat_6', H('🙌 תרים..','🙌 Lift it'));
   _el('chat_7', H('🤝 טוב שותף..!!','🤝 Good partner!'));
+  _el('lbl_roundResults', H('תוצאות סיבוב','Round Results'));
   _el('lbl_deck2', H('קופה','Deck'));
 }
 
@@ -1340,7 +1341,7 @@ function startGame(count) {
 
     players = Array.from({length: count}, (_, i) => ({
         id: i,
-        name: i === 0 ? 'אתה' : `מחשב ${i}`,
+        name: i === 0 ? H('אתה','You') : H(`מחשב ${i}`,`Bot ${i}`),
         hand: deck.splice(0, 3),
         faceUp: deck.splice(0, 3),
         faceDown: deck.splice(0, 3),
@@ -3496,7 +3497,7 @@ if (!onlineMode) return; // already left to menu
             'background:rgba(0,0,0,0.88);border:1.5px solid rgba(255,255,255,0.15);border-radius:14px;'+
             'padding:14px 20px;z-index:9999;min-width:200px;pointer-events:none;';
 
-        let html = '<div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-align:center;margin-bottom:10px;">קלפים שנאספו</div>';
+        let html = H('<div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-align:center;margin-bottom:10px;">קלפים שנאספו</div>','<div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-align:center;margin-bottom:10px;">Cards Collected</div>');
 
         if (teams) {
             teams.forEach((team, ti) => {
@@ -4547,7 +4548,7 @@ function sendReaction(emoji) {
         socket.emit('reaction', { emoji });
     } else {
         // AI mode — show locally
-        showReactionLocal(emoji, 'אתה');
+        showReactionLocal(emoji, H('אתה','You'));
     }
     const picker = document.getElementById('emojiPicker');
     if (picker) picker.style.display = 'none';
@@ -5646,7 +5647,7 @@ function sendReaction(emoji) {
         socket.emit('reaction', { emoji });
     } else {
         // AI mode — show locally
-        showReactionLocal(emoji, 'אתה');
+        showReactionLocal(emoji, H('אתה','You'));
     }
     const picker = document.getElementById('emojiPicker');
     if (picker) picker.style.display = 'none';
@@ -6396,7 +6397,7 @@ function basraRender(state) {
     } else if (!state.isMyTurn) {
         statusEl.textContent = H('תור של ','Turn: ')+state.playerNames[state.currentPlayer];
     } else {
-        statusEl.textContent = basraSelectedCard ? 'לחץ ▶ שחק קלף' : H('בחר קלף מהיד','Select a card from hand');
+        statusEl.textContent = basraSelectedCard ? H('לחץ ▶ שחק קלף','▶ Press Play Card') : H('בחר קלף מהיד','Select a card from hand');
     }
 }
 
@@ -6567,7 +6568,7 @@ function basraCancelSelection() {
 
 <!-- BASRA RESULT OVERLAY -->
 <div id="basraResultOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--gold);letter-spacing:4px;">תוצאות סיבוב</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--gold);letter-spacing:4px;" id="lbl_roundResults">Round Results</div>
     <div id="basraRoundScores" style="background:rgba(255,255,255,0.05);border-radius:16px;padding:20px 32px;min-width:260px;"></div>
     <div id="basraRoundBtns" style="display:flex;flex-direction:column;gap:10px;align-items:center;"></div>
 </div>
