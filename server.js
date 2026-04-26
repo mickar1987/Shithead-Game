@@ -2477,11 +2477,13 @@ function basraBotMove(room) {
                     return; // continue forEach
                 }
             }
-            // Rule 2b: 7d capture (non-basra) — same restriction as J
-            if (is7d && combined.length > 0 && !isBasra) {
-                if (tableCards.length < 3 && handSize > 1) {
-                    return; // skip 7d capture when <3 cards and no basra
+            // Rule 2b: 7d capture on <3 cards — only allow if it's a REAL basra
+            // (basra.isBasra already computed as isBasra above)
+            if (is7d && combined.length > 0 && tableCards.length < 3 && handSize > 1) {
+                if (!isBasra) {
+                    return; // skip 7d non-basra capture when <3 cards
                 }
+                // isBasra=true: 7d makes real basra → allow
             }
 
             // Rule 3: Conservative mode — only care about basra, not card count
@@ -2605,14 +2607,13 @@ function basraBotMove(room) {
     const _isJ = bestCard.slice(0,-1) === 'J';
     // 7d basra: always allowed (7d is special)
     // J basra with <3 cards: only if ≤2 cards in hand
-    const _jackBasraOnFewCards = _isJ && _isBasraCapture && tableCards.length < 3 && handSize > 2;
-    // 7d basra = real basra only (not just any capture)
-    const _7dRealBasra_ruleB = _is7d && _isBasraCapture && basra.isBasra('7d', bestCapture.map(i=>tableCards[i]).filter(Boolean), tableCards);
-    if ((_isJ || _is7d) && bestCapture.length > 0 &&
-        (!_isBasraCapture || _jackBasraOnFewCards) &&
-        !_7dRealBasra_ruleB) {
-        // Need 3+ cards on table (except burn risk)
-        if (tableCards.length < 3 && handSize > 2) {
+    // J: only capture when table has 3+ cards (no exceptions)
+    // 7d: allow REAL basra even with <3 cards, but block non-real-basra capture
+    const _captured7dCards = _is7d ? bestCapture.map(i => tableCards[i]).filter(Boolean) : [];
+    const _7dRealBasra = _is7d && basra.isBasra('7d', _captured7dCards, tableCards);
+    if ((_isJ || (_is7d && !_7dRealBasra)) && bestCapture.length > 0 && tableCards.length < 3 && handSize > 2) {
+        // Need 3+ cards on table (J always, 7d only when no real basra)
+        if (true) {
             // Find alternative capture with non-J/7d card
             let altCard = null, altCapture = [], altScore = -1;
             bot.hand.forEach(c => {
@@ -2683,13 +2684,16 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE A2 (final check): J with ≤2 cards in hand — NEVER play J if table has <3 cards
-    // Even if it would be a "basra" (1 card on table), wait — the risk isn't worth it
-    // Exception: if J is the ONLY card in hand (last card), must play it
-    // This runs LAST so no other rule can override it
-    if (bestCard.slice(0,-1) === 'J' && handSize <= 2 && handSize > 1) {
-        // Always wait — table needs 3+ cards OR a real multi-card basra opportunity
-        if (tableCards.length < 3) {
+    // RULE A2 (final check): J/7d with hand>1 and table<3 — block unless:
+    // - J: always block on table<3 (no exceptions)
+    // - 7d: block only if NOT a REAL basra (use actual isBasra check)
+    if (handSize > 1 && tableCards.length < 3) {
+        const _bestIsJ = bestCard.slice(0,-1) === 'J';
+        const _bestIs7d = bestCard === '7d';
+        const _a2CapturedCards = _bestIs7d ? bestCapture.map(i => tableCards[i]).filter(Boolean) : [];
+        const _a2RealBasra = _bestIs7d && bestCapture.length > 0 && basra.isBasra('7d', _a2CapturedCards, tableCards);
+        const _shouldBlock = _bestIsJ || (_bestIs7d && !_a2RealBasra);
+        if (_shouldBlock) {
             const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
             if (safeCards.length > 0) {
                 const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
