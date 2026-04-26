@@ -2683,12 +2683,13 @@ function basraBotMove(room) {
         }
     }
 
-    // RULE A2 (final check): J as second-to-last card — wait if table has <3 cards (no basra possible)
+    // RULE A2 (final check): J with ≤2 cards in hand — NEVER play J if table has <3 cards
+    // Even if it would be a "basra" (1 card on table), wait — the risk isn't worth it
+    // Exception: if J is the ONLY card in hand (last card), must play it
     // This runs LAST so no other rule can override it
-    if (bestCard.slice(0,-1) === 'J' && handSize <= 2) {
-        const _jIsBasra = bestCapture.length === tableCards.length && tableCards.length > 0;
-        // Only allow J if it makes a real basra OR table has 3+ cards
-        if (!_jIsBasra && tableCards.length < 3) {
+    if (bestCard.slice(0,-1) === 'J' && handSize <= 2 && handSize > 1) {
+        // Always wait — table needs 3+ cards OR a real multi-card basra opportunity
+        if (tableCards.length < 3) {
             const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
             if (safeCards.length > 0) {
                 const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
