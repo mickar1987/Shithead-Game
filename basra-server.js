@@ -171,16 +171,6 @@ function createBasraRoom(code, slots, bet = 0) {
         slots.forEach(s => s.hand.push(deck.shift()));
     }
 
-    // TEST MODE: force specific hands + table for debugging
-    if (process.env.BASRA_TEST_HANDS === '1' && slots.length === 2) {
-        // Table: Ah, 2d, Kc, Qh
-        // Player 0 (human): 3s
-        // Bot: 7d
-        tableCards = ['Ah', '2d', 'Kc', 'Qh'];
-        slots[0].hand = ['3s', '5c', '6h', '8d'];
-        slots[1].hand = ['7d', '4c', '9s', 'Kd'];
-        console.log('[TEST] Forced table=', tableCards, 'player=', slots[0].hand, 'bot=', slots[1].hand);
-    }
 
     // Teams assigned externally after all players join
     let teams = null;

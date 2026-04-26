@@ -1,4 +1,3 @@
-process.env.BASRA_TEST_HANDS = '1'; // TEST MODE
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -2700,15 +2699,12 @@ function basraBotMove(room) {
                 safeCards.sort((a,b) => priority(a)-priority(b));
                 bestCard = safeCards[0];
                 bestCapture = [];
+            } else {
+                // No safe alternative — forced to throw J/7d (no capture)
+                bestCapture = [];
+                console.log(`[BOT] No safe alt for ${bestCard}, forced throw`);
             }
         }
-    }
-
-    // DEBUG LOG
-    if (bestCard && (bestCard.slice(0,-1) === 'J' || bestCard === '7d')) {
-        const isCapture = bestCapture.length > 0;
-        const isBasraCapture = isCapture && bestCapture.length === tableCards.length;
-        console.log(`[BOT DEBUG] Playing ${bestCard} | hand=${JSON.stringify(bot.hand)} | table=${tableCards.length}:[${tableCards.join(',')}] | capture=${bestCapture.length} | isBasra=${isBasraCapture} | handSize=${handSize}`);
     }
 
     // SAFETY: if somehow bestCard is still null or invalid, pick first card
