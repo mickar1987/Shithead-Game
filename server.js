@@ -1,3 +1,4 @@
+process.env.BASRA_TEST_HANDS = '1'; // TEST MODE
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -2696,6 +2697,11 @@ function basraBotMove(room) {
                 bestCapture = [];
             }
         }
+    }
+
+    // DEBUG LOG
+    if (bestCard && (bestCard.slice(0,-1) === 'J' || bestCard === '7d') && tableCards.length < 3) {
+        console.log(`[BOT DEBUG] Playing ${bestCard} | hand=${JSON.stringify(bot.hand)} | table=${tableCards.length} | capture=${bestCapture.length} | handSize=${handSize}`);
     }
 
     // SAFETY: if somehow bestCard is still null or invalid, pick first card
