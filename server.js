@@ -2701,8 +2701,10 @@ function basraBotMove(room) {
     }
 
     // DEBUG LOG
-    if (bestCard && (bestCard.slice(0,-1) === 'J' || bestCard === '7d') && tableCards.length < 3) {
-        console.log(`[BOT DEBUG] Playing ${bestCard} | hand=${JSON.stringify(bot.hand)} | table=${tableCards.length} | capture=${bestCapture.length} | handSize=${handSize}`);
+    if (bestCard && (bestCard.slice(0,-1) === 'J' || bestCard === '7d')) {
+        const isCapture = bestCapture.length > 0;
+        const isBasraCapture = isCapture && bestCapture.length === tableCards.length;
+        console.log(`[BOT DEBUG] Playing ${bestCard} | hand=${JSON.stringify(bot.hand)} | table=${tableCards.length}:[${tableCards.join(',')}] | capture=${bestCapture.length} | isBasra=${isBasraCapture} | handSize=${handSize}`);
     }
 
     // SAFETY: if somehow bestCard is still null or invalid, pick first card
