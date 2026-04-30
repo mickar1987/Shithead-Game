@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.226</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.227</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2195,10 +2195,20 @@ function aiGetBestPlay(validCards, hand) {
     const powers = validCards.filter(c => POWERS.includes(c.slice(0,-1)));
     const normals = validCards.filter(c => !POWERS.includes(c.slice(0,-1)));
 
-    // 1. חוק קופה ריקה: לעולם לא 2/3/10 על ריק אם יש קלף רגיל
-    if (isPileEmpty && normals.length > 0) {
-        normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        return _ret(normals[0].slice(0,-1));
+    // 1. חוק קופה ריקה: סדר עדיפויות — normal > 2 > 3 > 10 (לא לבזבז 10 על ריק)
+    if (isPileEmpty) {
+        if (normals.length > 0) {
+            normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+            return _ret(normals[0].slice(0,-1));
+        }
+        const two = powers.find(c => c.slice(0,-1) === '2');
+        if (two) return _ret('2');
+        const three = validCards.find(c => c.slice(0,-1) === '3');
+        if (three) return _ret('3');
+        // Only 10 left — must play one
+        const ten = powers.find(c => c.slice(0,-1) === '10');
+        if (ten) return ['10', [ten]];
+        return _ret(validCards[0].slice(0,-1));
     }
 
     // 2. קלפים רגילים (לא power, לא 3): הנמוך ביותר שיכול לענות
@@ -2207,24 +2217,17 @@ function aiGetBestPlay(validCards, hand) {
         return _ret(normals[0].slice(0,-1));
     }
 
-    // 3. אסטרטגיית ה-3: רק אם אין קלף רגיל אחר לשחק, AND הקופה היא A או K (מצב קריטי)
-    //    3 שקוף — הקופה נשארת גבוהה אחריו, אז עדיף רק כשאין ברירה
+    // 3. אסטרטגיית ה-3: תמיד לפני 10 (3 שקוף שומר על הקופה כנמוכה יותר)
     const threeCard = validCards.find(c => c.slice(0,-1) === '3');
     if (threeCard && !isPileEmpty) {
-        // יש 3 — אבל כבר בדקנו שאין normals. בדוק אם יש 2/10 עדיף לפני 3
-        const twoCard = powers.find(c => c.slice(0,-1) === '2');
-        const tenCard = powers.find(c => c.slice(0,-1) === '10');
-        // שחק 3 רק אם: אין 2, ואין 10 שכדאי לשמור, ורק כשאין ברירה
-        // (אנחנו כאן כי normals ריק — כל הvalidCards הם powers/3)
-        if (!twoCard && (!tenCard || (pileSize < 3 && lastVal <= 12))) {
-            return _ret('3');
-        }
+        // 3 תמיד עדיף על 10 כשאין קלף רגיל — שחק כל ה-3ים
+        return _ret('3');
     }
 
-    // 4. קלפי כוח בלבד
+    // 4. קלפי כוח בלבד (2, 10)
     if (powers.length > 0) {
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        if (ten && (pileSize >= 3 || lastVal > 12)) return ['10', [ten]]; // תמיד רק 10 אחד
+        if (ten) return ['10', [ten]]; // תמיד רק 10 אחד
         const two = powers.find(c => c.slice(0,-1) === '2');
         if (two) return _ret('2');
         return _ret(powers[0].slice(0,-1));
