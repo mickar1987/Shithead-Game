@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.234</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.235</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3118,23 +3118,29 @@ function initSocket() {
         if (!authUser?.username || !authUser?.token) return;
         const u = encodeURIComponent(authUser.username);
         const t = encodeURIComponent(authUser.token);
-        // vs-AI shithead: in progress
-        if (!onlineMode && !gameOver && players.length > 0 && !window._suppressStatsRecord) {
-            navigator.sendBeacon(`/api/stats/beacon?u=${u}&t=${t}&game=shithead&mode=bot&result=abandon_lose`);
+        // vs-AI shithead: in progress (onlineMode=false, game running)
+        const _shitheadInProgress = (typeof onlineMode !== 'undefined' && !onlineMode &&
+            typeof gameOver !== 'undefined' && !gameOver &&
+            typeof players !== 'undefined' && players.length > 0 &&
+            !window._suppressStatsRecord);
+        if (_shitheadInProgress) {
+            const url = `/api/stats/beacon?u=${u}&t=${t}&game=shithead&mode=bot&result=abandon_lose`;
+            navigator.sendBeacon(url);
             window._suppressStatsRecord = true;
         }
         // vs-AI basra: in progress
         if (window._basraIsVsBot && !window._basraStatsRecorded) {
-            navigator.sendBeacon(`/api/stats/beacon?u=${u}&t=${t}&game=basra&mode=bot&result=abandon_lose`);
+            const url = `/api/stats/beacon?u=${u}&t=${t}&game=basra&mode=bot&result=abandon_lose`;
+            navigator.sendBeacon(url);
             window._basraStatsRecorded = true;
         }
     }
 
+    // Multiple event listeners for iOS PWA compatibility
+    const _onHide = () => { _hiddenAt = Date.now(); _recordAbandonBeacon(); };
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            _hiddenAt = Date.now();
-            _recordAbandonBeacon(); // record immediately on hide (app close / background)
-        } else {
+        if (document.visibilityState === 'hidden') { _onHide(); }
+        else {
             // Returning to app
             const awayMs = _hiddenAt ? Date.now() - _hiddenAt : 0;
             _hiddenAt = null;
@@ -3177,6 +3183,10 @@ function initSocket() {
             }
         }
     });
+
+    // iOS PWA fallbacks
+    window.addEventListener('pagehide', _onHide);
+    window.addEventListener('beforeunload', _onHide);
 
     socket.on('roomCreated', ({ code, slotIdx }) => {
         mySlotIdx = slotIdx;
