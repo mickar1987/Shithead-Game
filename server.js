@@ -412,6 +412,18 @@ app.get('/api/admin/reset-all-stats', async (req, res) => {
     } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
+app.get('/api/admin/reset-user-stats', async (req, res) => {
+    try {
+        const { key, u } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        if (!u) return res.json({ ok: false, error: 'Missing username' });
+        const user = await getUser(u);
+        if (!user) return res.json({ ok: false, error: 'User not found' });
+        await saveUser(u, { stats: {} });
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.get('/api/admin/set-coins', async (req, res) => {
     try {
         const { key, u, coins } = req.query;
@@ -574,6 +586,13 @@ async function deleteUser(u) {
     const d = await r.json();
     if (d.ok) { location.reload(); } else alert('ERR: ' + JSON.stringify(d));
 }
+async function resetUserStats(u) {
+    if (!confirm('Reset stats for ' + u + '?')) return;
+    const r = await fetch('/api/admin/reset-user-stats?key=' + KEY + '&u=' + encodeURIComponent(u));
+    const d = await r.json();
+    if (d.ok) { document.getElementById('statsModal').style.display='none'; location.reload(); }
+    else alert('ERR: ' + JSON.stringify(d));
+}
 async function showStats(u) {
     const r = await fetch('/api/stats/user?key=' + KEY + '&u=' + encodeURIComponent(u));
     const d = await r.json();
@@ -617,6 +636,7 @@ async function showStats(u) {
         '<div style="display:flex;gap:8px;flex-wrap:wrap">' + modeHtml('shithead','bot','🤖 מול מחשב') + modeHtml('shithead','online','🌐 מול שחקנים') + '</div></div>' +
         '<div><div style="color:#86efac;font-size:13px;font-weight:700;margin-bottom:8px">Basra</div>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap">' + modeHtml('basra','bot','🤖 מול מחשב') + modeHtml('basra','online','🌐 מול שחקנים') + '</div></div>';
+    document.getElementById('statsModalUser').value = u;
     document.getElementById('statsModal').style.display = 'flex';
 }
 </script>
@@ -671,7 +691,11 @@ ${rows}
 <!-- Stats Modal -->
 <div id="statsModal" class="modal" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box">
-    <h3 id="statsModalTitle"></h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="statsModalTitle" style="margin:0"></h3>
+      <button onclick="resetUserStats(document.getElementById('statsModalUser').value)" style="background:#7c3aed;border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">🗑 איפוס סטטיסטיקה</button>
+    </div>
+    <input type="hidden" id="statsModalUser" value="">
     <div id="statsModalBody"></div>
     <button onclick="document.getElementById('statsModal').style.display='none'" style="margin-top:16px;padding:6px 20px;background:#374151;border:none;color:#fff;border-radius:6px;cursor:pointer">✕ סגור</button>
   </div>
