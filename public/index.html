@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.236</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.237</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1341,6 +1341,14 @@ function startGame(count) {
             if (!authUser?.username) { clearInterval(window._vsAIPing); return; }
             _doPing();
         }, 60000);
+    }
+    // Mark active game in localStorage for abandon detection
+    if (authUser?.username && authUser?.token) {
+        localStorage.setItem('_activeGame', JSON.stringify({
+            game: 'shithead', mode: 'bot',
+            username: authUser.username, token: authUser.token,
+            ts: Date.now()
+        }));
     }
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('actionButtons').classList.remove('hidden');
@@ -2506,6 +2514,7 @@ function checkWin(idx) {
 
 function showResults() {
     gameOver = true;
+    localStorage.removeItem('_activeGame'); // normal end — clear flag
     const last = players.find(p => !p.finished);
     if (last) winnersOrder.push(last.id);
     // Stop VS AI ping — game over
@@ -4839,6 +4848,22 @@ let selectedBasraWinScore = 120;
 // Init default selections visually
 document.addEventListener('DOMContentLoaded', () => {
     applyLang();
+    // Check for abandoned game from previous session
+    try {
+        const _ag = localStorage.getItem('_activeGame');
+        if (_ag) {
+            const ag = JSON.parse(_ag);
+            localStorage.removeItem('_activeGame'); // clear immediately
+            // Only record if it was recent (within 24 hours) and we have valid credentials
+            const age = Date.now() - (ag.ts || 0);
+            if (ag.username && ag.token && age < 86400000) {
+                const u = encodeURIComponent(ag.username);
+                const t = encodeURIComponent(ag.token);
+                fetch(`/api/stats/beacon?u=${u}&t=${t}&game=${ag.game}&mode=${ag.mode}&result=abandon_lose`)
+                    .catch(() => {});
+            }
+        }
+    } catch(e) {}
     // Run after DOM ready to highlight correct defaults
     setTimeout(() => {
         setBasraRoomType('public');
@@ -4905,6 +4930,7 @@ function refreshBasraPublicRooms() {
     socket.emit('basraGetPublicRooms');
 }
 function basraLeave() {
+    localStorage.removeItem('_activeGame');
     // Record abandon+lose for vs-bot games if mid-game
     // Stats already recorded in basraGameOver — nothing to do here
     window._basraStatsRecorded = false;
@@ -5754,6 +5780,7 @@ function leaveLobby() {
 }
 
 function leaveToMenu() {
+    localStorage.removeItem('_activeGame'); // leaving — clear flag
     // If mid-game vs AI — show results with abandon place
     if (!gameOver && players && players.some(p => p.isAI)) {
         // Human leaving = last available place (all unfinished AIs finish before human)
@@ -6049,6 +6076,13 @@ function startBasraVsAI() {
     if (!socket) initSocket();
     window._basraStatsRecorded = false;
     window._basraIsVsBot = true;
+    if (authUser?.username && authUser?.token) {
+        localStorage.setItem('_activeGame', JSON.stringify({
+            game: 'basra', mode: 'bot',
+            username: authUser.username, token: authUser.token,
+            ts: Date.now()
+        }));
+    }
     const name = authUser?.username || localStorage.getItem('guestName') || 'שחקן';
     socket.emit('basraCreateVsAI', {
         name,
