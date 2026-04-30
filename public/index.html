@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.228</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.229</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2173,6 +2173,85 @@ function aiPileDifficulty(rank, opponents) {
     return cantAnswer * 20; // each stuck opponent = 20 bonus
 }
 
+// ── AI Helpers ──────────────────────────────────────
+
+// Simulate what value the top of pile would be after playing a card
+// (accounting for 3=transparent, 2=reset)
+function aiPileTopAfter(card, currentPile) {
+    const r = card.slice(0,-1);
+    if (r === '2') return 2;  // reset — pile "value" = 2 (anything can follow)
+    if (r === '3') {          // transparent — look through to card below
+        for (let i = currentPile.length - 1; i >= 0; i--) {
+            const pr = currentPile[i].slice(0,-1);
+            if (pr !== '3') return aiCardValue(currentPile[i]);
+        }
+        return 0; // pile effectively empty through
+    }
+    return aiCardValue(card);
+}
+
+// How many cards in opponent's hand (best opponent = fewest cards)
+function aiOpponentMinCards() {
+    let min = 999;
+    for (let i = 1; i < players.length; i++) {
+        if (!players[i].finished) {
+            const cnt = players[i].hand.length +
+                players[i].faceUp.filter(Boolean).length +
+                players[i].faceDown.filter(Boolean).length;
+            if (cnt < min) min = cnt;
+        }
+    }
+    return min;
+}
+
+// Can opponent play on a given pile-top value?
+function aiOpponentCanPlay(pileTopVal, opponent) {
+    const hand = opponent.hand;
+    if (!hand.length) {
+        // faceUp phase — anything might work
+        return opponent.faceUp.some(Boolean);
+    }
+    return hand.some(c => {
+        const r = c.slice(0,-1);
+        if (r === '2' || r === '10') return true; // always playable
+        if (r === '3') return true;  // transparent, always playable
+        if (r === '7') return pileTopVal <= 7;
+        return aiCardValue(c) >= pileTopVal;
+    });
+}
+
+// Look-ahead penalty: how bad is it for us if opponent gets an easy turn?
+// Returns score penalty (higher = worse choice for us)
+function aiLookaheadPenalty(card, currentPile) {
+    const r = card.slice(0,-1);
+    // 10 = burn = we get another turn, no opponent play — no penalty
+    if (r === '10') return 0;
+    // 2 = reset to 2 — opponent can play almost anything
+    const newTopVal = aiPileTopAfter(card, currentPile);
+    let penalty = 0;
+    for (let i = 1; i < players.length; i++) {
+        if (players[i].finished) continue;
+        const opp = players[i];
+        const canPlay = aiOpponentCanPlay(newTopVal, opp);
+        if (canPlay) {
+            // Penalty proportional to how few cards they have (they're close to winning)
+            const oppCards = opp.hand.length + opp.faceUp.filter(Boolean).length + opp.faceDown.filter(Boolean).length;
+            if (oppCards <= 3) penalty += 30; // critical — opponent about to win
+            else if (oppCards <= 5) penalty += 15;
+            else penalty += 3;
+            // Extra penalty: if opponent can play ALL their hand at once (same rank)
+            if (opp.hand.length > 1) {
+                const topRank = card.slice(0,-1) === '3'
+                    ? (currentPile.length ? currentPile[currentPile.length-1].slice(0,-1) : null)
+                    : r;
+                const oppSameRank = opp.hand.filter(c2 => c2.slice(0,-1) === topRank).length;
+                if (oppSameRank === opp.hand.length) penalty += 20; // opponent can clear hand!
+            }
+        }
+    }
+    return penalty;
+}
+
 function aiGetBestPlay(validCards, hand) {
     if (!validCards.length) return null;
     // allOfRank: returns ALL copies of rank from hand (not just validCards)
@@ -2195,7 +2274,7 @@ function aiGetBestPlay(validCards, hand) {
     const powers = validCards.filter(c => POWERS.includes(c.slice(0,-1)));
     const normals = validCards.filter(c => !POWERS.includes(c.slice(0,-1)));
 
-    // 1. חוק קופה ריקה: סדר עדיפויות — normal > 2 > 3 > 10 (לא לבזבז 10 על ריק)
+    // 1. קופה ריקה: סדר עדיפויות — normal > 2 > 3 > 10 (לא לבזבז 10)
     if (isPileEmpty) {
         if (normals.length > 0) {
             normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
@@ -2205,35 +2284,72 @@ function aiGetBestPlay(validCards, hand) {
         if (two) return _ret('2');
         const three = validCards.find(c => c.slice(0,-1) === '3');
         if (three) return _ret('3');
-        // Only 10 left — must play one
         const ten = powers.find(c => c.slice(0,-1) === '10');
         if (ten) return ['10', [ten]];
         return _ret(validCards[0].slice(0,-1));
     }
 
-    // 2. קלפים רגילים (לא power, לא 3): הנמוך ביותר שיכול לענות
-    if (normals.length > 0) {
-        normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        return _ret(normals[0].slice(0,-1));
+    // ── LOOK-AHEAD: score all valid options ──────────────
+    // Build unique ranks to consider
+    const uniqueRanks = [...new Set(validCards.map(c => c.slice(0,-1)))];
+
+    // Score each candidate rank
+    const scored = uniqueRanks.map(rank => {
+        const r = rank;
+        let score = 0;
+
+        // Base: prefer lower cards (save high cards)
+        const repCard = validCards.find(c => c.slice(0,-1) === r);
+        score -= aiCardValue(repCard) * 0.5;
+
+        // Prefer playing all copies of same rank (clear hand faster)
+        const copies = allOfRank(r).length;
+        score += copies * 3;
+
+        // POWER bonuses
+        if (r === '10') {
+            score += 25; // burn = extra turn, always good
+            return { rank: r, score }; // 10 always 1 card
+        }
+        if (r === '2') score += 10; // reset — tactical
+        if (r === '3') {
+            score += 5; // transparent — slight bonus
+        }
+
+        // LOOK-AHEAD PENALTY: how easy does this make it for opponents?
+        const penalty = aiLookaheadPenalty(repCard, pile);
+        score -= penalty;
+
+        return { rank: r, score };
+    });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    // But keep hard rules:
+    // Rule: 3 always before 10 when no normals
+    const hasNormal = scored.some(s => !POWERS.includes(s.rank));
+    if (!hasNormal) {
+        const threeOpt = scored.find(s => s.rank === '3');
+        const tenOpt = scored.find(s => s.rank === '10');
+        if (threeOpt && tenOpt && scored.indexOf(tenOpt) < scored.indexOf(threeOpt)) {
+            // Swap: 3 before 10
+            const ti = scored.indexOf(tenOpt);
+            const tri = scored.indexOf(threeOpt);
+            [scored[ti], scored[tri]] = [scored[tri], scored[ti]];
+        }
     }
 
-    // 3. אסטרטגיית ה-3: תמיד לפני 10 (3 שקוף שומר על הקופה כנמוכה יותר)
-    const threeCard = validCards.find(c => c.slice(0,-1) === '3');
-    if (threeCard && !isPileEmpty) {
-        // 3 תמיד עדיף על 10 כשאין קלף רגיל — שחק כל ה-3ים
-        return _ret('3');
+    const best = scored[0];
+    if (!best) return null;
+
+    // 10: always play only one
+    if (best.rank === '10') {
+        const ten = validCards.find(c => c.slice(0,-1) === '10');
+        return ['10', [ten]];
     }
 
-    // 4. קלפי כוח בלבד (2, 10)
-    if (powers.length > 0) {
-        const ten = powers.find(c => c.slice(0,-1) === '10');
-        if (ten) return ['10', [ten]]; // תמיד רק 10 אחד
-        const two = powers.find(c => c.slice(0,-1) === '2');
-        if (two) return _ret('2');
-        return _ret(powers[0].slice(0,-1));
-    }
-
-    return null;
+    return _ret(best.rank);
 }
 
 
@@ -2336,18 +2452,27 @@ function aiMove() {
         }
     } else {
         // faceDown phase
+        // Strategy 7: if pile is empty, play faceDown now — highest chance of success
+        // If pile is NOT empty, still must play faceDown (no choice)
         const idx = p.faceDown.findIndex(c => c);
         if (idx !== -1) {
+            // If pile not empty and we expect a risky flip, consider pile size:
+            // Flip faceDown — no info, but on empty pile it always "works" (no pile to take)
             const c = p.faceDown[idx];
             p.faceDown[idx] = null;
             if (canPlay(c)) {
                 toPlay = [c];
             } else {
-                log(H(`${p.name} הפך כסוי - לוקח`,`${p.name} flipped face-down — takes pile`));
-                p.hand.push(c, ...pile);
-                pile = [];
-                nextTurn();
-                return;
+                if (pile.length === 0) {
+                    // Pile is empty — card doesn't matter, just play it
+                    toPlay = [c];
+                } else {
+                    log(H(`${p.name} הפך כסוי - לוקח`,`${p.name} flipped face-down — takes pile`));
+                    p.hand.push(c, ...pile);
+                    pile = [];
+                    nextTurn();
+                    return;
+                }
             }
         }
     }
