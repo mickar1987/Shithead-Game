@@ -350,6 +350,26 @@ process.on('unhandledRejection', (reason) => {
 // keepalive moved to after server.listen
 
 // ── Stats API ──
+app.get('/api/stats/beacon', async (req, res) => {
+    // sendBeacon-compatible endpoint (GET with query params for iOS)
+    try {
+        const { u, t, game, mode, result } = req.query;
+        if (!u || !t) return res.status(200).send('ok'); // always 200 for beacon
+        const user = await getUser(u);
+        if (!user || user.token !== t) return res.status(200).send('ok');
+        const stats = user.stats || {};
+        const g = stats[game] || {};
+        const m = g[mode] || { played:0, won:0, lost:0, abandoned:0 };
+        m.played = (m.played||0) + 1;
+        m.lost = (m.lost||0) + 1;
+        m.abandoned = (m.abandoned||0) + 1;
+        g[mode] = m; stats[game] = g;
+        await saveUser(u, { stats });
+        console.log(`[beacon] ${u} ${game}/${mode} abandon`);
+        res.status(200).send('ok');
+    } catch(e) { res.status(200).send('ok'); }
+});
+
 app.post('/api/stats/record', async (req, res) => {
     try {
         const { username, token, game, mode, result, place } = req.body;
