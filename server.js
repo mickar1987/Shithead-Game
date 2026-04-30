@@ -1914,9 +1914,34 @@ io.on('connection', (socket) => {
 
     registerBasraHandlers(socket);
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         // Handle shithead disconnect
         if (socket.data?.roomCode) handlePlayerLeave(socket.data);
+        // Record abandon for shithead vs-AI if applicable
+        const shitheadRoom = socket.data?.roomCode ? rooms[socket.data.roomCode] : null;
+        if (shitheadRoom) {
+            const isBot = shitheadRoom.slots.some(s => s.isBot);
+            const humanSlot = shitheadRoom.slots.find(s => !s.isBot && s.username);
+            if (isBot && humanSlot?.username && !shitheadRoom.gameOver) {
+                setTimeout(async () => {
+                    if (shitheadRoom.gameOver) return;
+                    try {
+                        const u = await getUser(humanSlot.username);
+                        if (u) {
+                            const stats = u.stats || {};
+                            const g = stats['shithead'] || {};
+                            const m = g['bot'] || { played:0, won:0, lost:0, abandoned:0 };
+                            m.played = (m.played||0) + 1;
+                            m.lost = (m.lost||0) + 1;
+                            m.abandoned = (m.abandoned||0) + 1;
+                            g['bot'] = m; stats['shithead'] = g;
+                            await saveUser(humanSlot.username, { stats });
+                            console.log(`[disconnect-abandon] shithead ${humanSlot.username}`);
+                        }
+                    } catch(e) {}
+                }, 30000);
+            }
+        }
 
         // Handle basra disconnect — mark slot as disconnected after grace period
         const basraCode = socket.data?.basraRoom;
@@ -1925,15 +1950,31 @@ io.on('connection', (socket) => {
             const slotIdx = socket.data.basraSlot;
             const slot = room.slots?.[slotIdx];
             if (slot && slot.socketId === socket.id) {
-                // Grace period: 15s to reconnect before marking disconnected
-                setTimeout(() => {
-                    if (slot.socketId === socket.id) {
-                        slot.connected = false;
-                        // Don't clear username — needed for reconnect
-                        // But clear socketId so duplicate check won't block reconnect
-                        slot.socketId = null;
+                // Grace period: 30s to reconnect before marking disconnected
+                setTimeout(async () => {
+                    if (slot.socketId !== socket.id) return; // reconnected
+                    slot.connected = false;
+                    slot.socketId = null;
+                    // If vs-AI game still active — record abandon server-side
+                    const isBot = room.slots.some(s => s.isBot);
+                    if (isBot && !room.gameOver && !room.roundOver && slot.username) {
+                        try {
+                            const u = await getUser(slot.username);
+                            if (u) {
+                                const stats = u.stats || {};
+                                const g = stats['basra'] || {};
+                                const m = g['bot'] || { played:0, won:0, lost:0, abandoned:0 };
+                                m.played = (m.played||0) + 1;
+                                m.lost = (m.lost||0) + 1;
+                                m.abandoned = (m.abandoned||0) + 1;
+                                g['bot'] = m; stats['basra'] = g;
+                                await saveUser(slot.username, { stats });
+                                console.log(`[disconnect-abandon] basra ${slot.username}`);
+                                room.gameOver = true; // stop the game
+                            }
+                        } catch(e) { console.error('[disconnect-abandon] basra error:', e.message); }
                     }
-                }, 15000);
+                }, 30000);
             }
         }
     });
