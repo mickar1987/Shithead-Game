@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.232</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.233</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3114,26 +3114,54 @@ function initSocket() {
     let _hiddenAt = null;
     const _MAX_AWAY_MS = 5 * 60 * 1000; // 5 minutes
 
+    function _recordAbandonBeacon() {
+        if (!authUser?.username || !authUser?.token) return;
+        // vs-AI shithead: in progress
+        if (!onlineMode && !gameOver && players.length > 0 && !window._suppressStatsRecord) {
+            const body = JSON.stringify({ username: authUser.username, token: authUser.token,
+                game: 'shithead', mode: 'bot', result: 'abandon_lose' });
+            navigator.sendBeacon('/api/stats/record', new Blob([body], {type:'application/json'}));
+            window._suppressStatsRecord = true; // don't double-record
+        }
+        // vs-AI basra: in progress
+        if (window._basraIsVsBot && !window._basraStatsRecorded) {
+            const body = JSON.stringify({ username: authUser.username, token: authUser.token,
+                game: 'basra', mode: 'bot', result: 'abandon_lose' });
+            navigator.sendBeacon('/api/stats/record', new Blob([body], {type:'application/json'}));
+            window._basraStatsRecorded = true;
+        }
+    }
+
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             _hiddenAt = Date.now();
+            _recordAbandonBeacon(); // record immediately on hide (app close / background)
         } else {
             // Returning to app
             const awayMs = _hiddenAt ? Date.now() - _hiddenAt : 0;
             _hiddenAt = null;
 
             if (awayMs > _MAX_AWAY_MS) {
-                // Too long away — exit gracefully
+                // Too long away — exit gracefully (beacon already recorded abandon)
                 // vs-AI shithead
                 if (!onlineMode && !gameOver && players.length > 0 && pile !== undefined) {
-                    window._suppressStatsRecord = false;
+                    window._suppressStatsRecord = true; // beacon already sent
                     leaveToMenu();
                     return;
                 }
                 // vs-AI basra
                 if (window._basraIsVsBot && basraRoomCode) {
+                    window._basraStatsRecorded = true; // beacon already sent
                     basraLeave();
                     return;
+                }
+            } else if (awayMs > 0) {
+                // Returned quickly — undo beacon's suppress flags so normal end can record
+                // (beacon might not have been processed if returned too fast)
+                // Actually beacon is fire-and-forget, so just un-suppress for shithead
+                // Basra server handles stats server-side anyway
+                if (!onlineMode && !gameOver && window._suppressStatsRecord) {
+                    window._suppressStatsRecord = false;
                 }
             }
 
