@@ -2542,6 +2542,7 @@ function checkWin(idx) {
 function showResults() {
     gameOver = true;
     localStorage.removeItem('_activeGame'); // normal end — clear flag
+    localStorage.removeItem('_pendingBeacon');
     const last = players.find(p => !p.finished);
     if (last) winnersOrder.push(last.id);
     // Stop VS AI ping — game over
@@ -4891,7 +4892,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const ag = JSON.parse(_ag);
             localStorage.removeItem('_activeGame'); // clear immediately
             const age = Date.now() - (ag.ts || 0);
-            if (ag.username && ag.token && age < 86400000) {
+            if (ag.cleanExit) { /* clean exit — no abandon */ }
+            else if (ag.username && ag.token && age < 86400000) {
                 const u = encodeURIComponent(ag.username);
                 const t = encodeURIComponent(ag.token);
                 let _result = 'abandon_lose';
@@ -4982,7 +4984,7 @@ function refreshBasraPublicRooms() {
     socket.emit('basraGetPublicRooms');
 }
 function basraLeave() {
-    localStorage.removeItem('_activeGame'); // clean exit
+    try { const _ag2=localStorage.getItem('_activeGame'); if(_ag2){const _o=JSON.parse(_ag2);_o.cleanExit=true;localStorage.setItem('_activeGame',JSON.stringify(_o));} } catch(e){}
     // Record abandon+lose for vs-bot games if mid-game
     // Stats already recorded in basraGameOver — nothing to do here
     window._basraStatsRecorded = false;
@@ -5832,7 +5834,7 @@ function leaveLobby() {
 }
 
 function leaveToMenu() {
-    localStorage.removeItem('_activeGame'); // clean exit — no abandon to record
+    try { const _ag2=localStorage.getItem('_activeGame'); if(_ag2){const _o=JSON.parse(_ag2);_o.cleanExit=true;localStorage.setItem('_activeGame',JSON.stringify(_o));} } catch(e){}
     // If mid-game vs AI — show results with abandon place
     if (!gameOver && players && players.some(p => p.isAI)) {
         // Human leaving = last available place (all unfinished AIs finish before human)
