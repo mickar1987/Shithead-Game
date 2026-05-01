@@ -589,7 +589,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.238</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.238log</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2511,11 +2511,14 @@ function checkWin(idx) {
                 const _ag = localStorage.getItem('_activeGame');
                 if (_ag) {
                     const ag = JSON.parse(_ag);
-                    ag.place = winnersOrder.length; // human finished at this place
+                    ag.place = winnersOrder.length;
                     ag.totalPlayers = players.length;
                     localStorage.setItem('_activeGame', JSON.stringify(ag));
+                    showToast(`[DEBUG] saved place=${ag.place}/${ag.totalPlayers}`, 4000);
+                } else {
+                    showToast('[DEBUG] _activeGame not found in localStorage!', 4000);
                 }
-            } catch(e) {}
+            } catch(e) { showToast('[DEBUG] error: '+e.message, 4000); }
         }
         if (winnersOrder.length >= players.length - 1) {
             gameOver = true; // stop all further moves immediately
