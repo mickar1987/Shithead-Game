@@ -245,11 +245,15 @@ app.post('/api/verify', async (req, res) => {
 // Ping endpoint — keeps user marked as online (used by VS AI local games)
 app.post('/api/ping', async (req, res) => {
     try {
-        const { username, token } = req.body;
+        const { username, token, place, totalPlayers, game } = req.body;
         const name = username?.trim().toLowerCase();
         const u = await getUser(name);
         if (!u || u.token !== token) return res.json({ ok: false });
         activePings[name] = Date.now();
+        // Save current game position for abandon detection
+        if (place !== undefined) {
+            activePings[name + '_place'] = { place, totalPlayers: totalPlayers||0, game: game||'shithead', ts: Date.now() };
+        }
         res.json({ ok: true });
     } catch(e) { res.json({ ok: false }); }
 });
@@ -257,11 +261,22 @@ app.post('/api/ping', async (req, res) => {
 // Ping-stop — explicitly mark user as offline
 app.post('/api/ping-stop', async (req, res) => {
     try {
-        const { username, token } = req.body;
+        const { username, token, result } = req.body;
         const name = username?.trim().toLowerCase();
         const u = await getUser(name);
         if (!u || u.token !== token) return res.json({ ok: false });
+        // If clean exit (result provided) with a place — record it
+        if (result && result !== 'abandon') {
+            const placeInfo = activePings[name + '_place'];
+            if (placeInfo && placeInfo.place) {
+                const stats = u.stats || {};
+                const g = stats[placeInfo.game] || {};
+                const m = g['bot'] || { played:0, won:0, lost:0, abandoned:0 };
+                // Already recorded by showResults — skip
+            }
+        }
         delete activePings[name];
+        delete activePings[name + '_place'];
         res.json({ ok: true });
     } catch(e) { res.json({ ok: false }); }
 });
@@ -352,29 +367,41 @@ process.on('unhandledRejection', (reason) => {
 // ── Stats API ──
 app.get('/api/stats/beacon', async (req, res) => {
     try {
-        const { u, t, game, mode, result, place, total } = req.query;
+        let { u, t, game, mode, result, place, total } = req.query;
         if (!u || !t) return res.status(200).send('ok');
         const user = await getUser(u);
         if (!user || user.token !== t) return res.status(200).send('ok');
-        const stats = user.stats || {};
-        const g = stats[game] || {};
-        const m = g[mode] || { played:0, won:0, lost:0, abandoned:0 };
-        m.played = (m.played||0) + 1;
+        // Use server-side place if available (more reliable than client)
+        const serverPlace = activePings[u + '_place'];
+        if (serverPlace && !place) {
+            place = serverPlace.place;
+            total = serverPlace.totalPlayers;
+            game = serverPlace.game || game;
+        }
         const placeNum = parseInt(place) || 0;
         const totalNum = parseInt(total) || 0;
+        // Determine result from place if not provided
+        if (placeNum > 0 && totalNum > 0) {
+            if (placeNum === 1) result = 'win';
+            else if (placeNum < totalNum) result = 'abandon_mid';
+            else result = 'abandon_lose';
+        }
+        const stats = user.stats || {};
+        const g = stats[game] || {};
+        const m = g[mode || 'bot'] || { played:0, won:0, lost:0, abandoned:0 };
+        m.played = (m.played||0) + 1;
         if (result === 'win') {
             m.won = (m.won||0) + 1;
         } else if (result === 'abandon_mid') {
-            // Finished at a middle position (not last) — count as win for that place
             m.won = (m.won||0) + 1;
             m.abandoned = (m.abandoned||0) + 1;
         } else {
-            // abandon_lose — still playing when closed = last place
             m.lost = (m.lost||0) + 1;
             m.abandoned = (m.abandoned||0) + 1;
         }
-        g[mode] = m; stats[game] = g;
+        g[mode || 'bot'] = m; stats[game] = g;
         await saveUser(u, { stats });
+        delete activePings[u + '_place']; // clear after recording
         console.log(`[beacon] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum}`);
         res.status(200).send('ok');
     } catch(e) { res.status(200).send('ok'); }
