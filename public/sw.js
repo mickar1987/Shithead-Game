@@ -1,5 +1,5 @@
-const CACHE = 'basrhead-v2';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const CACHE = 'basrhead-v3';
+const ASSETS = ['/manifest.json'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -15,10 +15,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const url = e.request.url;
-    // Never intercept API calls or socket.io
     if (url.includes('/api/') || url.includes('socket.io')) return;
+    // Always network-first for HTML — never serve stale index.html
+    if (url.endsWith('/') || url.includes('index.html') || !url.includes('.')) {
+        e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+        return;
+    }
     // Network first for everything else
-    e.respondWith(
-        fetch(e.request).catch(() => caches.match(e.request))
-    );
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
