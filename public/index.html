@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.244</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.245</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1347,22 +1347,14 @@ function startGame(count) {
             _doPing();
         }, 60000);
     }
-    // Mark active game in localStorage for abandon detection
+    // Save active game state to localStorage — place=count means "last" until proven otherwise
     localStorage.setItem('_activeGame', JSON.stringify({
         game: 'shithead', mode: 'bot',
         username: authUser?.username || null,
         token: authUser?.token || null,
+        place: count, totalPlayers: count,
         ts: Date.now()
     }));
-    // Tell server: game started with N players, human is last by default
-    if (authUser?.username && authUser?.token) {
-        fetch('/api/ping', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({
-                username: authUser.username, token: authUser.token,
-                place: count, totalPlayers: count, game: 'shithead'
-            })
-        }).catch(()=>{});
-    }
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('actionButtons').classList.remove('hidden');
     document.getElementById('gameTopBar').style.display = 'flex';
@@ -2521,23 +2513,12 @@ function checkWin(idx) {
             fastMode = true;
             // Update position in localStorage
             try {
-                // Update server with actual finishing place
-                if (authUser?.username && authUser?.token) {
-                    fetch('/api/ping', { method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({
-                            username: authUser.username, token: authUser.token,
-                            place: winnersOrder.length, totalPlayers: players.length,
-                            game: 'shithead'
-                        })
-                    }).catch(()=>{});
-                }
-                // Also save locally as backup
+                // Update localStorage with actual place
                 try {
-                    const _placeData = { game:'shithead', mode:'bot',
-                        username: authUser?.username||null, token: authUser?.token||null,
-                        place: winnersOrder.length, totalPlayers: players.length,
-                        ts: Date.now(), recorded: false };
-                    localStorage.setItem('_pendingPlace', JSON.stringify(_placeData));
+                    const _ag = JSON.parse(localStorage.getItem('_activeGame') || '{}');
+                    _ag.place = winnersOrder.length;
+                    _ag.totalPlayers = players.length;
+                    localStorage.setItem('_activeGame', JSON.stringify(_ag));
                 } catch(e) {}
             } catch(e) { showToast('[DEBUG] error: '+e.message, 4000); }
         }
@@ -4916,43 +4897,27 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(e) {}
     // Check for abandoned game from previous session
     try {
-        // Check _activeGame, fallback to _lastPlace
-        let _ag = localStorage.getItem('_activeGame');
-        if (!_ag) {
-            const _lp = localStorage.getItem('_lastPlace');
-            if (_lp) {
-                const _lpObj = JSON.parse(_lp);
-                if (!_lpObj.cleanExit && !_lpObj.recorded && Date.now() - (_lpObj.ts||0) < 3600000)
-                    _ag = _lp;
-            }
-        }
+        const _ag = localStorage.getItem('_activeGame');
         if (_ag) {
             const ag = JSON.parse(_ag);
-            localStorage.removeItem('_activeGame'); // clear immediately
-            // Mark _lastPlace as recorded
-            try { const _lp=JSON.parse(localStorage.getItem('_lastPlace')||'{}'); _lp.recorded=true; localStorage.setItem('_lastPlace',JSON.stringify(_lp)); } catch(e){}
-            const age = Date.now() - (ag.ts || 0);
-            if (ag.cleanExit) { /* clean exit — no abandon */ }
-            else if (ag.username && ag.token && age < 86400000) {
+            localStorage.removeItem('_activeGame');
+            // Only record if not a clean exit, has credentials, and is recent
+            if (!ag.cleanExit && ag.username && ag.token && (Date.now() - (ag.ts||0)) < 86400000) {
                 const u = encodeURIComponent(ag.username);
                 const t = encodeURIComponent(ag.token);
+                // Determine result from place
                 let _result = 'abandon_lose';
                 if (ag.place && ag.totalPlayers) {
                     if (ag.place === 1) _result = 'win';
                     else if (ag.place < ag.totalPlayers) _result = 'abandon_mid';
+                    // place === totalPlayers = last = abandon_lose
                 }
-                const _url = `/api/stats/beacon?u=${u}&t=${t}&game=${ag.game}&mode=${ag.mode}&result=${_result}&place=${ag.place||0}&total=${ag.totalPlayers||0}`;
-                // Save pending beacon — will retry until success
+                const _url = `/api/stats/beacon?u=${u}&t=${t}&game=${ag.game||'shithead'}&mode=${ag.mode||'bot'}&result=${_result}&place=${ag.place||0}&total=${ag.totalPlayers||0}`;
                 localStorage.setItem('_pendingBeacon', _url);
                 const _tryBeacon = (attempt) => {
                     fetch(_url)
-                        .then(r => {
-                            if (r.ok) localStorage.removeItem('_pendingBeacon'); // success
-                            else throw new Error('status ' + r.status);
-                        })
-                        .catch(() => {
-                            if (attempt < 8) setTimeout(() => _tryBeacon(attempt + 1), Math.min(2000 * attempt, 10000));
-                        });
+                        .then(r => { if (r.ok) localStorage.removeItem('_pendingBeacon'); else throw 0; })
+                        .catch(() => { if (attempt < 6) setTimeout(() => _tryBeacon(attempt+1), 2000*attempt+1000); });
                 };
                 setTimeout(() => _tryBeacon(1), 1000);
             }
