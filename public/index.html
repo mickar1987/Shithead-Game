@@ -601,7 +601,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.238log8</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.238log9</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4880,14 +4880,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const _ag = localStorage.getItem('_activeGame');
         if (_ag) {
             const ag = JSON.parse(_ag);
-            alert('[STARTUP] Found _activeGame: ' + _ag); // DEBUG
             localStorage.removeItem('_activeGame'); // clear immediately
             const age = Date.now() - (ag.ts || 0);
             if (ag.username && ag.token && age < 86400000) {
                 const u = encodeURIComponent(ag.username);
                 const t = encodeURIComponent(ag.token);
-                fetch(`/api/stats/beacon?u=${u}&t=${t}&game=${ag.game}&mode=${ag.mode}&result=abandon_lose`)
-                    .catch(() => {});
+                let _result = 'abandon_lose';
+                if (ag.place && ag.totalPlayers) {
+                    if (ag.place === 1) _result = 'win';
+                    else if (ag.place < ag.totalPlayers) _result = 'abandon_mid';
+                }
+                const _url = `/api/stats/beacon?u=${u}&t=${t}&game=${ag.game}&mode=${ag.mode}&result=${_result}&place=${ag.place||0}&total=${ag.totalPlayers||0}`;
+                // Try multiple methods with retries for iOS PWA
+                const _tryFetch = (attempt) => {
+                    fetch(_url)
+                        .then(r => { if (!r.ok) throw new Error('status ' + r.status); })
+                        .catch(() => {
+                            if (attempt < 4) setTimeout(() => _tryFetch(attempt + 1), 2000 * attempt);
+                        });
+                };
+                setTimeout(() => _tryFetch(1), 500);
             }
         }
     } catch(e) {}
