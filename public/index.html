@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.241</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.242</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2513,15 +2513,24 @@ function checkWin(idx) {
             fastMode = true;
             // Update position in localStorage
             try {
-                // Save place in multiple locations as backup
+                // Save place to dedicated key - independent of _activeGame lifecycle
                 const _placeData = {
                     game:'shithead', mode:'bot',
                     username: authUser?.username||null, token: authUser?.token||null,
                     place: winnersOrder.length, totalPlayers: players.length,
-                    ts: Date.now()
+                    ts: Date.now(), recorded: false
                 };
-                localStorage.setItem('_activeGame', JSON.stringify(_placeData));
-                localStorage.setItem('_lastPlace', JSON.stringify(_placeData)); // permanent backup
+                localStorage.setItem('_pendingPlace', JSON.stringify(_placeData));
+                // Also update _activeGame if it exists
+                try {
+                    const _ag = localStorage.getItem('_activeGame');
+                    if (_ag) {
+                        const ag = JSON.parse(_ag);
+                        ag.place = winnersOrder.length;
+                        ag.totalPlayers = players.length;
+                        localStorage.setItem('_activeGame', JSON.stringify(ag));
+                    }
+                } catch(e) {}
             } catch(e) { showToast('[DEBUG] error: '+e.message, 4000); }
         }
         if (winnersOrder.length >= players.length - 1) {
@@ -2535,6 +2544,7 @@ function showResults() {
     gameOver = true;
     localStorage.removeItem('_activeGame'); // normal end — clear flag
     localStorage.removeItem('_pendingBeacon');
+    localStorage.removeItem('_pendingPlace'); // clear place — will be recorded via showResults stats
     const last = players.find(p => !p.finished);
     if (last) winnersOrder.push(last.id);
     // Stop VS AI ping — game over
@@ -4875,6 +4885,25 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 fetch(_pb).then(r => { if (r.ok) localStorage.removeItem('_pendingBeacon'); }).catch(()=>{});
             }, 2000);
+        }
+    } catch(e) {}
+    // Check for pending place record (player finished then closed app)
+    try {
+        const _pp = localStorage.getItem('_pendingPlace');
+        if (_pp) {
+            const pp = JSON.parse(_pp);
+            if (!pp.recorded && pp.username && pp.token && Date.now() - (pp.ts||0) < 86400000) {
+                pp.recorded = true;
+                localStorage.setItem('_pendingPlace', JSON.stringify(pp));
+                const u = encodeURIComponent(pp.username);
+                const t = encodeURIComponent(pp.token);
+                const result = pp.place === 1 ? 'win' : pp.place < pp.totalPlayers ? 'abandon_mid' : 'abandon_lose';
+                setTimeout(() => {
+                    fetch(`/api/stats/beacon?u=${u}&t=${t}&game=${pp.game}&mode=${pp.mode}&result=${result}&place=${pp.place}&total=${pp.totalPlayers}`)
+                        .then(r => { if (r.ok) localStorage.removeItem('_pendingPlace'); })
+                        .catch(() => { pp.recorded = false; localStorage.setItem('_pendingPlace', JSON.stringify(pp)); });
+                }, 1500);
+            }
         }
     } catch(e) {}
     // Check for abandoned game from previous session
