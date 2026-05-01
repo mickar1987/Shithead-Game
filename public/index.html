@@ -4875,6 +4875,15 @@ let selectedBasraWinScore = 120;
 // Init default selections visually
 document.addEventListener('DOMContentLoaded', () => {
     applyLang();
+    // Retry any pending beacon from previous failed attempt
+    try {
+        const _pb = localStorage.getItem('_pendingBeacon');
+        if (_pb) {
+            setTimeout(() => {
+                fetch(_pb).then(r => { if (r.ok) localStorage.removeItem('_pendingBeacon'); }).catch(()=>{});
+            }, 2000);
+        }
+    } catch(e) {}
     // Check for abandoned game from previous session
     try {
         const _ag = localStorage.getItem('_activeGame');
@@ -4891,15 +4900,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (ag.place < ag.totalPlayers) _result = 'abandon_mid';
                 }
                 const _url = `/api/stats/beacon?u=${u}&t=${t}&game=${ag.game}&mode=${ag.mode}&result=${_result}&place=${ag.place||0}&total=${ag.totalPlayers||0}`;
-                // Try multiple methods with retries for iOS PWA
-                const _tryFetch = (attempt) => {
+                // Save pending beacon — will retry until success
+                localStorage.setItem('_pendingBeacon', _url);
+                const _tryBeacon = (attempt) => {
                     fetch(_url)
-                        .then(r => { if (!r.ok) throw new Error('status ' + r.status); })
+                        .then(r => {
+                            if (r.ok) localStorage.removeItem('_pendingBeacon'); // success
+                            else throw new Error('status ' + r.status);
+                        })
                         .catch(() => {
-                            if (attempt < 4) setTimeout(() => _tryFetch(attempt + 1), 2000 * attempt);
+                            if (attempt < 8) setTimeout(() => _tryBeacon(attempt + 1), Math.min(2000 * attempt, 10000));
                         });
                 };
-                setTimeout(() => _tryFetch(1), 500);
+                setTimeout(() => _tryBeacon(1), 1000);
             }
         }
     } catch(e) {}
