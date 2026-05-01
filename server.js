@@ -253,6 +253,7 @@ app.post('/api/ping', async (req, res) => {
         // Save current game position for abandon detection
         if (place !== undefined) {
             activePings[name + '_place'] = { place, totalPlayers: totalPlayers||0, game: game||'shithead', ts: Date.now() };
+            console.log(`[ping-place] ${name} place=${place}/${totalPlayers} game=${game}`);
         }
         res.json({ ok: true });
     } catch(e) { res.json({ ok: false }); }
@@ -402,7 +403,7 @@ app.get('/api/stats/beacon', async (req, res) => {
         g[mode || 'bot'] = m; stats[game] = g;
         await saveUser(u, { stats });
         delete activePings[u + '_place']; // clear after recording
-        console.log(`[beacon] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum}`);
+        console.log(`[beacon] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum} serverPlace=${JSON.stringify(serverPlace||null)}`);
         res.status(200).send('ok');
     } catch(e) { res.status(200).send('ok'); }
 });
