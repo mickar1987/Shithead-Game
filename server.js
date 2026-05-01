@@ -351,21 +351,31 @@ process.on('unhandledRejection', (reason) => {
 
 // ── Stats API ──
 app.get('/api/stats/beacon', async (req, res) => {
-    // sendBeacon-compatible endpoint (GET with query params for iOS)
     try {
-        const { u, t, game, mode, result } = req.query;
-        if (!u || !t) return res.status(200).send('ok'); // always 200 for beacon
+        const { u, t, game, mode, result, place, total } = req.query;
+        if (!u || !t) return res.status(200).send('ok');
         const user = await getUser(u);
         if (!user || user.token !== t) return res.status(200).send('ok');
         const stats = user.stats || {};
         const g = stats[game] || {};
         const m = g[mode] || { played:0, won:0, lost:0, abandoned:0 };
         m.played = (m.played||0) + 1;
-        m.lost = (m.lost||0) + 1;
-        m.abandoned = (m.abandoned||0) + 1;
+        const placeNum = parseInt(place) || 0;
+        const totalNum = parseInt(total) || 0;
+        if (result === 'win') {
+            m.won = (m.won||0) + 1;
+        } else if (result === 'abandon_mid') {
+            // Finished at a middle position (not last) — count as win for that place
+            m.won = (m.won||0) + 1;
+            m.abandoned = (m.abandoned||0) + 1;
+        } else {
+            // abandon_lose — still playing when closed = last place
+            m.lost = (m.lost||0) + 1;
+            m.abandoned = (m.abandoned||0) + 1;
+        }
         g[mode] = m; stats[game] = g;
         await saveUser(u, { stats });
-        console.log(`[beacon] ${u} ${game}/${mode} abandon`);
+        console.log(`[beacon] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum}`);
         res.status(200).send('ok');
     } catch(e) { res.status(200).send('ok'); }
 });
