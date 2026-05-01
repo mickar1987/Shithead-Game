@@ -586,11 +586,11 @@
         <div style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-bottom:2px;"><span id="lbl_chooseGame">Choose Game</span></div>
         <button onclick="showMenu('menuShithead')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_shithead">Shithead</button>
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
-        <button onclick="alert('localStorage: ' + (localStorage.getItem('_activeGame') || 'EMPTY'))" style="background:rgba(255,0,0,0.4);border:1px solid red;color:#fff;padding:6px;font-size:11px;cursor:pointer;border-radius:6px;margin-top:2px;">🔍 DEBUG</button>
+        <button onclick="alert('localStorage: ' + (localStorage.getItem('_activeGame') || 'EMPTY') + '\nauth: ' + (typeof authUser !== 'undefined' ? JSON.stringify({u:authUser?.username,t:authUser?.token?'yes':'no'}) : 'undefined'))" style="background:rgba(255,0,0,0.4);border:1px solid red;color:#fff;padding:6px;font-size:11px;cursor:pointer;border-radius:6px;margin-top:2px;">🔍 DEBUG</button>
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.238log5</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.238log6</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1344,13 +1344,13 @@ function startGame(count) {
         }, 60000);
     }
     // Mark active game in localStorage for abandon detection
-    if (authUser?.username && authUser?.token) {
-        localStorage.setItem('_activeGame', JSON.stringify({
-            game: 'shithead', mode: 'bot',
-            username: authUser.username, token: authUser.token,
-            ts: Date.now()
-        }));
-    }
+    // Save regardless of auth — will skip recording if no credentials later
+    localStorage.setItem('_activeGame', JSON.stringify({
+        game: 'shithead', mode: 'bot',
+        username: authUser?.username || null,
+        token: authUser?.token || null,
+        ts: Date.now()
+    }));
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('actionButtons').classList.remove('hidden');
     document.getElementById('gameTopBar').style.display = 'flex';
@@ -6092,13 +6092,12 @@ function startBasraVsAI() {
     if (!socket) initSocket();
     window._basraStatsRecorded = false;
     window._basraIsVsBot = true;
-    if (authUser?.username && authUser?.token) {
-        localStorage.setItem('_activeGame', JSON.stringify({
-            game: 'basra', mode: 'bot',
-            username: authUser.username, token: authUser.token,
-            ts: Date.now()
-        }));
-    }
+    localStorage.setItem('_activeGame', JSON.stringify({
+        game: 'basra', mode: 'bot',
+        username: authUser?.username || null,
+        token: authUser?.token || null,
+        ts: Date.now()
+    }));
     const name = authUser?.username || localStorage.getItem('guestName') || 'שחקן';
     socket.emit('basraCreateVsAI', {
         name,
