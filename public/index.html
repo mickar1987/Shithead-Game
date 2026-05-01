@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.242</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.243</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2513,23 +2513,23 @@ function checkWin(idx) {
             fastMode = true;
             // Update position in localStorage
             try {
-                // Save place to dedicated key - independent of _activeGame lifecycle
-                const _placeData = {
-                    game:'shithead', mode:'bot',
-                    username: authUser?.username||null, token: authUser?.token||null,
-                    place: winnersOrder.length, totalPlayers: players.length,
-                    ts: Date.now(), recorded: false
-                };
-                localStorage.setItem('_pendingPlace', JSON.stringify(_placeData));
-                // Also update _activeGame if it exists
+                // Send place to server via ping — server-side storage is reliable
+                if (authUser?.username && authUser?.token) {
+                    fetch('/api/ping', { method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({
+                            username: authUser.username, token: authUser.token,
+                            place: winnersOrder.length, totalPlayers: players.length,
+                            game: 'shithead'
+                        })
+                    }).catch(()=>{});
+                }
+                // Also save locally as backup
                 try {
-                    const _ag = localStorage.getItem('_activeGame');
-                    if (_ag) {
-                        const ag = JSON.parse(_ag);
-                        ag.place = winnersOrder.length;
-                        ag.totalPlayers = players.length;
-                        localStorage.setItem('_activeGame', JSON.stringify(ag));
-                    }
+                    const _placeData = { game:'shithead', mode:'bot',
+                        username: authUser?.username||null, token: authUser?.token||null,
+                        place: winnersOrder.length, totalPlayers: players.length,
+                        ts: Date.now(), recorded: false };
+                    localStorage.setItem('_pendingPlace', JSON.stringify(_placeData));
                 } catch(e) {}
             } catch(e) { showToast('[DEBUG] error: '+e.message, 4000); }
         }
