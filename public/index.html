@@ -591,17 +591,10 @@
             // Also manually set a test flag to prove localStorage works
             localStorage.setItem('_test', 'works');
             const test = localStorage.getItem('_test');
-            alert('_activeGame: ' + (ag || 'EMPTY') + 
-                  '\n_test: ' + test +
-                  '\nauth: ' + JSON.stringify({u:authUser?.username,t:authUser?.token?'yes':'no'}) +
-                  '\nonlineMode: ' + (typeof onlineMode !== 'undefined' ? onlineMode : 'undef') +
-                  '\ngameOver: ' + (typeof gameOver !== 'undefined' ? gameOver : 'undef') +
-                  '\nplayers: ' + (typeof players !== 'undefined' ? players.length : 'undef'));
-        " style="background:rgba(255,0,0,0.4);border:1px solid red;color:#fff;padding:6px;font-size:11px;cursor:pointer;border-radius:6px;margin-top:2px;">🔍 DEBUG</button>
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.238log9</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.241</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2520,16 +2513,15 @@ function checkWin(idx) {
             fastMode = true;
             // Update position in localStorage
             try {
-                const _ag = localStorage.getItem('_activeGame');
-                if (_ag) {
-                    const ag = JSON.parse(_ag);
-                    ag.place = winnersOrder.length;
-                    ag.totalPlayers = players.length;
-                    localStorage.setItem('_activeGame', JSON.stringify(ag));
-                    showToast(`[DEBUG] saved place=${ag.place}/${ag.totalPlayers}`, 4000);
-                } else {
-                    showToast('[DEBUG] _activeGame not found in localStorage!', 4000);
-                }
+                // Save place in multiple locations as backup
+                const _placeData = {
+                    game:'shithead', mode:'bot',
+                    username: authUser?.username||null, token: authUser?.token||null,
+                    place: winnersOrder.length, totalPlayers: players.length,
+                    ts: Date.now()
+                };
+                localStorage.setItem('_activeGame', JSON.stringify(_placeData));
+                localStorage.setItem('_lastPlace', JSON.stringify(_placeData)); // permanent backup
             } catch(e) { showToast('[DEBUG] error: '+e.message, 4000); }
         }
         if (winnersOrder.length >= players.length - 1) {
@@ -4887,10 +4879,21 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(e) {}
     // Check for abandoned game from previous session
     try {
-        const _ag = localStorage.getItem('_activeGame');
+        // Check _activeGame, fallback to _lastPlace
+        let _ag = localStorage.getItem('_activeGame');
+        if (!_ag) {
+            const _lp = localStorage.getItem('_lastPlace');
+            if (_lp) {
+                const _lpObj = JSON.parse(_lp);
+                if (!_lpObj.cleanExit && !_lpObj.recorded && Date.now() - (_lpObj.ts||0) < 3600000)
+                    _ag = _lp;
+            }
+        }
         if (_ag) {
             const ag = JSON.parse(_ag);
             localStorage.removeItem('_activeGame'); // clear immediately
+            // Mark _lastPlace as recorded
+            try { const _lp=JSON.parse(localStorage.getItem('_lastPlace')||'{}'); _lp.recorded=true; localStorage.setItem('_lastPlace',JSON.stringify(_lp)); } catch(e){}
             const age = Date.now() - (ag.ts || 0);
             if (ag.cleanExit) { /* clean exit — no abandon */ }
             else if (ag.username && ag.token && age < 86400000) {
