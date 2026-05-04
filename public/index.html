@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.250</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.251</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2511,16 +2511,20 @@ function checkWin(idx) {
         showToast(H(`🏁 ${_pFinName} סיים!`,`🏁 ${_pFinName} finished!`));
         if (idx === 0) {
             fastMode = true;
-            // Update position in localStorage
-            try {
-                // Update localStorage with actual place
-                try {
-                    const _ag = JSON.parse(localStorage.getItem('_activeGame') || '{}');
-                    _ag.place = winnersOrder.length;
-                    _ag.totalPlayers = players.length;
-                    localStorage.setItem('_activeGame', JSON.stringify(_ag));
-                } catch(e) {}
-            } catch(e) { showToast('[DEBUG] error: '+e.message, 4000); }
+            // Save place directly to server — most reliable method
+            if (authUser?.username && authUser?.token) {
+                fetch('/api/stats/save-place', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: authUser.username,
+                        token: authUser.token,
+                        place: winnersOrder.length,
+                        totalPlayers: players.length,
+                        game: 'shithead'
+                    })
+                }).catch(() => {});
+            }
         }
         if (winnersOrder.length >= players.length - 1) {
             gameOver = true; // stop all further moves immediately
