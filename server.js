@@ -158,8 +158,7 @@ async function saveUser(username, data) {
     if (usersCol && mongoOk) {
         try {
             const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
-            console.log(`[saveUser] MongoDB ok: ${username} matched=${result.matchedCount} modified=${result.modifiedCount}`);
-                } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error:', e.message); }
+                    } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error:', e.message); }
     }
 }
 
@@ -392,8 +391,7 @@ app.get('/api/stats/beacon', async (req, res) => {
         let { u, t, game, mode, result, place, total } = req.query;
         if (!u || !t) return res.status(200).send('ok');
         const user = await getUser(u);
-        if (!user) { console.log(`[beacon] user not found: ${u}`); return res.status(200).send('ok'); }
-        if (user.token !== t) { console.log(`[beacon] token mismatch: stored=${user.token?.slice(0,8)} got=${t?.slice(0,8)}`); return res.status(200).send('ok'); }
+        if (!user || user.token !== t) return res.status(200).send('ok');
         // Use server-side place if available (more reliable than client)
         const serverPlace = activePings[u + '_place'];
         if (serverPlace && !place) {
@@ -425,7 +423,7 @@ app.get('/api/stats/beacon', async (req, res) => {
         g[mode || 'bot'] = m; stats[game] = g;
         await saveUser(u, { stats });
         delete activePings[u + '_place'];
-        console.log(`[beacon-saved] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum} stats=${JSON.stringify(m)}`);
+        console.log(`[beacon] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum}`);
         res.status(200).send('ok');
     } catch(e) { res.status(200).send('ok'); }
 });
@@ -479,7 +477,7 @@ app.get('/api/stats/user', async (req, res) => {
         if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
         const user = await getUser(u);
         if (!user) return res.json({ ok: false, error: 'user not found' });
-        console.log(`[stats/user] ${u} stats=${JSON.stringify(user.stats)} keys=${Object.keys(user).join(',')}`);
+
         res.json({ ok: true, stats: user.stats || {}, username: u });
     } catch(e) { res.json({ ok: false, error: e.message }); }
 });
