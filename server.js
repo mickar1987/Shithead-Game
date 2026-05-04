@@ -479,6 +479,7 @@ app.get('/api/stats/user', async (req, res) => {
         if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
         const user = await getUser(u);
         if (!user) return res.json({ ok: false, error: 'user not found' });
+        console.log(`[stats/user] ${u} stats=${JSON.stringify(user.stats)} keys=${Object.keys(user).join(',')}`);
         res.json({ ok: true, stats: user.stats || {}, username: u });
     } catch(e) { res.json({ ok: false, error: e.message }); }
 });
