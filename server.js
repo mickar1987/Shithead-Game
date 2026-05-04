@@ -158,7 +158,8 @@ async function saveUser(username, data) {
     if (usersCol && mongoOk) {
         try {
             const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
-                } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error, using memory fallback'); }
+            console.log(`[saveUser] MongoDB ok: ${username} matched=${result.matchedCount} modified=${result.modifiedCount}`);
+                } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error:', e.message); }
     }
 }
 
