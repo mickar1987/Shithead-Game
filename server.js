@@ -435,6 +435,11 @@ app.get('/api/stats/beacon', async (req, res) => {
         const g = stats[game] || {};
         const m = g[mode || 'bot'] || { played:0, won:0, lost:0, abandoned:0 };
         m.played = (m.played||0) + 1;
+        // Update places array
+        if (game === 'shithead' && placeNum >= 1 && placeNum <= 4) {
+            m.places = m.places || [0,0,0,0];
+            m.places[placeNum - 1] = (m.places[placeNum - 1] || 0) + 1;
+        }
         if (result === 'win') {
             m.won = (m.won||0) + 1;
         } else if (result === 'abandon_mid') {
