@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.253</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.254</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1391,17 +1391,21 @@ function startGame(count) {
         // faceUp: cards easy to play (high coverage) + hard to beat
         // 2,3 = play on anything; A,K,Q = high, hard to answer
         // 7,8 = tactical; avoid 4,5,6 — they get stuck on high piles
+        // Priority for faceUp: want strong cards that are hard to block
+        // 10=burn(always useful), 2=reset, 3=transparent, A/K/Q=high+hard to answer
+        // 8=skip(not great faceUp), 7=risky faceUp, low normals = worst
         const fuScore = r => {
-            if (r === '2')  return 90;
-            if (r === '3')  return 85;
-            if (r === 'A')  return 62;
-            if (r === 'K')  return 56;
-            if (r === 'Q')  return 50;
-            if (r === '8')  return 44;
-            if (r === '7')  return 38;
-            if (r === 'J')  return 24;
-            if (r === '9')  return 18;
-            if (r === '6')  return 8;  // low priority — blocks you from high piles
+            if (r === '10') return 95; // burn — always playable, devastating as faceUp
+            if (r === '2')  return 90; // reset — always playable
+            if (r === '3')  return 85; // transparent — always playable
+            if (r === 'A')  return 75; // highest normal — hard to beat
+            if (r === 'K')  return 70;
+            if (r === 'Q')  return 65;
+            if (r === 'J')  return 35; // mid — ok faceUp
+            if (r === '8')  return 30; // skip — ok but not great as faceUp
+            if (r === '9')  return 20;
+            if (r === '7')  return 15; // risky — forces next player low
+            if (r === '6')  return 8;
             if (r === '5')  return 5;
             if (r === '4')  return 2;
             return 12;
@@ -2200,6 +2204,48 @@ function aiPileDifficulty(rank, opponents) {
 
 // ── AI Helpers ──────────────────────────────────────
 
+// Threat level of each opponent
+function aiThreatLevel(p) {
+    if (p.finished) return 0;
+    if (p.hand.length > 0) return 0; // still has hand cards = low threat
+    const hasFaceUp = p.faceUp.some(Boolean);
+    const hasFaceDown = p.faceDown.some(Boolean);
+    const faceUpCount = p.faceUp.filter(Boolean).length;
+    const faceDownCount = p.faceDown.filter(Boolean).length;
+    if (hasFaceUp) return 1;   // faceUp phase = medium threat
+    if (hasFaceDown) {
+        // Last faceDown cards = high threat
+        if (faceDownCount <= 2) return 3; // very high threat
+        return 2; // high threat
+    }
+    return 0;
+}
+
+// Max threat among all opponents
+function aiMaxThreat() {
+    let max = 0;
+    for (let i = 1; i < players.length; i++) {
+        if (!players[i].finished) max = Math.max(max, aiThreatLevel(players[i]));
+    }
+    return max;
+}
+
+// Is a card "hard to answer" (forces opponent into trouble)?
+// Hard cards: A, K, Q push pile high; 7 forces low; 3 transparent (chain)
+// NOT hard: 10 (burn = good for us but doesn't "push"), 8 (skip = good but pile resets)
+function aiIsHardCard(rank, pileTopVal) {
+    if (rank === 'A') return true;  // very hard to answer
+    if (rank === 'K') return true;
+    if (rank === 'Q') return true;
+    if (rank === '7') return true;  // forces next player to play ≤7
+    if (rank === '3') {
+        // transparent — depends on what's underneath
+        // Hard if it maintains a high pile
+        return pileTopVal >= 10;
+    }
+    return false;
+}
+
 // Simulate what value the top of pile would be after playing a card
 // (accounting for 3=transparent, 2=reset)
 function aiPileTopAfter(card, currentPile) {
@@ -2314,11 +2360,24 @@ function aiGetBestPlay(validCards, hand) {
         return _ret(validCards[0].slice(0,-1));
     }
 
+    const threat = aiMaxThreat();
+
     // 2. קלפים רגילים: הנמוך ביותר שיכול לענות
-    // אבל: לא לשחק קלף שיגרום ליריב לרוקן את כל ידו בבת אחת
+    // Under high threat: prefer "hard" cards (A/K/Q/7) to slow down opponent
     if (normals.length > 0) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-        // מצא את הנמוך שלא "מגיש מתנה" ליריב
+
+        if (threat >= 2) {
+            // High threat: prefer hard cards that opponent can't easily answer
+            const hardCards = normals.filter(c => aiIsHardCard(c.slice(0,-1), lastVal));
+            if (hardCards.length > 0) {
+                // Among hard cards: pick lowest (save highest for later)
+                hardCards.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+                return _ret(hardCards[0].slice(0,-1));
+            }
+        }
+
+        // Normal: play lowest, avoid gifting opponent
         const safe = normals.find(card => {
             const r = card.slice(0,-1);
             for (let i = 1; i < players.length; i++) {
@@ -2326,12 +2385,11 @@ function aiGetBestPlay(validCards, hand) {
                 const opp = players[i];
                 if (opp.hand.length >= 2) {
                     const allSameRank = opp.hand.every(c => c.slice(0,-1) === r);
-                    if (allSameRank && opp.hand.length <= 4) return false; // יגרום לריקון יד יריב
+                    if (allSameRank && opp.hand.length <= 4) return false;
                 }
             }
             return true;
         });
-        // אם כל הנמוכים "מגישים מתנה" — שחק את הנמוך ממילא (אין ברירה)
         const chosen = safe || normals[0];
         return _ret(chosen.slice(0,-1));
     }
@@ -2343,9 +2401,15 @@ function aiGetBestPlay(validCards, hand) {
     // 4. כוח בלבד
     if (powers.length > 0) {
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        if (ten) return ['10', [ten]];
+        // Rule: don't burn small pile (≤2 cards) unless under high threat
+        if (ten && (pileSize > 2 || threat >= 2)) return ['10', [ten]];
         const two = powers.find(c => c.slice(0,-1) === '2');
         if (two) return _ret('2');
+        // If 10 exists but pile too small — skip it and play 2 or nothing
+        if (ten && pileSize <= 2) {
+            // nothing else to play — forced
+            if (!two && powers.length === 1) return ['10', [ten]];
+        }
         return _ret(powers[0].slice(0,-1));
     }
 
