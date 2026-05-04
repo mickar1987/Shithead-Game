@@ -1,27 +1,26 @@
-const CACHE = 'basrhead-v4';
-const ASSETS = ['/manifest.json', '/icon-192.png', '/icon-512.png'];
+// v249 - Never cache HTML
+const CACHE = 'basrhead-v5';
 
-self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-    self.skipWaiting();
-});
-
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
     e.waitUntil(caches.keys().then(keys =>
-        Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        Promise.all(keys.map(k => caches.delete(k)))
     ));
     self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
-    const url = e.request.url;
-    if (url.includes('/api/') || url.includes('socket.io')) return;
-    // NEVER cache HTML — always fetch from network
-    if (url.endsWith('/') || url.includes('index.html') ||
-        url.split('?')[0].split('/').pop().indexOf('.') === -1) {
-        e.respondWith(fetch(e.request.clone(), {cache: 'no-store'}).catch(() => caches.match(e.request)));
+    const url = new URL(e.request.url);
+    // Never intercept API or socket
+    if (url.pathname.startsWith('/api/') || url.pathname.includes('socket.io')) return;
+    // Always network for HTML
+    if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+        e.respondWith(
+            fetch(e.request, { cache: 'no-store' })
+            .catch(() => new Response('Offline', { status: 503 }))
+        );
         return;
     }
-    // Network first for everything else
+    // Icons/manifest: cache OK
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
