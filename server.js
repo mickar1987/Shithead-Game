@@ -389,15 +389,36 @@ process.on('unhandledRejection', (reason) => {
 // keepalive moved to after server.listen
 
 // ── Stats API ──
+app.post('/api/stats/save-place', async (req, res) => {
+    try {
+        const { username, token, place, totalPlayers, game } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        // Save place in user record for use by beacon
+        await saveUser(name, { _pendingPlace: { place, totalPlayers, game: game||'shithead', ts: Date.now() } });
+        console.log(`[save-place] ${name} place=${place}/${totalPlayers}`);
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.get('/api/stats/beacon', async (req, res) => {
     try {
         let { u, t, game, mode, result, place, total } = req.query;
         if (!u || !t) return res.status(200).send('ok');
         const user = await getUser(u);
         if (!user || user.token !== t) return res.status(200).send('ok');
-        // Use server-side place if available (more reliable than client)
+        // Use DB-saved place if available (saved when player finished)
+        const dbPlace = user._pendingPlace;
+        if (dbPlace && (!place || parseInt(place) === parseInt(total))) {
+            place = dbPlace.place;
+            total = dbPlace.totalPlayers;
+            game = dbPlace.game || game;
+            console.log(`[beacon] using DB place: ${place}/${total}`);
+        }
+        // Also check server memory
         const serverPlace = activePings[u + '_place'];
-        if (serverPlace && !place) {
+        if (serverPlace && (!place || parseInt(place) === parseInt(total))) {
             place = serverPlace.place;
             total = serverPlace.totalPlayers;
             game = serverPlace.game || game;
@@ -426,6 +447,7 @@ app.get('/api/stats/beacon', async (req, res) => {
         g[mode || 'bot'] = m; stats[game] = g;
         await saveUser(u, { stats });
         delete activePings[u + '_place'];
+        await saveUser(u, { _pendingPlace: null }); // clear used place
         console.log(`[beacon] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum}`);
         res.status(200).send('ok');
     } catch(e) { res.status(200).send('ok'); }
