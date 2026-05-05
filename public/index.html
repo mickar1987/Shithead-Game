@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.254</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.255</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1410,9 +1410,22 @@ function startGame(count) {
             if (r === '4')  return 2;
             return 12;
         };
-        const sortedRest = [...rest].sort((a,b) => fuScore(b.slice(0,-1)) - fuScore(a.slice(0,-1)));
+        let sortedRest = [...rest].sort((a,b) => fuScore(b.slice(0,-1)) - fuScore(a.slice(0,-1)));
+        // Max one 10 in faceUp — keep others in hand
+        let tensInFaceUp = 0;
+        const filtered = [];
+        const deferred = [];
+        for (const c of sortedRest) {
+            if (c.slice(0,-1) === '10') {
+                if (tensInFaceUp === 0) { filtered.push(c); tensInFaceUp++; }
+                else deferred.push(c); // extra 10s → keep in hand
+            } else {
+                filtered.push(c);
+            }
+        }
+        sortedRest = [...filtered, ...deferred];
         p.faceUp = sortedRest.slice(0, 3);
-        p.hand   = sortedRest.slice(3); // the 3 weakest stay in hand — dump them ASAP
+        p.hand   = sortedRest.slice(3);
     });
 
     render();
@@ -2207,17 +2220,23 @@ function aiPileDifficulty(rank, opponents) {
 // Threat level of each opponent
 function aiThreatLevel(p) {
     if (p.finished) return 0;
-    if (p.hand.length > 0) return 0; // still has hand cards = low threat
-    const hasFaceUp = p.faceUp.some(Boolean);
-    const hasFaceDown = p.faceDown.some(Boolean);
+    const handCount = p.hand.length;
     const faceUpCount = p.faceUp.filter(Boolean).length;
     const faceDownCount = p.faceDown.filter(Boolean).length;
-    if (hasFaceUp) return 1;   // faceUp phase = medium threat
-    if (hasFaceDown) {
-        // Last faceDown cards = high threat
-        if (faceDownCount <= 2) return 3; // very high threat
-        return 2; // high threat
+    const totalCards = handCount + faceUpCount + faceDownCount;
+    // In faceDown phase (no hand, no faceUp)
+    if (handCount === 0 && faceUpCount === 0 && faceDownCount > 0) {
+        if (faceDownCount === 1) return 4; // last card face-down = extreme threat
+        if (faceDownCount <= 2) return 3;  // very high
+        return 2;                           // high
     }
+    // In faceUp phase (no hand cards)
+    if (handCount === 0 && faceUpCount > 0) {
+        if (faceUpCount === 1) return 2;   // last faceUp = high threat
+        return 1;                           // medium
+    }
+    // Still in hand phase — low threat unless very few cards total
+    if (totalCards <= 2) return 1;
     return 0;
 }
 
@@ -2368,12 +2387,22 @@ function aiGetBestPlay(validCards, hand) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
 
         if (threat >= 2) {
-            // High threat: prefer hard cards that opponent can't easily answer
-            const hardCards = normals.filter(c => aiIsHardCard(c.slice(0,-1), lastVal));
+            // High threat: prefer hard cards (A/K/Q/7) opponent can't easily answer
+            // Under extreme threat (faceDown last card) — use highest hard card
+            const hardCards = normals.filter(c => aiIsHardCard(c.slice(0,-1), isPileEmpty ? 0 : lastVal));
             if (hardCards.length > 0) {
-                // Among hard cards: pick lowest (save highest for later)
-                hardCards.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+                if (threat >= 3) {
+                    // Extreme threat: play HIGHEST hard card to maximally slow opponent
+                    hardCards.sort((a,b) => aiCardValue(b) - aiCardValue(a));
+                } else {
+                    hardCards.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+                }
                 return _ret(hardCards[0].slice(0,-1));
+            }
+            // No hard cards — at least play highest available to give opponent tough pile
+            if (threat >= 3) {
+                normals.sort((a,b) => aiCardValue(b) - aiCardValue(a));
+                return _ret(normals[0].slice(0,-1));
             }
         }
 
