@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.258</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.260</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1348,6 +1348,8 @@ function startGame(count) {
         }, 60000);
     }
     // Save active game state to localStorage — place=count means "last" until proven otherwise
+    aiMemoryReset();
+    _aiTurnCount = 0;
     localStorage.setItem('_activeGame', JSON.stringify({
         game: 'shithead', mode: 'bot',
         username: authUser?.username || null,
@@ -1983,6 +1985,7 @@ function _humanTakeAI() {
     // Normal: take pile into hand
     playSound('take');
     showToast(H('↙ לקחת את הערימה','↙ Taking the pile'));
+    aiMemoryRecordSwallow(0, pile); // AI remembers what human swallowed
     players[0].hand.push(...pile);
     pile = [];
     nextTurn();
@@ -2215,6 +2218,69 @@ function aiPileDifficulty(rank, opponents) {
     return cantAnswer * 20; // each stuck opponent = 20 bonus
 }
 
+// ── AI Memory System ─────────────────────────────────
+// Track what each opponent swallowed in last 2 pile-takes
+// _aiMemory[playerIdx] = [ {pile: [...cards], turn: N}, ... ] (last 2)
+let _aiMemory = {};
+let _aiTurnCount = 0;
+
+function aiMemoryReset() {
+    _aiMemory = {};
+    _aiTurnCount = 0;
+}
+
+function aiMemoryRecordSwallow(playerIdx, piledCards) {
+    if (!_aiMemory[playerIdx]) _aiMemory[playerIdx] = [];
+    _aiMemory[playerIdx].push({
+        pile: [...piledCards],
+        turn: _aiTurnCount,
+        handSizeAfter: (players[playerIdx]?.hand.length || 0) + piledCards.length
+    });
+    if (_aiMemory[playerIdx].length > 2) _aiMemory[playerIdx].shift(); // keep last 2
+}
+
+// Is the player currently "loaded" with swallowed cards (hasn't drawn from deck yet)?
+// Heuristic: if they swallowed recently AND their hand is still large
+function aiIsPlayerLoaded(playerIdx) {
+    const mem = _aiMemory[playerIdx];
+    if (!mem || mem.length === 0) return false;
+    const last = mem[mem.length - 1];
+    // Recent swallow (within 6 turns) AND hand still has the swallowed cards
+    const turnsSince = _aiTurnCount - last.turn;
+    if (turnsSince > 6) return false; // too long ago
+    const currentHandSize = players[playerIdx]?.hand.length || 0;
+    return currentHandSize >= last.pile.length; // they still have at least the swallowed cards
+}
+
+// What's the highest card the player likely has trouble answering?
+// Based on swallowed piles: they couldn't answer above X
+function aiMemoryGetWeakThreshold(playerIdx) {
+    const mem = _aiMemory[playerIdx];
+    if (!mem || mem.length === 0) return null;
+    // Look at most recent swallow — what was the top of the pile they couldn't answer?
+    // The pile they swallowed = cards they failed to beat
+    // Find highest non-special card in swallowed pile
+    let highestSwallowed = 0;
+    for (const event of mem) {
+        for (const c of event.pile) {
+            const r = c.slice(0,-1);
+            if (['2','3','10'].includes(r)) continue; // specials don't count
+            const v = aiCardValue(c);
+            if (v > highestSwallowed) highestSwallowed = v;
+        }
+    }
+    return highestSwallowed; // they couldn't beat this value → they likely can't beat higher
+}
+
+// Cards they swallowed = they likely have these weak cards
+function aiMemorySwallowedCards(playerIdx) {
+    const mem = _aiMemory[playerIdx];
+    if (!mem || mem.length === 0) return [];
+    const cards = [];
+    for (const event of mem) cards.push(...event.pile);
+    return cards;
+}
+
 // ── AI Helpers ──────────────────────────────────────
 
 // Threat level of each opponent
@@ -2390,19 +2456,40 @@ function aiGetBestPlay(validCards, hand) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
 
         if (threat >= 2) {
-            // High threat: prefer hard cards (A/K/Q/7) opponent can't easily answer
-            // Under extreme threat (faceDown last card) — use highest hard card
+            // Check memory: what's the highest value opponent couldn't answer?
+            // Find most threatened opponent index
+            let mostThreatenedIdx = -1, maxT = 0;
+            for (let i = 1; i < players.length; i++) {
+                const t = aiThreatLevel(players[i]);
+                if (t > maxT) { maxT = t; mostThreatenedIdx = i; }
+            }
+            const weakThreshold = mostThreatenedIdx >= 0 ? aiMemoryGetWeakThreshold(mostThreatenedIdx) : null;
+
+            // If player is still loaded with swallowed cards AND we know their weakness
+            // → strike NOW before they draw from deck
+            const isLoaded = mostThreatenedIdx >= 0 && aiIsPlayerLoaded(mostThreatenedIdx);
+            if (weakThreshold && weakThreshold > 0 && isLoaded) {
+                // Find lowest card just above their weakness = forces swallow again
+                const killerCards = normals.filter(c => aiCardValue(c) > weakThreshold);
+                if (killerCards.length > 0) {
+                    killerCards.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+                    return _ret(killerCards[0].slice(0,-1));
+                }
+                // Also consider 2 to reset pile and follow with high card next turn
+                const two = validCards.find(c => c.slice(0,-1) === '2');
+                if (two && normals.length === 0) return _ret('2');
+            }
+
+            // No memory info — use hard cards
             const hardCards = normals.filter(c => aiIsHardCard(c.slice(0,-1), isPileEmpty ? 0 : lastVal));
             if (hardCards.length > 0) {
                 if (threat >= 3) {
-                    // Extreme threat: play HIGHEST hard card to maximally slow opponent
                     hardCards.sort((a,b) => aiCardValue(b) - aiCardValue(a));
                 } else {
                     hardCards.sort((a,b) => aiCardValue(a) - aiCardValue(b));
                 }
                 return _ret(hardCards[0].slice(0,-1));
             }
-            // No hard cards — at least play highest available to give opponent tough pile
             if (threat >= 3) {
                 normals.sort((a,b) => aiCardValue(b) - aiCardValue(a));
                 return _ret(normals[0].slice(0,-1));
@@ -2677,6 +2764,7 @@ function showResults() {
 }
 
 function nextTurn(skips = 1) {
+    _aiTurnCount++;
     if (gameOver) return;
     const prevPlayer = currentPlayer;
     const prevWasAI = players[currentPlayer]?.isAI;
