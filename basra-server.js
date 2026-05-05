@@ -292,8 +292,9 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
             if (basraScored) {
                 p.basras++;
                 if (!p.basraCards) p.basraCards = [];
-                // If J is involved (played card is J, or captured cards include J) → jack basra (20pts)
-                const jackInvolved = cardRank(cardStr) === 'J' || capturedCards.some(cc => cardRank(cc) === 'J') || (is7D(cardStr) && tableCards.some(cc => cardRank(cc) === 'J'));
+                // Jack basra (20pts) ONLY when table had exactly 1 card (J) and player played J or 7d
+                const _tableWasOnlyJ = tableCards.length === 1 && cardRank(tableCards[0]) === 'J';
+                const jackInvolved = _tableWasOnlyJ && (cardRank(cardStr) === 'J' || is7D(cardStr));
                 const basraCard = jackInvolved ? (cardRank(cardStr) === 'J' ? cardStr : capturedCards.find(cc => cardRank(cc) === 'J')) : cardStr;
                 p.basraCards.push({ card: basraCard, jack: jackInvolved });
                 if (jackInvolved) p.jackBasras = (p.jackBasras || 0) + 1;
