@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.255</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.258</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2223,20 +2223,23 @@ function aiThreatLevel(p) {
     const handCount = p.hand.length;
     const faceUpCount = p.faceUp.filter(Boolean).length;
     const faceDownCount = p.faceDown.filter(Boolean).length;
-    const totalCards = handCount + faceUpCount + faceDownCount;
-    // In faceDown phase (no hand, no faceUp)
-    if (handCount === 0 && faceUpCount === 0 && faceDownCount > 0) {
-        if (faceDownCount === 1) return 4; // last card face-down = extreme threat
-        if (faceDownCount <= 2) return 3;  // very high
-        return 2;                           // high
+    // REAL threat: hand cards remaining AND no table cards left at all
+    if (handCount > 0 && faceUpCount === 0 && faceDownCount === 0) {
+        if (handCount === 1) return 4; // 1 card in hand, no table = about to win!
+        if (handCount === 2) return 3; // 2 cards, no table = very dangerous
+        return 0; // more than 2 hand cards without table = not yet threatening
     }
-    // In faceUp phase (no hand cards)
+    // faceUp phase
     if (handCount === 0 && faceUpCount > 0) {
-        if (faceUpCount === 1) return 2;   // last faceUp = high threat
-        return 1;                           // medium
+        if (faceUpCount === 1) return 2;
+        return 1;
     }
-    // Still in hand phase — low threat unless very few cards total
-    if (totalCards <= 2) return 1;
+    // faceDown phase
+    if (handCount === 0 && faceUpCount === 0 && faceDownCount > 0) {
+        if (faceDownCount === 1) return 3;
+        if (faceDownCount <= 2) return 2;
+        return 1;
+    }
     return 0;
 }
 
@@ -2430,7 +2433,9 @@ function aiGetBestPlay(validCards, hand) {
     // 4. כוח בלבד
     if (powers.length > 0) {
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        // Rule: don't burn small pile (≤2 cards) unless under high threat
+        // Under extreme threat (opponent 1-2 cards in hand): always burn to steal turn
+        if (ten && threat >= 3) return ['10', [ten]];
+        // Rule: don't burn small pile (≤2 cards) unless under threat
         if (ten && (pileSize > 2 || threat >= 2)) return ['10', [ten]];
         const two = powers.find(c => c.slice(0,-1) === '2');
         if (two) return _ret('2');
