@@ -2719,9 +2719,15 @@ function basraBotMove(room) {
     const throwValue = -bestThrow.throwScore;
 
     if (!bestCard || bestScore < throwValue) {
-        // Throwing is better than the best capture found (e.g. wasting J on 1 card)
-        bestCard = bestThrow.card;
-        bestCapture = [];
+        // Check: don't throw a card that CAN capture something
+        // If bestThrow.card has a capture available, forcing a throw is wrong
+        const throwCardCaps = basraBotFindCaptures(bestThrow.card, tableCards);
+        if (throwCardCaps.length > 0 && bestCard && bestScore > 0) {
+            // Keep the capture — don't override with throw of a card that could capture
+        } else {
+            bestCard = bestThrow.card;
+            bestCapture = [];
+        }
     }
 
     // ══ HARD RULES — override any scoring ══
