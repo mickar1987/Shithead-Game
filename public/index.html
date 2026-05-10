@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.271</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.273</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2445,24 +2445,25 @@ function aiGetBestPlay(validCards, hand) {
             if (threatEmpty >= 3) {
                 const hardCards = normals.filter(c => aiIsHardCard(c.slice(0,-1), 0));
                 if (hardCards.length > 0) {
-                    hardCards.sort((a,b) => aiCardValue(b) - aiCardValue(a)); // highest first
+                    hardCards.sort((a,b) => aiCardValue(b) - aiCardValue(a));
                     return _ret(hardCards[0].slice(0,-1));
                 }
-                // No hard cards — play highest available
                 normals.sort((a,b) => aiCardValue(b) - aiCardValue(a));
                 return _ret(normals[0].slice(0,-1));
             }
             // Normal: play lowest
             return _ret(normals[0].slice(0,-1));
         }
+        // Empty pile power order: 2 ALWAYS before 10
         const two = powers.find(c => c.slice(0,-1) === '2');
         if (two) return _ret('2');
         const three = validCards.find(c => c.slice(0,-1) === '3');
         if (three) return _ret('3');
+        // 10 last resort on empty pile (waste of burn)
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        // Under threat: burn is good (steal turn)
-        if (ten && threatEmpty >= 2) return ['10', [ten]];
-        if (ten) return ['10', [ten]];
+        if (ten && threatEmpty >= 2) return ['10', [ten]]; // only under threat
+        if (ten && normals.length === 0 && !two && !three) return ['10', [ten]]; // truly last resort
+        if (ten && normals.length === 0) return ['10', [ten]];
         return _ret(validCards[0].slice(0,-1));
     }
 
@@ -2535,19 +2536,15 @@ function aiGetBestPlay(validCards, hand) {
     const threeCard = validCards.find(c => c.slice(0,-1) === '3');
     if (threeCard) return _ret('3');
 
-    // 4. כוח בלבד
+    // 4. כוח בלבד - 2 תמיד לפני 10
     if (powers.length > 0) {
         const ten = powers.find(c => c.slice(0,-1) === '10');
-        // Trained: burn on threat>=2, minPileForBurn=0 (always burn when valid)
-        if (ten && threat >= 2) return ['10', [ten]]; // under threat: always burn
-        if (ten && pileSize > 0) return ['10', [ten]]; // pile not empty: burn freely
         const two = powers.find(c => c.slice(0,-1) === '2');
+        // Under threat: burn to steal turn (only if no 2)
+        if (ten && threat >= 2 && !two) return ['10', [ten]];
+        // 2 always before 10
         if (two) return _ret('2');
-        // If 10 exists but pile too small — skip it and play 2 or nothing
-        if (ten && pileSize <= 2) {
-            // nothing else to play — forced
-            if (!two && powers.length === 1) return ['10', [ten]];
-        }
+        if (ten && pileSize > 0) return ['10', [ten]];
         return _ret(powers[0].slice(0,-1));
     }
 
@@ -2612,43 +2609,7 @@ function aiMove() {
     if (p.hand.length > 0) {
         const valid = p.hand.filter(c => canPlay(c));
         if (valid.length) {
-            const threat = aiMaxThreat();
-            let best = aiGetBestPlay(valid, p.hand);
-            // Under extreme threat: verify chosen card actually makes opponent struggle
-            // If best card's value ≤ pile top after playing, opponent can easily answer
-            if (threat >= 3 && best) {
-                const [bestRank, bestCards] = best;
-                const chosenVal = aiCardValue(bestCards[0]);
-                // Check if all opponents with 1-2 cards can answer our chosen card
-                const allCanAnswer = players.slice(1).some(opp => {
-                    if (opp.finished || aiThreatLevel(opp) < 3) return false;
-                    return opp.hand.some(c => {
-                        const r = c.slice(0,-1);
-                        if (['2','3','10'].includes(r)) return true;
-                        if (r === '7') return true;
-                        return aiCardValue(c) >= chosenVal;
-                    });
-                });
-                if (allCanAnswer) {
-                    // Try to find a card they CAN'T answer
-                    const betterValid = valid.filter(c => {
-                        const cv = aiCardValue(c);
-                        return players.slice(1).every(opp => {
-                            if (aiThreatLevel(opp) < 3) return true;
-                            return !opp.hand.some(h => {
-                                const r = h.slice(0,-1);
-                                if (['2','3','10'].includes(r)) return true;
-                                if (r === '7') return true;
-                                return aiCardValue(h) >= cv;
-                            });
-                        });
-                    });
-                    if (betterValid.length > 0) {
-                        betterValid.sort((a,b) => aiCardValue(a) - aiCardValue(b));
-                        best = [betterValid[0].slice(0,-1), [betterValid[0]]];
-                    }
-                }
-            }
+            const best = aiGetBestPlay(valid, p.hand);
             if (best) {
                 const [bestRank, bestCards] = best;
                 toPlay = bestCards;
