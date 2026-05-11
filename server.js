@@ -2009,6 +2009,10 @@ io.on('connection', (socket) => {
 
     registerBasraHandlers(socket);
 
+    socket.on('clientLog', ({ msg }) => {
+        console.log('[CLIENT]', msg);
+    });
+
     socket.on('disconnect', async () => {
         // Handle shithead disconnect
         if (socket.data?.roomCode) handlePlayerLeave(socket.data);
