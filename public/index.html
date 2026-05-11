@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="verDiv" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:1px;" onclick="testLog()">v4.277log5 TAP</div>
+    <div id="verDiv" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:1px;" onclick="testLog()">v4.277log6 TAP</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2657,6 +2657,7 @@ function aiMove() {
         } else {
             // Can't play from faceUp — must take pile AND pick up a faceUp card/group
             log(H(`${p.name} לא יכול לשחק - לוקח`,`${p.name} can't play — takes pile`));
+            (function(){var x=new XMLHttpRequest();x.open('POST','/api/log',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({msg:`[AI-SWALLOW-FACEUP] ${p.name} faceUp=[${p.faceUp.filter(Boolean).join(',')}] pileTop=${pile.length?pile[pile.length-1]:'empty'}`}));})();
             p.hand.push(...pile);
             pile = [];
             // Must also pick up one faceUp card/group into hand
@@ -2694,6 +2695,7 @@ function aiMove() {
                     toPlay = [c];
                 } else {
                     log(H(`${p.name} הפך כסוי - לוקח`,`${p.name} flipped face-down — takes pile`));
+                    (function(){var x=new XMLHttpRequest();x.open('POST','/api/log',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({msg:`[AI-SWALLOW-FACEDOWN] ${p.name} flipped=${c} pileTop=${pile.length?pile[pile.length-1]:'empty'}`}));})();
                     p.hand.push(c, ...pile);
                     pile = [];
                     nextTurn();
@@ -2711,6 +2713,7 @@ function aiMove() {
         if (pile.length > 0) {
             log(H(`${p.name} לוקח את הערימה`,`${p.name} takes the pile`));
             playSound('take');
+            (function(){var x=new XMLHttpRequest();x.open('POST','/api/log',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({msg:`[AI-SWALLOW-NOVALID] ${p.name} hand=[${p.hand.join(',')}] pileTop=${pile[pile.length-1]} pileSize=${pile.length}`}));})();
             p.hand.push(...pile);
             pile = [];
         } else {
@@ -5111,7 +5114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         var x=new XMLHttpRequest();
         x.open('POST','/api/log',true);
         x.setRequestHeader('Content-Type','application/json');
-        x.send(JSON.stringify({msg:'[STARTUP] app loaded v4.277log5'}));
+        x.send(JSON.stringify({msg:'[STARTUP] app loaded v4.277log6'}));
     }, 2000);
     // Retry any pending beacon from previous failed attempt
     try {
