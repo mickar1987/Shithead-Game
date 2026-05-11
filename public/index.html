@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.276log</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.277log2</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2622,14 +2622,36 @@ function aiMove() {
     } else if (p.faceUp.some(c => c)) {
         const valid = p.faceUp.filter(c => c && canPlay(c));
         if (valid.length) {
-            const best = aiGetBestPlay(valid, p.hand);
-            if (best) {
-                const [, bestCards] = best;
-                toPlay = bestCards;
-                p.faceUp.forEach((c, i) => { if (toPlay.includes(c)) p.faceUp[i] = null; });
+            // FaceUp strategy: play lowest valid, avoid 10 on empty pile
+            const isPileEmptyFU = pile.length === 0;
+            let chosen = null;
+            if (isPileEmptyFU) {
+                // On empty pile: prefer normals over 10, and prefer lower cards
+                const fuNormals = valid.filter(c => !['2','3','10'].includes(c.slice(0,-1)));
+                const fuTwo = valid.find(c => c.slice(0,-1) === '2');
+                const fuThree = valid.find(c => c.slice(0,-1) === '3');
+                const fuTen = valid.find(c => c.slice(0,-1) === '10');
+                if (fuNormals.length > 0) {
+                    fuNormals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+                    chosen = fuNormals[0];
+                } else if (fuTwo) chosen = fuTwo;
+                else if (fuThree) chosen = fuThree;
+                else if (fuTen) chosen = fuTen;
+                else chosen = valid[0];
             } else {
-                // aiGetBestPlay returned null despite valid cards — fallback: play first valid
-                toPlay = [valid[0]];
+                // Non-empty pile: use aiGetBestPlay, fallback to lowest valid
+                const best = aiGetBestPlay(valid, []);
+                if (best) {
+                    const [, bestCards] = best;
+                    toPlay = bestCards;
+                    p.faceUp.forEach((c, i) => { if (toPlay.includes(c)) p.faceUp[i] = null; });
+                } else {
+                    valid.sort((a,b) => aiCardValue(a) - aiCardValue(b));
+                    chosen = valid[0];
+                }
+            }
+            if (!toPlay.length && chosen) {
+                toPlay = [chosen];
                 p.faceUp.forEach((c, i) => { if (toPlay.includes(c)) p.faceUp[i] = null; });
             }
         } else {
