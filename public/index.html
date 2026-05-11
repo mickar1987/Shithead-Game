@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.277log4</div>
+    <div id="verDiv" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:1px;" onclick="testLog()">v4.277log5 TAP</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5096,8 +5096,23 @@ function setBasraBet(val) {
 let selectedBasraWinScore = 120;
 
 // Init default selections visually
+function testLog() {
+    var x=new XMLHttpRequest();
+    x.open('POST','/api/log',true);
+    x.setRequestHeader('Content-Type','application/json');
+    x.onload = function() { document.getElementById('verDiv').textContent='LOG OK: '+x.status; };
+    x.onerror = function() { document.getElementById('verDiv').textContent='LOG FAIL'; };
+    x.send(JSON.stringify({msg:'[TEST] manual log test'}));
+}
 document.addEventListener('DOMContentLoaded', () => {
     applyLang();
+    // Send startup log to verify /api/log works
+    setTimeout(()=>{
+        var x=new XMLHttpRequest();
+        x.open('POST','/api/log',true);
+        x.setRequestHeader('Content-Type','application/json');
+        x.send(JSON.stringify({msg:'[STARTUP] app loaded v4.277log5'}));
+    }, 2000);
     // Retry any pending beacon from previous failed attempt
     try {
         const _pb = localStorage.getItem('_pendingBeacon');
