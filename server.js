@@ -402,6 +402,12 @@ app.post('/api/stats/save-place', async (req, res) => {
     } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
+app.post('/api/log', (req, res) => {
+    const { msg } = req.body || {};
+    if (msg) console.log(msg);
+    res.json({ ok: true });
+});
+
 app.get('/api/stats/beacon', async (req, res) => {
     try {
         let { u, t, game, mode, result, place, total } = req.query;
