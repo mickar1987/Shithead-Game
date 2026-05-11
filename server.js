@@ -2719,14 +2719,42 @@ function basraBotMove(room) {
     const throwValue = -bestThrow.throwScore;
 
     if (!bestCard || bestScore < throwValue) {
-        // Check: don't throw a card that CAN capture something
-        // If bestThrow.card has a capture available, forcing a throw is wrong
         const throwCardCaps = basraBotFindCaptures(bestThrow.card, tableCards);
         if (throwCardCaps.length > 0 && bestCard && bestScore > 0) {
-            // Keep the capture — don't override with throw of a card that could capture
+            // Keep the capture
         } else {
             bestCard = bestThrow.card;
             bestCapture = [];
+        }
+    }
+    // FINAL SAFETY: if bestCapture is empty but a capture exists — find it
+    if (bestCapture.length === 0 && bestCard) {
+        const finalCaps = basraBotFindCaptures(bestCard, tableCards);
+        if (finalCaps.length > 0) {
+            // We should capture — recalc
+            const used = new Set(), combined = [];
+            finalCaps.sort((a,b)=>b.length-a.length).forEach(grp => {
+                if(grp.every(i=>!used.has(i))){grp.forEach(i=>used.add(i));combined.push(...grp);}
+            });
+            bestCapture = combined;
+        }
+    }
+    // Also: check if bestCard can't capture but another card CAN
+    if (bestCapture.length === 0) {
+        let altCard=null, altCapture=[], altScore=-1;
+        bot.hand.forEach(c => {
+            if (c.slice(0,-1)==='J'||c==='7d') return; // J/7d handled by rules
+            const caps = basraBotFindCaptures(c, tableCards);
+            if (caps.length===0) return;
+            const used=new Set(),combined=[];
+            caps.sort((a,b)=>b.length-a.length).forEach(grp=>{
+                if(grp.every(i=>!used.has(i))){grp.forEach(i=>used.add(i));combined.push(...grp);}
+            });
+            if(combined.length > altScore){ altScore=combined.length; altCard=c; altCapture=combined; }
+        });
+        if (altCard) {
+            bestCard = altCard;
+            bestCapture = altCapture;
         }
     }
 
