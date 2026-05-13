@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.282</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.283</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2883,11 +2883,10 @@ function nextTurn(skips = 1) {
         const needed = topR ? 4 - streak : 0;
         for (let pi = 0; pi < players.length; pi++) {
             if (pi === currentPlayer || players[pi].finished || !players[pi].isAI) continue;
-            // Only allow AI burn interrupt during HAND phase (not faceUp/faceDown)
-            // faceUp/faceDown plays use a different callback path that breaks if interrupted
-            const _prevInHandPhase = players[prevPlayer].hand.length > 0 || 
-                (players[prevPlayer].hand.length === 0 && players[prevPlayer].faceUp.every(c=>!c) && players[prevPlayer].faceDown.some(c=>c));
-            const canBurnAI = needed > 0 && _prevInHandPhase && needed <= players[pi].hand.filter(c => c.slice(0,-1) === topR).length;
+            // Only allow AI burn interrupt when prevPlayer was in HAND phase
+            // faceUp/faceDown animations use different callback — interrupting breaks them
+            const _prevHadHand = players[prevPlayer].hand.length > 0;
+            const canBurnAI = needed > 0 && _prevHadHand && needed <= players[pi].hand.filter(c => c.slice(0,-1) === topR).length;
             // Only BURN interrupts allowed for non-current players (not add-on)
             if (canBurnAI) {
                 const intRank = topR;
