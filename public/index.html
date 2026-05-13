@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.284</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.285</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2622,7 +2622,6 @@ function aiMove() {
         }
     } else if (p.faceUp.some(c => c)) {
         const valid = p.faceUp.filter(c => c && canPlay(c));
-        (function(){var x=new XMLHttpRequest();x.open('POST','/api/log',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({msg:`[FACEUP-ENTER] ${p.name} valid=[${valid.join(',')}] faceUp=[${p.faceUp.filter(Boolean).join(',')}] pileTop=${pile.length?pile[pile.length-1]:'empty'}`}));})();
         if (valid.length) {
             // FaceUp strategy: play lowest valid, avoid 10 on empty pile
             const isPileEmptyFU = pile.length === 0;
@@ -2663,7 +2662,6 @@ function aiMove() {
                 if (!toPlay.length) toPlay = [chosen];
                 p.faceUp.forEach((c, i) => { if (toPlay.includes(c)) p.faceUp[i] = null; });
             }
-            (function(){var x=new XMLHttpRequest();x.open('POST','/api/log',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({msg:`[FACEUP-TOPLAY] ${p.name} toPlay=[${toPlay.join(',')}] chosen=${chosen} best=${JSON.stringify(best?best[0]:null)}`}));})();
         } else if (pile.length === 0) {
             // No valid faceUp card AND pile empty — just skip turn
             log(H(`${p.name} אין מהלך - דולג`,`${p.name} no move — skip`));
@@ -2731,7 +2729,6 @@ function aiMove() {
             pile = [];
         } else {
             log(H(`${p.name} אין מהלך - דולג`,`${p.name} no move — skip`));
-            (function(){var x=new XMLHttpRequest();x.open('POST','/api/log',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({msg:`[SKIP] ${p.name} hand=[${p.hand.join(',')}] faceUp=[${p.faceUp.filter(Boolean).join(',')}] faceDown=[${p.faceDown.filter(Boolean).join(',')}]`}));})();
         }
         render();
         nextTurn();
