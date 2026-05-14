@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.287</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.288</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2887,22 +2887,28 @@ function nextTurn(skips = 1) {
         const needed = topR ? 4 - streak : 0;
         for (let pi = 0; pi < players.length; pi++) {
             if (pi === currentPlayer || players[pi].finished || !players[pi].isAI) continue;
-            // Only allow AI burn interrupt when prevPlayer was in HAND phase
-            // faceUp/faceDown animations use different callback — interrupting breaks them
-            const _prevHadHand = players[prevPlayer].hand.length > 0;
-            const canBurnAI = needed > 0 && _prevHadHand && needed <= players[pi].hand.filter(c => c.slice(0,-1) === topR).length;
+            // Check hand first; if hand empty (faceUp phase), check faceUp cards
+            const _botHasHand = players[pi].hand.length > 0;
+            const botMatchCards = _botHasHand
+                ? players[pi].hand.filter(c => c.slice(0,-1) === topR)
+                : players[pi].faceUp.filter(c => c && c.slice(0,-1) === topR);
+            const canBurnAI = needed > 0 && needed <= botMatchCards.length;
             // Only BURN interrupts allowed for non-current players (not add-on)
             if (canBurnAI) {
                 const intRank = topR;
-                const intCards = players[pi].hand.filter(c => c.slice(0,-1) === intRank);
+                const intCards = botMatchCards;
                 const takeCount = needed;
                 const toPlay = intCards.slice(0, takeCount);
                 // Animate cards flying to pile first
                 animating = true;
                 _execMoveToken++;
                 const myToken2 = _execMoveToken;
-                // Remove from hand for render
-                toPlay.forEach(c => { const idx2 = players[pi].hand.indexOf(c); if (idx2 !== -1) players[pi].hand.splice(idx2, 1); });
+                // Remove from hand or faceUp for render
+                if (_botHasHand) {
+                    toPlay.forEach(c => { const idx2 = players[pi].hand.indexOf(c); if (idx2 !== -1) players[pi].hand.splice(idx2, 1); });
+                } else {
+                    toPlay.forEach(c => { const idx2 = players[pi].faceUp.indexOf(c); if (idx2 !== -1) players[pi].faceUp[idx2] = null; });
+                }
                 render();
                 animateCardToPile(toPlay, () => {
                     if (myToken2 !== _execMoveToken) return;
