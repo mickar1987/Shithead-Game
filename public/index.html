@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.289</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.290</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1987,6 +1987,7 @@ function _humanTakeAI() {
     playSound('take');
     showToast(H('↙ לקחת את הערימה','↙ Taking the pile'));
     aiMemoryRecordSwallow(0, pile); // AI remembers what human swallowed
+    plOnHumanTake(); // persistent learning: record which rank forced the take
     players[0].hand.push(...pile);
     pile = [];
     nextTurn();
@@ -2218,6 +2219,57 @@ function aiPileDifficulty(rank, opponents) {
         return !aiOppCanAnswerRank(rank, opp);
     }).length;
     return cantAnswer * 20; // each stuck opponent = 20 bonus
+}
+
+// ── Persistent Player Learning ───────────────────────
+// Collects data across games and adapts AI card selection
+const _PL_KEY = 'shithead_learn_v1';
+
+function plLoad() {
+    try { return JSON.parse(localStorage.getItem(_PL_KEY)) || {}; } catch(e) { return {}; }
+}
+function plSave(d) {
+    try { localStorage.setItem(_PL_KEY, JSON.stringify(d)); } catch(e) {}
+}
+
+// Called when human takes pile — record which rank was on top
+function plOnHumanTake() {
+    if (onlineMode) return;
+    const topR = pileTopRank();
+    if (!topR || ['2','3','10'].includes(topR)) return; // specials skew data
+    const d = plLoad();
+    d.takeByRank = d.takeByRank || {};
+    d.takeByRank[topR] = (d.takeByRank[topR] || 0) + 1;
+    d.totalTakes = (d.totalTakes || 0) + 1;
+    plSave(d);
+}
+
+// Called at game end — record win/loss
+function plOnGameEnd(humanWon) {
+    if (onlineMode) return;
+    const d = plLoad();
+    d.gamesPlayed = (d.gamesPlayed || 0) + 1;
+    if (!humanWon) d.aiWins = (d.aiWins || 0) + 1;
+    d.lastUpdated = Date.now();
+    plSave(d);
+}
+
+// Returns learned best card from candidates, or null if insufficient data.
+// Picks the rank the human historically takes pile on most (= their weakness).
+// Only applies when threat < 2 (not in crisis mode).
+function plBestCard(candidates, threat) {
+    if (threat >= 2) return null;
+    const d = plLoad();
+    if ((d.gamesPlayed || 0) < 3 || (d.totalTakes || 0) < 8) return null;
+    const byRank = d.takeByRank || {};
+    const total = d.totalTakes;
+    let best = null, bestRate = 0.08; // minimum meaningful signal
+    for (const c of candidates) {
+        const r = c.slice(0,-1);
+        const rate = (byRank[r] || 0) / total;
+        if (rate > bestRate) { bestRate = rate; best = c; }
+    }
+    return best;
 }
 
 // ── AI Memory System ─────────────────────────────────
@@ -2550,7 +2602,9 @@ function aiGetBestPlay(validCards, hand) {
             }
             return true;
         });
-        const chosen = safe || normals[0];
+        // Apply cross-game learning: prefer rank the human historically takes pile on
+        const learnedBest = plBestCard(safe ? [safe, ...normals] : normals, threat);
+        const chosen = learnedBest || safe || normals[0];
         return _ret(chosen.slice(0,-1));
     }
 
@@ -2819,6 +2873,8 @@ function showResults() {
         fetch('/api/ping-stop', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ username: authUser.username, token: authUser.token }) }).catch(()=>{});
     }
+    // Persistent learning: record game result
+    if (players.some(p => p.isAI)) plOnGameEnd(winnersOrder[0] === 0);
     // Record stats if vs AI (online games recorded server-side)
     if (!window._suppressStatsRecord && authUser?.username && authUser?.token && players.some(p => p.isAI)) {
         const humanPlace = winnersOrder.indexOf(0) + 1;
