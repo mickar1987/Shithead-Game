@@ -1,0 +1,3583 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+const crypto = require('crypto');
+const { MongoClient } = require('mongodb');
+const basra = require('./basra-server');
+const basraRooms = {}; // separate room store for basra
+// Fix TLS for Node.js v22
+process.env.NODE_OPTIONS = process.env.NODE_OPTIONS || '';
+
+// ══ COINS: settle bets at end of game ══
+async function settleCoins(room) {
+    console.log(`[settleCoins] called. bet=${room.bet}, settled=${room.coinsSettled}, order=${room.winnersOrder}`);
+    if (room.coinsSettled || room.bet === 0) { console.log('[settleCoins] skipped.'); return; }
+    room.coinsSettled = true;
+    const bet = room.bet;
+
+    // Only consider HUMAN players (non-bots) for coin settlement
+    const order = room.winnersOrder.filter(i => !room.slots[i]?.isBot || room.slots[i]?.wasHuman);
+    const n = order.length;
+    if (n < 2) { console.log('[settleCoins] not enough human players'); return; }
+
+    // Find human winner (1st) and human loser (last)
+    // order[0] = best human, order[n-1] = worst human
+    const changes = {};
+    order.forEach(i => { changes[i] = 0; });
+
+    // 2-player or 3-player: winner takes bet from loser
+    changes[order[0]]   += bet;
+    changes[order[n-1]] -= bet;
+
+    // 4-player: 2nd takes half from 3rd
+    if (n >= 4) {
+        const half = Math.floor(bet / 2);
+        changes[order[1]] += half;
+        changes[order[2]] -= half;
+    }
+
+    console.log(`[settleCoins] human order=${order} n=${n} changes=${JSON.stringify(changes)}`);
+
+    // Build results for ALL slots in winnersOrder (bots get delta=0)
+    const results = [];
+    for (const slotIdx of room.winnersOrder) {
+        const slot = room.slots[slotIdx];
+        const delta = changes[slotIdx] || 0;
+        let finalCoins = null;
+        if (slot.username && (!slot.isBot || slot.wasHuman)) {
+            try {
+                const u = await getUser(slot.username);
+                if (u) {
+                    finalCoins = Math.max(0, (u.coins || 0) + delta);
+                    await saveUser(slot.username, { coins: finalCoins });
+                    console.log(`[coins] ${slot.username}: ${u.coins} ${delta >= 0 ? '+' : ''}${delta} = ${finalCoins}`);
+                }
+            } catch(e) { console.error('[coins] error:', e.message); }
+        }
+        results.push({ name: slot.name, delta, coins: finalCoins, slotIdx });
+    }
+    console.log(`[coins] settled. bet=${bet}`);
+    io.to(room.code).emit('coinsResult', results);
+
+}
+
+
+async function settleBasraCoins(room, winnerSlotIdx) {
+    console.log(`[settleBasra] called bet=${room.bet} settled=${room.coinsSettled} winner=${winnerSlotIdx} usernames=${JSON.stringify(room.slots.map(s=>s.username))}`);
+    if (room.coinsSettled || !room.bet || room.bet === 0) return;
+    room.coinsSettled = true;
+    const bet = room.bet;
+    const results = [];
+
+    // Determine deltas
+    let deltas;
+    if (room.teams) {
+        // 4p team mode: find winning team
+        const winnerTeam = room.teams.find(t => t.includes(winnerSlotIdx));
+        deltas = room.slots.map((_, i) => winnerTeam && winnerTeam.includes(i) ? bet : -bet);
+    } else {
+        deltas = room.slots.map((_, i) => i === winnerSlotIdx ? bet : -bet);
+    }
+
+    for (let i = 0; i < room.slots.length; i++) {
+        const slot = room.slots[i];
+        const delta = deltas[i];
+        let finalCoins = null;
+        if (slot.username) {
+            try {
+                const u = await getUser(slot.username);
+                if (u) {
+                    finalCoins = Math.max(0, (u.coins || 0) + delta);
+                    await saveUser(slot.username, { coins: finalCoins });
+                    console.log(`[basra coins] ${slot.username}: ${delta>=0?'+':''}${delta} = ${finalCoins}`);
+                }
+            } catch(e) { console.error('[basra coins] error:', e.message); }
+        }
+        results.push({ name: slot.name, delta, coins: finalCoins, slotIdx: i });
+    }
+    room.slots.forEach(s => {
+        if (s.socketId) io.to(s.socketId).emit('coinsResult', results);
+    });
+
+}
+
+function buildDisplayName(first, last) {
+    first = (first || '').trim();
+    last  = (last  || '').trim();
+    if (!first) return last || '';
+    if (!last)  return first;
+    const initial = [...last][0].toUpperCase();
+    return `${first}.${initial}.`;
+}
+
+// ══════════════════════════════════════════════
+//  MONGODB
+// ══════════════════════════════════════════════
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://shithead_user:Mickar87@shithead.rxbmlst.mongodb.net/?appName=Shithead&retryWrites=true&w=majority';
+const mongoClient = new MongoClient(MONGO_URI, {
+    tls: true,
+    tlsAllowInvalidCertificates: false,
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+});
+let usersCol = null;
+
+async function connectMongo(retries = 5) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await mongoClient.connect();
+            const db = mongoClient.db('shithead');
+            usersCol = db.collection('users');
+            await usersCol.createIndex({ username: 1 }, { unique: true });
+            console.log('[mongo] Connected to MongoDB Atlas ✅'); mongoOk = true;
+            return true;
+        } catch(e) {
+            console.error(`[mongo] Connection attempt ${i+1} failed: ${e.message}`);
+            if (i < retries - 1) await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+    console.error('[mongo] All connection attempts failed!');
+    return false;
+}
+
+// In-memory fallback when MongoDB is unavailable
+const memUsers = {};
+let mongoOk = false;
+
+async function getUser(username) {
+    if (usersCol && mongoOk) {
+        try { return await usersCol.findOne({ username }); } catch(e) { mongoOk = false; }
+    }
+    return memUsers[username] || null;
+}
+
+async function saveUser(username, data) {
+    // Always update in-memory
+    memUsers[username] = Object.assign(memUsers[username] || { username }, data);
+    if (usersCol && mongoOk) {
+        try {
+            const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
+                    } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error:', e.message); }
+    }
+}
+
+async function updateCoins(username, delta) {
+    const user = await getUser(username);
+    if (!user) return null;
+    const newCoins = Math.max(0, (user.coins || 0) + delta);
+    await saveUser(username, { coins: newCoins });
+    return { ...user, coins: newCoins };
+}
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: '*' }
+});
+
+// Serve HTML with no-cache to prevent SW from serving stale HTML
+app.get('/', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+app.get('/index.html', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+// SW file: no-cache so new SW is always fetched
+app.get('/sw.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, 'public', 'sw.js'));
+});
+app.get('/sw2.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, 'public', 'sw2.js'));
+});
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ══════════════════════════════════════════════
+//  USERS — MongoDB persistent coin system
+// ══════════════════════════════════════════════
+const STARTING_COINS = 2000;
+const DAILY_COINS = 200;
+
+function hashPin(pin) {
+    return crypto.createHash('sha256').update('shithead_salt_' + pin).digest('hex');
+}
+
+function makeToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+// HTTP endpoints for auth
+app.use(express.json());
+
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, pin, firstName, lastName } = req.body;
+        if (!username || !pin) return res.json({ ok: false, error: 'חסר שם משתמש או PIN' });
+        const name = username.trim().toLowerCase();
+        if (name.length < 2 || name.length > 16) return res.json({ ok: false, error: 'שם משתמש 2-16 תווים' });
+        if (pin.length !== 4 || !/^[0-9]{4}$/.test(pin)) return res.json({ ok: false, error: 'PIN חייב להיות 4 ספרות' });
+        const first = (firstName || '').trim();
+        if (!first) return res.json({ ok: false, error: 'חסר שם פרטי' });
+        const existing = await getUser(name);
+        if (existing) return res.json({ ok: false, error: 'שם משתמש תפוס' });
+        const token = makeToken();
+        const last = (lastName || '').trim();
+        await saveUser(name, { username: name, pinHash: hashPin(pin), coins: STARTING_COINS, lastDailyTs: null, token, firstName: first, lastName: last });
+        const displayName = buildDisplayName(first, last);
+        res.json({ ok: true, username: name, token, coins: STARTING_COINS, firstName: first, lastName: last, displayName });
+    } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, pin } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u) return res.json({ ok: false, error: 'שם משתמש לא קיים' });
+        if (u.pinHash !== hashPin(pin)) return res.json({ ok: false, error: 'PIN שגוי' });
+        // Keep existing token if valid, only create new one if missing
+        const token = u.token || makeToken();
+        if (!u.token) await saveUser(name, { token });
+        console.log(`[login] ${name} token=${u.token ? 'existing' : 'new'}`);
+        const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
+        res.json({ ok: true, username: name, token, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
+    } catch(e) { res.json({ ok: false, error: 'שגיאת שרת' }); }
+});
+
+app.post('/api/verify', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+            if (!u || u.token !== token) return res.json({ ok: false });
+        saveUser(name, { lastSeenTs: Date.now() }).catch(()=>{}); // non-blocking
+        const displayName = buildDisplayName(u.firstName||'', u.lastName||'');
+        res.json({ ok: true, username: name, coins: u.coins, firstName: u.firstName||'', lastName: u.lastName||'', displayName });
+    } catch(e) { console.error('[verify error]', e); res.json({ ok: false }); }
+});
+
+// Ping endpoint — keeps user marked as online (used by VS AI local games)
+app.post('/api/ping', async (req, res) => {
+    try {
+        const { username, token, place, totalPlayers, game } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        activePings[name] = Date.now();
+        // Save current game position for abandon detection
+        if (place !== undefined) {
+            activePings[name + '_place'] = { place, totalPlayers: totalPlayers||0, game: game||'shithead', ts: Date.now() };
+            console.log(`[ping-place] ${name} place=${place}/${totalPlayers} game=${game}`);
+        }
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false }); }
+});
+
+// Ping-stop — explicitly mark user as offline
+app.post('/api/ping-stop', async (req, res) => {
+    try {
+        const { username, token, result } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        // If clean exit (result provided) with a place — record it
+        if (result && result !== 'abandon') {
+            const placeInfo = activePings[name + '_place'];
+            if (placeInfo && placeInfo.place) {
+                const stats = u.stats || {};
+                const g = stats[placeInfo.game] || {};
+                const m = g['bot'] || { played:0, won:0, lost:0, abandoned:0 };
+                // Already recorded by showResults — skip
+            }
+        }
+        delete activePings[name];
+        delete activePings[name + '_place'];
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false }); }
+});
+
+app.post('/api/daily', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false, error: 'לא מחובר' });
+        const now = Date.now();
+        const last = u.lastDailyTs || 0;
+        const msLeft = (last + 24 * 60 * 60 * 1000) - now;
+        if (msLeft > 0) return res.json({ ok: false, error: 'כבר קיבלת מטבעות', coins: u.coins, msLeft });
+        const newCoins = (u.coins || 0) + DAILY_COINS;
+        await saveUser(name, { coins: newCoins, lastDailyTs: now });
+        res.json({ ok: true, coins: newCoins, gained: DAILY_COINS, msLeft: 24 * 60 * 60 * 1000 });
+    } catch(e) { console.error('[daily]', e); res.json({ ok: false, error: 'שגיאת שרת' }); }
+});
+
+// Update profile (name + optional new PIN)
+app.post('/api/update-profile', async (req, res) => {
+    try {
+        const { username, token, firstName, lastName, newPin } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false, error: 'לא מחובר' });
+        const first = (firstName || '').trim();
+        if (!first) return res.json({ ok: false, error: 'שם פרטי חובה' });
+        if (newPin && (newPin.length !== 4 || !/^[0-9]{4}$/.test(newPin)))
+            return res.json({ ok: false, error: 'PIN חייב להיות 4 ספרות' });
+        const updates = { firstName: first, lastName: (lastName || '').trim() };
+        if (newPin) updates.pinHash = hashPin(newPin);
+        await saveUser(name, updates);
+        console.log(`[update-profile] ${name} updated name+${newPin ? 'pin' : 'no-pin'}`);
+        res.json({ ok: true });
+    } catch(e) { console.error('[update-profile]', e); res.json({ ok: false, error: 'שגיאת שרת' }); }
+});
+
+// Check daily status
+app.post('/api/daily-status', async (req, res) => {
+    try {
+        const { username, token } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        const now = Date.now();
+        const last = u.lastDailyTs || 0;
+        const msLeft = Math.max(0, (last + 24 * 60 * 60 * 1000) - now);
+        res.json({ ok: true, msLeft, coins: u.coins });
+    } catch(e) { res.json({ ok: false }); }
+});
+
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true, mongo: !!usersCol, time: new Date().toISOString() });
+});
+
+// Debug: check specific user raw data
+app.get('/api/debug/user', async (req, res) => {
+    const key = req.query.key;
+    const username = req.query.u;
+    if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const u = await getUser(username);
+        if (!u) return res.json({ found: false });
+        res.json({ found: true, username: u.username, coins: u.coins, hasToken: !!u.token, tokenStart: u.token?.slice(0,12), firstName: u.firstName, lastName: u.lastName });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
+// Admin: set coins for a user
+// Health check — keeps Render free tier awake
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Self-ping every 4 minutes to prevent Render free tier sleep
+process.on('uncaughtException', (err) => {
+    console.error('[UNCAUGHT]', err.message, err.stack?.split('\n')[1]);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[UNHANDLED]', reason);
+});
+
+// keepalive moved to after server.listen
+
+// ── Stats API ──
+app.post('/api/stats/save-place', async (req, res) => {
+    try {
+        const { username, token, place, totalPlayers, game } = req.body;
+        const name = username?.trim().toLowerCase();
+        const u = await getUser(name);
+        if (!u || u.token !== token) return res.json({ ok: false });
+        // Save place in user record for use by beacon
+        await saveUser(name, { _pendingPlace: { place, totalPlayers, game: game||'shithead', ts: Date.now() } });
+        console.log(`[save-place] ${name} place=${place}/${totalPlayers}`);
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/log', (req, res) => {
+    const { msg } = req.body || {};
+    if (msg) console.log(msg);
+    res.json({ ok: true });
+});
+
+app.get('/api/stats/beacon', async (req, res) => {
+    try {
+        let { u, t, game, mode, result, place, total } = req.query;
+        if (!u || !t) return res.status(200).send('ok');
+        const user = await getUser(u);
+        if (!user || user.token !== t) return res.status(200).send('ok');
+        // Use DB-saved place if available (saved when player finished)
+        const dbPlace = user._pendingPlace;
+        if (dbPlace && (!place || parseInt(place) === parseInt(total))) {
+            place = dbPlace.place;
+            total = dbPlace.totalPlayers;
+            game = dbPlace.game || game;
+            console.log(`[beacon] using DB place: ${place}/${total}`);
+        }
+        // Also check server memory
+        const serverPlace = activePings[u + '_place'];
+        if (serverPlace && (!place || parseInt(place) === parseInt(total))) {
+            place = serverPlace.place;
+            total = serverPlace.totalPlayers;
+            game = serverPlace.game || game;
+        }
+        const placeNum = parseInt(place) || 0;
+        const totalNum = parseInt(total) || 0;
+        // Determine result from place if not provided
+        if (placeNum > 0 && totalNum > 0) {
+            if (placeNum === 1) result = 'win';
+            else if (placeNum < totalNum) result = 'abandon_mid';
+            else result = 'abandon_lose';
+        }
+        const stats = user.stats || {};
+        const g = stats[game] || {};
+        const m = g[mode || 'bot'] || { played:0, won:0, lost:0, abandoned:0 };
+        m.played = (m.played||0) + 1;
+        // Update places array
+        if (game === 'shithead' && placeNum >= 1 && placeNum <= 4) {
+            m.places = m.places || [0,0,0,0];
+            m.places[placeNum - 1] = (m.places[placeNum - 1] || 0) + 1;
+        }
+        if (result === 'win') {
+            m.won = (m.won||0) + 1;
+        } else if (result === 'abandon_mid') {
+            m.won = (m.won||0) + 1;
+            m.abandoned = (m.abandoned||0) + 1;
+        } else {
+            m.lost = (m.lost||0) + 1;
+            m.abandoned = (m.abandoned||0) + 1;
+        }
+        g[mode || 'bot'] = m; stats[game] = g;
+        await saveUser(u, { stats });
+        delete activePings[u + '_place'];
+        await saveUser(u, { _pendingPlace: null }); // clear used place
+        console.log(`[beacon] ${u} ${game}/${mode} result=${result} place=${placeNum}/${totalNum}`);
+        res.status(200).send('ok');
+    } catch(e) { res.status(200).send('ok'); }
+});
+
+app.post('/api/stats/record', async (req, res) => {
+    try {
+        const { username, token, game, mode, result, place } = req.body;
+        if (!username || !token) return res.json({ ok: false, error: 'auth required' });
+        const u = await getUser(username);
+        if (!u || u.token !== token) return res.json({ ok: false, error: 'invalid token' });
+        // game: 'shithead' | 'basra'
+        // mode: 'bot' | 'online'
+        // result: 'win' | 'lose' | 'abandon' (basra) OR 'finish' | 'abandon' (shithead)
+        // place: 1-4 (shithead only)
+        const stats = u.stats || {};
+        const g = stats[game] || {};
+        const m = g[mode] || { played: 0, won: 0, lost: 0, abandoned: 0, places: [0,0,0,0] };
+        m.played = (m.played || 0) + 1;
+        if (result === 'abandon_lose') {
+            // basra abandon: lose + abandoned in one call
+            m.lost = (m.lost || 0) + 1;
+            m.abandoned = (m.abandoned || 0) + 1;
+        } else if (result === 'abandon') {
+            m.abandoned = (m.abandoned || 0) + 1;
+            // For shithead abandon — also record place
+            if (game === 'shithead' && place >= 1 && place <= 4) {
+                m.places = m.places || [0,0,0,0];
+                m.places[place - 1]++;
+                m.lost = (m.lost || 0) + 1;
+            }
+        } else if (game === 'shithead' && place >= 1 && place <= 4) {
+            m.places = m.places || [0,0,0,0];
+            m.places[place - 1]++;
+            if (place === 1) m.won = (m.won || 0) + 1;
+            else m.lost = (m.lost || 0) + 1;
+        } else if (result === 'win') {
+            m.won = (m.won || 0) + 1;
+        } else if (result === 'lose') {
+            m.lost = (m.lost || 0) + 1;
+        }
+        g[mode] = m;
+        stats[game] = g;
+        await saveUser(username, { stats });
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/stats/user', async (req, res) => {
+    try {
+        const { key, u } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const user = await getUser(u);
+        if (!user) return res.json({ ok: false, error: 'user not found' });
+
+        res.json({ ok: true, stats: user.stats || {}, username: u });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/admin/reset-all-stats', async (req, res) => {
+    try {
+        const { key } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const result = await usersCol.updateMany({}, { $unset: { stats: '' } });
+        res.json({ ok: true, modified: result.modifiedCount });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/admin/reset-user-stats', async (req, res) => {
+    try {
+        const { key, u } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        if (!u) return res.json({ ok: false, error: 'Missing username' });
+        const user = await getUser(u);
+        if (!user) return res.json({ ok: false, error: 'User not found' });
+        await saveUser(u, { stats: {} });
+        res.json({ ok: true });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/admin/set-coins', async (req, res) => {
+    try {
+        const { key, u, coins } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const amount = parseInt(coins);
+        if (isNaN(amount) || amount < 0) return res.json({ error: 'Invalid coins value' });
+        const user = await getUser(u);
+        if (!user) return res.json({ error: `User "${u}" not found` });
+        await saveUser(u, { coins: amount });
+        res.json({ ok: true, username: u, coins: amount });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
+// Admin: delete user
+app.get('/api/admin/delete-user', async (req, res) => {
+    try {
+        const { key, u } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        const result = await usersCol.deleteOne({ username: u });
+        res.json({ ok: result.deletedCount > 0, username: u });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
+// Admin: view all users (protected by secret key)
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        const key = req.query.key;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        // Use memory fallback if MongoDB unavailable
+        let allUsers;
+        if (usersCol && mongoOk) {
+            allUsers = await usersCol.find({}, { projection: { pinHash: 0, token: 0 } }).toArray();
+        } else {
+            allUsers = Object.values(memUsers).map(u => { const {pinHash, token, ...rest} = u; return rest; });
+        }
+        const sorted = allUsers.sort((a, b) => (b.coins || 0) - (a.coins || 0));
+
+        // Build connected users set from all sources
+        const connectedUsernames = new Set();
+        // Shithead rooms: connected human slots
+        Object.values(rooms).forEach(r => r.slots && r.slots.forEach(sl => {
+            if (sl.username && sl.connected && !sl.isBot) connectedUsernames.add(sl.username);
+        }));
+        // Basra rooms: slots with live socketId
+        Object.values(basraRooms).forEach(r => r.slots.forEach(sl => {
+            if (sl.username && sl.socketId && io.sockets.sockets.has(sl.socketId)) {
+                connectedUsernames.add(sl.username);
+            }
+        }));
+        // Any socket with explicit username
+        for (const [, sock] of io.sockets.sockets) {
+            if (sock.data?.username) connectedUsernames.add(sock.data.username);
+        }
+        // VS AI pings (active within last 90 seconds)
+        const pingCutoff = Date.now() - 70000;
+        Object.entries(activePings).forEach(([uname, ts]) => {
+            if (ts > pingCutoff) connectedUsernames.add(uname);
+            else delete activePings[uname];
+        });
+
+
+        // Build room map: username -> room code
+        const userRoomMap = {};
+        Object.values(rooms).forEach(r => r.slots && r.slots.forEach(sl => {
+            if (sl.username && sl.connected && !sl.isBot) userRoomMap[sl.username] = 'SH:' + r.code;
+        }));
+        Object.values(basraRooms).forEach(r => r.slots.forEach(sl => {
+            if (sl.username && sl.socketId && io.sockets.sockets.has(sl.socketId)) userRoomMap[sl.username] = 'BS:' + r.code;
+        }));
+
+        const totalCoins = sorted.reduce((s,u)=>s+(u.coins||0),0).toLocaleString();
+        const totalUsers = sorted.length;
+        const connectedCount = connectedUsernames.size;
+
+        // Aggregate global stats across all users
+        const globalStats = {
+            shithead:{ bot:{played:0,won:0,abandoned:0,places:[0,0,0,0]}, online:{played:0} },
+            basra:{ bot:{played:0,won:0,lost:0,abandoned:0}, online:{played:0} }
+        };
+        sorted.forEach(u => {
+            if (!u.stats) return;
+            ['shithead','basra'].forEach(g => {
+                ['bot','online'].forEach(m => {
+                    const s = u.stats[g]?.[m];
+                    if (!s) return;
+                    globalStats[g][m].played += s.played||0;
+                    if (m === 'bot') {
+                        globalStats[g][m].won    = (globalStats[g][m].won||0) + (s.won||0);
+                        globalStats[g][m].lost   = (globalStats[g][m].lost||0) + (s.lost||0);
+                        globalStats[g][m].abandoned = (globalStats[g][m].abandoned||0) + (s.abandoned||0);
+                        if (g === 'shithead' && s.places) {
+                            for (let i=0;i<4;i++) globalStats.shithead.bot.places[i] += s.places[i]||0;
+                        }
+                    }
+                });
+            });
+        });
+
+        const rows = sorted.map((u, i) => {
+            const isOnline = connectedUsernames.has(u.username);
+            const lastSeen = u.lastSeenTs ? new Date(u.lastSeenTs).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '—';
+            const roomInfo = userRoomMap[u.username] || '—';
+            return `
+            <tr style="border-bottom:1px solid #333">
+                <td style="padding:8px;text-align:center">${i+1}</td>
+                <td style="padding:8px"><b>${u.username}</b></td>
+                <td style="padding:8px">${u.firstName || ''} ${u.lastName || ''}</td>
+                <td style="padding:8px;text-align:center">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${isOnline?'#22c55e':'#555'};margin-left:6px"></span>
+                    ${isOnline ? '<span style="color:#22c55e">מחובר</span>' : '<span style="color:#555">לא מחובר</span>'}
+                </td>
+                <td style="padding:8px;text-align:center;font-family:monospace;font-size:12px;color:${roomInfo!=='—'?'#fbbf24':'#555'}">${roomInfo}</td>
+                <td style="padding:8px;text-align:center">${lastSeen}</td>
+                <td style="padding:8px;text-align:center">
+                    <span style="display:flex;align-items:center;gap:4px;justify-content:center">
+                        <input id="coins_${u.username}" type="number" value="${u.coins||0}" style="width:80px;padding:4px;background:#1a3a2a;border:1px solid #444;color:#fff;border-radius:4px;text-align:center">
+                        <button onclick="setCoins('${u.username}')" style="padding:4px 10px;background:#16a34a;border:none;color:#fff;border-radius:4px;cursor:pointer">✓</button>
+                    </span>
+                </td>
+                <td style="padding:8px;text-align:center">
+                    <button onclick="showStats('${u.username}')" style="padding:4px 10px;background:#1d4ed8;border:none;color:#fff;border-radius:4px;cursor:pointer;margin-bottom:4px">📊</button>
+                    <button onclick="deleteUser('${u.username}')" style="padding:4px 10px;background:#dc2626;border:none;color:#fff;border-radius:4px;cursor:pointer">🗑</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        res.send(`<!DOCTYPE html>
+<html dir="rtl">
+<head><meta charset="utf-8"><title>Admin — משתמשים</title>
+<style>
+  body{font-family:sans-serif;background:#0a1a0d;color:#fff;padding:20px;margin:0}
+  h2{color:gold;margin-bottom:16px}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th{background:#1a4a2a;padding:10px;text-align:right;position:sticky;top:0}
+  tr:hover{background:rgba(255,255,255,0.05)}
+  .stats{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+  .stat{background:#1a3a2a;padding:10px 16px;border-radius:8px;font-size:13px}
+  .stat span{color:gold;font-size:18px;font-weight:700;display:block}
+  .stat-section{background:#0f2a1a;border:1px solid #1a4a2a;border-radius:10px;padding:12px 16px;margin-bottom:12px}
+  .stat-section h3{margin:0 0 10px 0;font-size:14px;color:#86efac;letter-spacing:1px}
+  .stat-row{display:flex;gap:16px;flex-wrap:wrap}
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:999;align-items:center;justify-content:center}
+  .modal-box{background:#0f2a1a;border:1px solid #1a4a2a;border-radius:12px;padding:24px;min-width:320px;max-width:500px;width:90%}
+  .modal-box h3{color:gold;margin:0 0 16px 0}
+  .srow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px}
+  .srow:last-child{border:none}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;margin-right:4px}
+</style>
+<script>
+const KEY = '${key}';
+async function setCoins(u) {
+    const coins = document.getElementById('coins_' + u).value;
+    const r = await fetch('/api/admin/set-coins?key=' + KEY + '&u=' + u + '&coins=' + coins);
+    const d = await r.json();
+    if (d.ok) { alert('OK: ' + coins); } else alert('ERR: ' + JSON.stringify(d));
+}
+async function deleteUser(u) {
+    if (!confirm('Delete ' + u + '?')) return;
+    const r = await fetch('/api/admin/delete-user?key=' + KEY + '&u=' + u);
+    const d = await r.json();
+    if (d.ok) { location.reload(); } else alert('ERR: ' + JSON.stringify(d));
+}
+async function resetUserStats(u) {
+    if (!confirm('Reset stats for ' + u + '?')) return;
+    const r = await fetch('/api/admin/reset-user-stats?key=' + KEY + '&u=' + encodeURIComponent(u));
+    const d = await r.json();
+    if (d.ok) { document.getElementById('statsModal').style.display='none'; location.reload(); }
+    else alert('ERR: ' + JSON.stringify(d));
+}
+async function showStats(u) {
+    const r = await fetch('/api/stats/user?key=' + KEY + '&u=' + encodeURIComponent(u));
+    const d = await r.json();
+    if (!d.ok) { alert('Error: ' + d.error); return; }
+    const s = d.stats || {};
+    function modeHtml(game, mode, label) {
+        const m = (s[game] && s[game][mode]) || {};
+        const played = m.played || 0;
+        const abandoned = m.abandoned || 0;
+        var rows = '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>שוחק</span><span>' + played + '</span></div>';
+        if (game === 'shithead') {
+            var places = m.places || [0,0,0,0];
+            var placeData = [
+                {label:'🥇 מקום 1', color:'#fbbf24', val: places[0]||0},
+                {label:'🥈 מקום 2', color:'#9ca3af', val: places[1]||0},
+                {label:'🥉 מקום 3', color:'#cd7c3a', val: places[2]||0},
+                {label:'💩 מקום 4', color:'#6b7280', val: places[3]||0}
+            ];
+            placeData.forEach(function(p, idx) {
+                var pct = played > 0 ? Math.round(p.val / played * 100) : 0;
+                var border = idx < 3 ? 'border-bottom:1px solid rgba(255,255,255,0.07);' : '';
+                rows += '<div style="' + border + 'padding:4px 0;font-size:12px">' +
+                    '<div style="display:flex;justify-content:space-between"><span style="color:' + p.color + '">' + p.label + '</span><span>' + p.val + ' <span style="color:rgba(255,255,255,0.35)">(' + pct + '%)</span></span></div>' +
+                    '<div style="background:rgba(255,255,255,0.07);border-radius:3px;height:4px;margin-top:2px"><div style="width:' + pct + '%;background:' + p.color + ';height:100%;border-radius:3px"></div></div>' +
+                '</div>';
+            });
+        } else {
+            var won = m.won || 0; var lost = m.lost || 0;
+            var winPct = played > 0 ? Math.round(won/played*100) : 0;
+            rows += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>נצח</span><span style="color:#22c55e">' + won + ' (' + winPct + '%)</span></div>';
+            rows += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.07);font-size:13px"><span>הפסיד</span><span style="color:#ef4444">' + lost + '</span></div>';
+        }
+        rows += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:#6b7280"><span>🚪 נטש</span><span>' + abandoned + '</span></div>';
+        return '<div style="background:#1a3a2a;border-radius:8px;padding:10px;flex:1;min-width:160px">' +
+            '<div style="font-size:12px;color:#86efac;margin-bottom:6px;font-weight:700">' + label + '</div>' +
+            rows + '</div>';
+    }
+    document.getElementById('statsModalTitle').textContent = 'Stats: ' + u;
+    document.getElementById('statsModalBody').innerHTML =
+        '<div style="margin-bottom:12px"><div style="color:#7dd3fc;font-size:13px;font-weight:700;margin-bottom:8px">Shithead</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' + modeHtml('shithead','bot','🤖 מול מחשב') + modeHtml('shithead','online','🌐 מול שחקנים') + '</div></div>' +
+        '<div><div style="color:#86efac;font-size:13px;font-weight:700;margin-bottom:8px">Basra</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' + modeHtml('basra','bot','🤖 מול מחשב') + modeHtml('basra','online','🌐 מול שחקנים') + '</div></div>';
+    document.getElementById('statsModalUser').value = u;
+    document.getElementById('statsModal').style.display = 'flex';
+}
+</script>
+</head>
+<body>
+<h2>🃏 SHITHEAD — ניהול משתמשים 
+  <button onclick="if(confirm('למחוק את כל הסטטיסטיקה?')){fetch('/api/admin/reset-all-stats?key='+KEY).then(r=>r.json()).then(d=>{ alert(d.ok ? 'אופס! ' + d.modified + ' משתמשים אופסו' : 'שגיאה: '+d.error); if(d.ok)location.reload(); })}" style="font-size:13px;padding:4px 12px;background:#7c3aed;border:none;color:#fff;border-radius:6px;cursor:pointer;margin-right:12px">🗑 איפוס סטטיסטיקה</button>
+</h2>
+
+<!-- Global stats -->
+<div class="stats">
+  <div class="stat"><span>${totalUsers}</span>סה&quot;כ משתמשים</div>
+  <div class="stat"><span style="color:#22c55e">${connectedCount}</span>מחוברים כעת</div>
+  <div class="stat"><span>${totalCoins}</span>מטבעות</div>
+</div>
+
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+  <div class="stat-section" style="flex:1;min-width:220px">
+    <h3>🃏 Shithead — כלל המשתמשים</h3>
+    <div class="stat-row">
+      <div class="stat" style="flex:1">
+        <span>${globalStats.shithead.bot.played}</span>🤖 מול מחשב
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">🥇 ${globalStats.shithead.bot.places[0]}  🥈 ${globalStats.shithead.bot.places[1]}  🥉 ${globalStats.shithead.bot.places[2]}  💩 ${globalStats.shithead.bot.places[3]}</div>
+        <div style="font-size:11px;color:#6b7280">נטשו: ${globalStats.shithead.bot.abandoned}</div>
+      </div>
+      <div class="stat" style="flex:1">
+        <span>${globalStats.shithead.online.played}</span>🌐 ברשת
+      </div>
+    </div>
+  </div>
+  <div class="stat-section" style="flex:1;min-width:220px">
+    <h3>🀄 Basra — כלל המשתמשים</h3>
+    <div class="stat-row">
+      <div class="stat" style="flex:1">
+        <span>${globalStats.basra.bot.played}</span>🤖 מול מחשב
+        <div style="font-size:11px;color:#22c55e;margin-top:2px">נצח: ${globalStats.basra.bot.won}</div>
+        <div style="font-size:11px;color:#ef4444;margin-top:1px">הפסיד: ${globalStats.basra.bot.lost}</div>
+        <div style="font-size:11px;color:#6b7280">נטש: ${globalStats.basra.bot.abandoned}</div>
+      </div>
+      <div class="stat" style="flex:1">
+        <span>${globalStats.basra.online.played}</span>🌐 ברשת
+      </div>
+    </div>
+  </div>
+</div>
+
+<table>
+<tr><th>#</th><th>שם משתמש</th><th>שם מלא</th><th>סטטוס</th><th>חדר</th><th>חיבור אחרון</th><th>מטבעות</th><th>פעולות</th></tr>
+${rows}
+</table>
+
+<!-- Stats Modal -->
+<div id="statsModal" class="modal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="statsModalTitle" style="margin:0"></h3>
+      <button onclick="resetUserStats(document.getElementById('statsModalUser').value)" style="background:#7c3aed;border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">🗑 איפוס סטטיסטיקה</button>
+    </div>
+    <input type="hidden" id="statsModalUser" value="">
+    <div id="statsModalBody"></div>
+    <button onclick="document.getElementById('statsModal').style.display='none'" style="margin-top:16px;padding:6px 20px;background:#374151;border:none;color:#fff;border-radius:6px;cursor:pointer">✕ סגור</button>
+  </div>
+</div>
+</body></html>`);
+    } catch(e) { res.json({ error: e.message }); }
+});
+// ── Stats recording ──
+async function recordShitheadStats(room) {
+    try {
+        const isBot = room.slots.some(s => s.isBot && !s.wasHuman);
+        const mode = isBot ? 'bot' : 'online';
+        for (const slotIdx of room.winnersOrder) {
+            const slot = room.slots[slotIdx];
+            if (!slot.username || (slot.isBot && !slot.wasHuman)) continue;
+            const place = room.winnersOrder.indexOf(slotIdx) + 1;
+            const u = await getUser(slot.username);
+            if (!u) continue;
+            const stats = u.stats || {};
+            const g = stats['shithead'] || {};
+            const m = g[mode] || { played:0, won:0, lost:0, abandoned:0, places:[0,0,0,0] };
+            m.played = (m.played||0) + 1;
+            m.places = m.places || [0,0,0,0];
+            m.places[place-1] = (m.places[place-1]||0) + 1;
+            if (place === 1) m.won = (m.won||0) + 1; else m.lost = (m.lost||0) + 1;
+            g[mode] = m; stats['shithead'] = g;
+            await saveUser(slot.username, { stats });
+            console.log(`[stats] shithead ${slot.username} mode=${mode} place=${place}`);
+        }
+    } catch(e) { console.error('[stats shithead] error:', e.message); }
+}
+
+async function recordBasraStats(room, winnerSlotIdx) {
+    try {
+        const isBot = room.slots.some(s => s.isBot);
+        const mode = isBot ? 'bot' : 'online';
+        for (let i = 0; i < room.slots.length; i++) {
+            const slot = room.slots[i];
+            if (!slot.username || slot.isBot) continue;
+            const won = i === winnerSlotIdx;
+            const u = await getUser(slot.username);
+            if (!u) continue;
+            const stats = u.stats || {};
+            const g = stats['basra'] || {};
+            const m = g[mode] || { played:0, won:0, lost:0, abandoned:0 };
+            m.played = (m.played||0) + 1;
+            if (won) {
+                m.won = (m.won||0) + 1;
+            } else {
+                m.lost = (m.lost||0) + 1;
+                m.abandoned = (m.abandoned||0) + 1; // losing = always abandoning in vs-bot
+            }
+            g[mode] = m; stats['basra'] = g;
+            await saveUser(slot.username, { stats });
+            console.log(`[stats] basra ${slot.username} mode=${mode} won=${won}`);
+        }
+    } catch(e) { console.error('[stats basra] error:', e.message); }
+}
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+const rooms = {};
+const disconnectTimers = {}; // roomCode → room object
+const activePings = {}; // username -> last ping timestamp (for VS AI)
+const roomTimers = {}; // roomCode → interval
+
+function clearRoomTimer(code) {
+    if (roomTimers[code]) { clearInterval(roomTimers[code]); delete roomTimers[code]; }
+}
+
+
+function findStarter(slots) {
+    const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
+    let minRank = 99;
+    slots.forEach(p => p.hand.forEach(c => {
+        const v = customSort.indexOf(c.slice(0,-1));
+        if (v < minRank) minRank = v;
+    }));
+    const minRankStr = customSort[minRank];
+    const candidates = slots.filter(p => p.hand.some(c => c.slice(0,-1) === minRankStr));
+    if (candidates.length === 1) return candidates[0].id;
+    const maxCount = Math.max(...candidates.map(p => p.hand.filter(c => c.slice(0,-1) === minRankStr).length));
+    const withPair = candidates.filter(p => p.hand.filter(c => c.slice(0,-1) === minRankStr).length === maxCount);
+    return withPair[Math.floor(Math.random() * withPair.length)].id;
+}
+function startSwapTimer(room) {
+    const key = room.code + '_swap';
+    clearRoomTimer(key);
+    // Reset swap tracking fresh at start of each swap phase
+    room.swapDoneCount = 0;
+    room.slots.forEach(s => { s._swapDone = false; });
+    let remaining = 40;
+    broadcast(room, 'swapTick', { remaining });
+
+    roomTimers[key] = setInterval(() => {
+        remaining--;
+        broadcast(room, 'swapTick', { remaining });
+        if (remaining <= 0) {
+            clearRoomTimer(key);
+            // Auto-end swap for all players who haven't ended yet
+            room.slots.forEach(s => { if (s.connected) s._swapDone = true; });
+            const starter = findStarter(room.slots);
+            room.isSwapPhase = false;
+            room.gameStarted = true;
+            room.swapDoneCount = 0;
+            room.currentPlayer = starter;
+            broadcast(room, 'swapTick', { remaining: 0 }); // hide timer on all clients
+            broadcast(room, 'toast', `⏰ זמן ההחלפה נגמר! ${room.slots[starter].name} ראשון`);
+            emitStateToAll(room);
+            startTurnTimer(room);
+        }
+    }, 1000);
+}
+
+function startTurnTimer(room) {
+    clearRoomTimer(room.code);
+    if (!room.turnTimer || room.turnTimer === 0 || room.isSwapPhase || room.gameOver) return;
+
+    let remaining = room.turnTimer;
+    // Broadcast initial tick
+    broadcast(room, 'timerTick', { remaining, currentPlayer: room.currentPlayer });
+
+    roomTimers[room.code] = setInterval(() => {
+        remaining--;
+        broadcast(room, 'timerTick', { remaining, currentPlayer: room.currentPlayer });
+        if (remaining <= 0) {
+            clearRoomTimer(room.code);
+            // Auto-take pile for current player
+            const autoSlot = room.currentPlayer;
+            const p = room.slots[autoSlot];
+            if (p && !p.finished) {
+                p.consecutiveTimeouts = (p.consecutiveTimeouts || 0) + 1;
+                const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
+
+                // Disqualify after 2 consecutive timeouts
+                if (p.consecutiveTimeouts >= 2) {
+                    broadcast(room, 'toast', `⏰ ${p.name} לא שיחק — מוכרז כמפסיד`);
+                    p.disqualified = true;
+                    p.finished = true;
+                    room.winnersOrder.push(autoSlot);
+
+                    const active = room.slots.filter(s => !s.finished);
+                    if (active.length <= 1) {
+                        if (active.length === 1) {
+                            active[0].finished = true;
+                            room.winnersOrder.unshift(active[0].id);
+                        }
+                        room.gameOver = true;
+                        clearRoomTimer(room.code);
+                        broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+                        setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
+                    } else {
+                        // Replace with bot
+                        p.isBot = true;
+                        p.finished = false;
+                        room.winnersOrder.pop();
+                        const origName = p.name;
+                        p.name = `🤖 ${origName}`;
+                        broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${origName}`);
+                        emitStateToAll(room);
+                        if (room.currentPlayer === autoSlot) {
+                            setTimeout(() => { if (rooms[room.code]) doBotTurn(room); }, 800);
+                        } else {
+                            nextTurn(room);
+                        }
+                    }
+                    return;
+                }
+
+                const validAuto = p.hand.filter(c => canPlay(c, room.pile));
+                if (p.hand.length > 0 && (room.pile.length === 0 || validAuto.length > 0)) {
+                    const pool = validAuto.length > 0 ? validAuto : p.hand;
+                    pool.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
+                    const card = pool[0];
+                    p.hand = p.hand.filter(c => c !== card);
+                    broadcast(room, 'toast', `⏰ זמן נגמר! ${p.name} שיחק ${card.slice(0,-1)} אוטומטית`);
+                    executeMove(room, room.currentPlayer, [card]);
+                } else {
+                    broadcast(room, 'toast', `⏰ זמן נגמר! ${p.name} לוקח את הערימה`);
+                    if (p.hand.length === 0 && p.faceUp.some(Boolean)) {
+                        const best = p.faceUp.find(Boolean);
+                        const idx = p.faceUp.indexOf(best);
+                        if (idx !== -1) { p.hand.push(best); p.faceUp[idx] = null; }
+                    }
+                    p.hand.push(...room.pile);
+                    room.pile = [];
+                    nextTurn(room);
+                }
+            }
+        }
+    }, 1000);
+}
+
+function makeCode() {
+    return Math.random().toString(36).substring(2, 6).toUpperCase();
+}
+
+const RANKS   = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const SUITS   = ['♠','♥','♦','♣'];
+const SPECIAL = new Set(['2','3','10']);
+
+function makeDeck() {
+    const d = [];
+    for (const s of SUITS) for (const r of RANKS) d.push(r + s);
+    return d.sort(() => Math.random() - 0.5);
+}
+
+function getEffectiveTop(pile) {
+    for (let i = pile.length - 1; i >= 0; i--) {
+        if (pile[i].slice(0, -1) !== '3') return pile[i];
+    }
+    return null;
+}
+
+function canPlay(card, pile) {
+    if (!card) return false;
+    const r = card.slice(0, -1);
+    if (['2', '3', '10'].includes(r)) return true;
+    const top = getEffectiveTop(pile);
+    if (!top) return true;
+    const topR = top.slice(0, -1);
+    if (topR === '2') return true;
+    const v = RANKS.indexOf(r), tv = RANKS.indexOf(topR);
+    return topR === '7' ? v <= tv : v >= tv;
+}
+
+function restartRoom(room) {
+    const deck = makeDeck();
+    room.slots = room.slots.map((s, i) => ({
+        id: i,
+        name: s.name,
+        socketId: s.socketId,
+        username: s.username || null,  // preserve username across restarts
+        hand: deck.splice(0, 3),
+        faceUp: deck.splice(0, 3),
+        faceDown: deck.splice(0, 3),
+        finished: false,
+        connected: s.connected,
+        consecutiveTimeouts: 0,
+        _swapDone: false,
+        isBot: false,
+    }));
+    room.drawPile = deck;
+    room.pile = [];
+    room.currentPlayer = 0;
+    room.isSwapPhase = true;
+    room.winnersOrder = [];
+    room.leaversOrder = []; // first leaver = last place
+    room.gameOver = false;
+    room.coinsSettled = false;  // allow new settlement
+    room.interruptWindow = false;
+    room.lastPlayedRank = null;
+    room.lastPlayerIdx = null;
+    room.restartVotes = new Set();
+    room.swapDoneCount = 0;
+    clearRoomTimer(room.code);
+    clearRoomTimer(room.code + '_swap');
+    console.log(`[restartRoom] slots:`, room.slots.map(s=>({name:s.name,socketId:!!s.socketId,connected:s.connected,_swapDone:s._swapDone})));
+}
+
+function createRoom(hostSocketId, hostName, playerCount, bet=0) {
+    const code = makeCode();
+    const deck = makeDeck();
+    const slots = Array.from({ length: playerCount }, (_, i) => ({
+        id: i,
+        name: null,
+        socketId: null,
+        username: null, // registered username (null = guest)
+        hand: deck.splice(0, 3),
+        faceUp: deck.splice(0, 3),
+        faceDown: deck.splice(0, 3),
+        finished: false,
+        connected: false,
+        consecutiveTimeouts: 0,
+    }));
+    rooms[code] = {
+        code,
+        playerCount,
+        slots,
+        drawPile: deck,
+        pile: [],
+        currentPlayer: 0,
+        isSwapPhase: true,
+        winnersOrder: [],
+        leaversOrder: [],
+        gameOver: false,
+        started: false,
+        hostSocketId,
+        interruptWindow: false,
+        lastPlayedRank: null,
+        lastPlayerIdx: null,
+        burnInterrupt: {},
+        bet: bet || 0,        // coins per player
+        coinsSettled: false,  // prevent double-settle
+    };
+    return code;
+}
+// ══ COINS: settle bets at end of game ══
+// winnersOrder[0]=1st, [last]=loser
+
+
+
+
+// ── Send state to a specific player (only their cards) ──
+function emitStateToPlayer(room, slotIdx) {
+    const slot = room.slots[slotIdx];
+    if (!slot.socketId) return;
+
+    const allJoined = room.slots.every(s => s.connected);
+    const state = {
+        myIdx: slotIdx,
+        myHand: slot.hand,
+        myFaceUp: slot.faceUp,
+        myFaceDown: slot.faceDown,
+        currentPlayer: room.currentPlayer,
+        isSwapPhase: room.isSwapPhase,
+        pile: room.pile,
+        drawPileCount: room.drawPile.length,
+        winnersOrder: room.winnersOrder,
+        gameOver: room.gameOver,
+        allJoined,
+        isPublic: room.isPublic || false,
+        turnTimer: room.turnTimer || 0,
+        bet: room.bet || 0,
+        interruptWindow: room.interruptWindow || false,
+        lastPlayedRank: room.lastPlayedRank || null,
+        lastPlayerIdx: room.lastPlayerIdx ?? null,
+        interruptEarned: (room.interruptEarned && room.lastPlayerIdx === slotIdx) || false,
+        burnInterruptCount: (() => {
+            // How many cards of top rank does THIS player need to burn pile?
+            if (!room.pile.length || room.isSwapPhase) return 0;
+            const topRank = (() => { for(let i=room.pile.length-1;i>=0;i--) if(room.pile[i].slice(0,-1)!=='3') return room.pile[i].slice(0,-1); return null; })();
+            if (!topRank) return 0;
+            const streak = room.pile.filter(c=>c.slice(0,-1)===topRank).length; // streak from top
+            // count consecutive from top
+            let s=0; for(let i=room.pile.length-1;i>=0;i--){ const _r=room.pile[i].slice(0,-1); if(_r===topRank) s++; else break; }
+            const needed = 4 - s;
+            return needed > 0 ? needed : 0;
+        })(),
+        pileTopRank: (() => { if(!room.pile.length) return null; for(let i=room.pile.length-1;i>=0;i--) if(room.pile[i].slice(0,-1)!=='3') return room.pile[i].slice(0,-1); return null; })(),
+        faceUpBurnCount: (() => {
+            // Can player burn with faceUp cards? (only when hand is empty)
+            const p = room.slots[slotIdx];
+            if (p.hand.length > 0 || !room.pile.length || room.isSwapPhase) return 0;
+            if (room.currentPlayer === slotIdx) return 0; // it's their turn, normal play
+            const topRank = (() => { for(let i=room.pile.length-1;i>=0;i--) if(room.pile[i].slice(0,-1)!=='3') return room.pile[i].slice(0,-1); return null; })();
+            if (!topRank) return 0;
+            let streak=0; for(let i=room.pile.length-1;i>=0;i--){ const _r=room.pile[i].slice(0,-1); if(_r===topRank) streak++; else break; }
+            const needed = 4 - streak;
+            if (needed <= 0) return 0;
+            const faceUpCount = p.faceUp.filter(c => c && c.slice(0,-1) === topRank).length;
+            return faceUpCount >= needed ? needed : 0;
+        })(),
+        players: room.slots.map((s, i) => ({
+            id: i,
+            name: s.name,
+            handCount: s.hand.length,
+            faceUp: s.faceUp,
+            faceDownCount: s.faceDown.filter(Boolean).length,
+            finished: s.finished,
+            connected: s.connected,
+        })),
+    };
+    io.to(slot.socketId).emit('state', state);
+}
+
+function emitStateToAll(room) {
+    room.slots.forEach((_, i) => emitStateToPlayer(room, i));
+}
+
+function checkBotBurnInterrupt(room) {
+    if (room.gameOver || room.isSwapPhase || !room.pile.length) return;
+    console.log(`[botBurn] checking room=${room.code} pile=${room.pile.length} current=${room.currentPlayer}`);
+    // Find top rank (skip 3s)
+    let topRank = null;
+    for (let i = room.pile.length-1; i >= 0; i--) {
+        if (room.pile[i].slice(0,-1) !== '3') { topRank = room.pile[i].slice(0,-1); break; }
+    }
+    if (!topRank) return;
+    let streak = 0;
+    for (let i = room.pile.length-1; i >= 0; i--) {
+        const _cr = room.pile[i].slice(0,-1);
+        if (_cr === topRank) streak++;
+        else break;
+    }
+    const needed = 4 - streak;
+    if (needed <= 0) return;
+    // Find a non-current bot that can complete the burn
+    for (let i = 0; i < room.slots.length; i++) {
+        const slot = room.slots[i];
+        if (!slot.isBot || slot.finished || i === room.currentPlayer) continue;
+        const matching = slot.hand.filter(c => c.slice(0,-1) === topRank);
+        if (matching.length >= needed) {
+            const burnCards = matching.slice(0, needed);
+            console.log(`[botBurn] bot ${i} (${slot.name}) can burn with ${burnCards} needed=${needed}`);
+            setTimeout(() => {
+                if (room.gameOver || !room.pile.length) return;
+                // Verify still valid
+                let tr2 = null;
+                for (let j = room.pile.length-1; j >= 0; j--) {
+                    if (room.pile[j].slice(0,-1) !== '3') { tr2 = room.pile[j].slice(0,-1); break; }
+                }
+                if (tr2 !== topRank) return;
+                // Execute burn interrupt
+                burnCards.forEach(c => { const idx = slot.hand.indexOf(c); if (idx !== -1) slot.hand.splice(idx, 1); });
+                burnCards.forEach(c => room.pile.push(c));
+                broadcast(room, 'toast', `⚡🔥 ${slot.name} התפרץ ושרף!`);
+                broadcast(room, 'log', `⚡🔥 ${slot.name} התפרץ לשריפה!`);
+                broadcast(room, 'cardPlayed', { playerIdx: i, cards: burnCards, isInterrupt: true });
+                setTimeout(() => {
+                    const burnerName = slot.name;
+                    broadcast(room, 'log', `🔥 שריפה! תור נוסף ל-${burnerName}`);
+                    broadcast(room, 'burn', { playerIdx: i });
+                    room.pile = [];
+                    drawUpToThree(room, i);
+                    checkWin(room, i);
+                    emitStateToAll(room);
+                    startTurnTimer(room);
+                }, 600);
+            }, 800);
+            break; // only one bot can interrupt
+        }
+    }
+}
+
+// ── Broadcast a toast/log to all in room ──
+function broadcast(room, event, data) {
+    room.slots.forEach(s => {
+        if (s.socketId) io.to(s.socketId).emit(event, data);
+    });
+}
+
+// ── Draw up to 3 cards ──
+function drawUpToThree(room, idx) {
+    const p = room.slots[idx];
+    while (p.hand.length < 3 && room.drawPile.length > 0)
+        p.hand.push(room.drawPile.shift());
+}
+
+// ── Check win ──
+// ── Emit open lobby state ──
+function emitOpenLobby(room) {
+    const state = {
+        players: room.slots.filter(s => s.connected).map((s,i) => ({ name: s.name, connected: true })),
+        openRoom: true,
+        gameStarted: room.gameStarted || false
+    };
+    broadcast(room, 'state', state);
+}
+
+function checkWin(room, idx) {
+    const p = room.slots[idx];
+    if (!p.finished &&
+        p.hand.length === 0 &&
+        p.faceUp.every(c => !c) &&
+        p.faceDown.every(c => !c)) {
+        p.finished = true;
+        room.winnersOrder.push(idx);
+        broadcast(room, 'toast', `🏁 ${p.name} סיים במקום ${room.winnersOrder.length}!`);
+        if (room.winnersOrder.length >= room.playerCount - 1) {
+            const last = room.slots.find(s => !s.finished);
+            if (last) room.winnersOrder.push(last.id);
+            room.gameOver = true;
+            clearRoomTimer(room.code);
+            console.log(`[gameOver] bet=${room.bet} order=${room.winnersOrder} slots=${JSON.stringify(room.slots.map(s=>({n:s.name,u:s.username})))}`);
+            broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i].name));
+            setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
+        }
+    }
+}
+
+// ── Next turn ──
+// ── Bot play logic ──
+function doBotTurn(room) {
+    if (room.gameOver || room.isSwapPhase) return;
+    const idx = room.currentPlayer;
+    const p = room.slots[idx];
+    if (!p || !p.isBot || p.finished) return;
+
+    const customSort = ['4','5','6','7','8','9','J','Q','K','A','2','3','10'];
+
+    setTimeout(() => {
+        if (room.gameOver || room.currentPlayer !== idx) return;
+
+        // Play from hand - play ALL copies of chosen rank
+        if (p.hand.length > 0) {
+            const valid = p.hand.filter(c => canPlay(c, room.pile));
+            if (valid.length > 0) {
+                valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
+                const card = valid[0];
+                const rank = card.slice(0,-1);
+                const allSameRank = p.hand.filter(c => c.slice(0,-1) === rank);
+                p.hand = p.hand.filter(c => c.slice(0,-1) !== rank);
+                executeMove(room, idx, allSameRank);
+            } else {
+                // Take pile
+                p.hand.push(...room.pile);
+                room.pile = [];
+                broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
+                emitStateToAll(room);
+                nextTurn(room);
+            }
+            return;
+        }
+
+        // Play from faceUp
+        const faceUpCards = p.faceUp.filter(c => c);
+        if (faceUpCards.length > 0 && room.drawPile.length === 0) {
+            const valid = faceUpCards.filter(c => canPlay(c, room.pile));
+            if (valid.length > 0) {
+                valid.sort((a,b) => customSort.indexOf(a.slice(0,-1)) - customSort.indexOf(b.slice(0,-1)));
+                const card = valid[0];
+                const fi = p.faceUp.indexOf(card);
+                p.faceUp[fi] = null;
+                executeMove(room, idx, [card]);
+            } else {
+                p.hand.push(...room.pile, ...faceUpCards);
+                p.faceUp = [null, null, null];
+                room.pile = [];
+                broadcast(room, 'toast', `🤖 ${p.name} לוקח`);
+                emitStateToAll(room);
+                nextTurn(room);
+            }
+            return;
+        }
+
+        // Flip faceDown
+        const fdIdx = p.faceDown.findIndex(c => c);
+        if (fdIdx >= 0 && p.hand.length === 0) {
+            const card = p.faceDown[fdIdx];
+            p.faceDown[fdIdx] = null;
+            p.hand.push(card);
+            if (canPlay(card, room.pile)) {
+                p.hand = p.hand.filter(c => c !== card);
+                executeMove(room, idx, [card]);
+            } else {
+                p.hand.push(...room.pile);
+                room.pile = [];
+                broadcast(room, 'toast', `🤖 ${p.name} הפך ${card.slice(0,-1)} — לוקח`);
+                emitStateToAll(room);
+                nextTurn(room);
+            }
+            return;
+        }
+
+        nextTurn(room);
+    }, 1200);
+}
+
+function nextTurn(room, skips = 1) {
+    if (room.gameOver) return;
+    const n = room.playerCount;
+    for (let i = 0; i < skips; i++) {
+        let attempts = 0;
+        do {
+            room.currentPlayer = (room.currentPlayer + 1) % n;
+            attempts++;
+            if (attempts > n) break;
+        } while (room.slots[room.currentPlayer].finished);
+    }
+    emitStateToAll(room);
+    startTurnTimer(room);
+    // Check if any non-current bot can do a burn interrupt
+    checkBotBurnInterrupt(room);
+    // If current player is a bot, trigger bot move
+    const cur = room.slots[room.currentPlayer];
+    if (cur && cur.isBot && !cur.finished && !room.gameOver) {
+        doBotTurn(room);
+    }
+}
+
+// ── Execute a move ──
+function executeMove(room, playerIdx, cards) {
+    const pile = room.pile;
+    cards.forEach(c => pile.push(c));
+    const r = cards[0].slice(0, -1);
+
+    broadcast(room, 'cardPlayed', { playerIdx, cards });
+
+    let _bs1 = 0; for (let i = pile.length-1; i >= 0; i--) { const _c=pile[i].slice(0,-1); if(_c===r) _bs1++; else break; }
+    const isBurned = r === '10' || _bs1 >= 4;
+
+    if (isBurned) {
+        const burnerName = room.slots[playerIdx]?.name || '';
+        broadcast(room, 'toast', `🔥 ${burnerName} שרף!`);
+        broadcast(room, 'log', `🔥 שריפה! תור נוסף ל-${burnerName}`);
+        broadcast(room, 'cardPlayed', { playerIdx, cards });
+        setTimeout(() => {
+            broadcast(room, 'burn', { playerIdx });
+            room.pile = [];
+            drawUpToThree(room, playerIdx);
+            checkWin(room, playerIdx);
+            if (!room.slots[playerIdx].finished) {
+                emitStateToAll(room);
+                startTurnTimer(room);
+            } else {
+                nextTurn(room);
+            }
+        }, 400);
+        return;
+    }
+
+    // Check remaining same-rank BEFORE drawing (so we know if player held back cards)
+    const remainingSameRankBeforeDraw = room.slots[playerIdx].hand.filter(c => c.slice(0,-1) === r).length;
+
+    drawUpToThree(room, playerIdx);
+    checkWin(room, playerIdx);
+    if (room.slots[playerIdx].finished) { nextTurn(room); return; }
+
+    const skips = r === '8' ? cards.length : 1;
+
+    // Open interrupt window only if player played ALL same-rank cards they had before drawing
+    if (r !== '10' && remainingSameRankBeforeDraw === 0) {
+        room.interruptWindow = true;
+        room.lastPlayedRank = r;
+        room.lastPlayerIdx = playerIdx;
+        room.interruptEarned = true;
+    } else {
+        room.interruptWindow = false;
+        room.lastPlayedRank = null;
+        room.lastPlayerIdx = null;
+        room.interruptEarned = false;
+    }
+    nextTurn(room, skips);
+}
+
+// ══════════════════════════════════════════════
+//  SOCKET EVENTS
+// ══════════════════════════════════════════════
+// ── Cleanup stale rooms every 5 minutes ──
+setInterval(() => {
+    const now = Date.now();
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+    const EMPTY_10MIN = 10 * 60 * 1000;
+    Object.keys(rooms).forEach(code => {
+        const room = rooms[code];
+        const age = now - (room.createdAt || 0);
+        const connected = room.slots.filter(s => s.connected).length;
+        // Delete if: older than 2hrs, OR empty for 10min, OR game over and no connected
+        if (age > TWO_HOURS || (connected === 0 && age > EMPTY_10MIN) || (room.gameOver && connected === 0)) {
+            clearRoomTimer(code);
+            clearRoomTimer(code + '_swap');
+            delete rooms[code];
+            console.log(`Cleaned up stale room ${code}`);
+        }
+    });
+}, 5 * 60 * 1000);
+
+function handlePlayerLeave(socketData) {
+    const { roomCode, slotIdx } = socketData;
+    const room = rooms[roomCode];
+    if (!room) return;
+    const slot = room.slots[slotIdx];
+    if (!slot) return;
+    // Guard: if already processed this slot's leave, ignore
+    if (room.leaversOrder.includes(slotIdx) && slot.isBot) return;
+    // Guard: pure bots (never human) don't trigger leave logic
+    if (slot.isBot && !slot.wasHuman) return;
+    const name = slot.name;
+
+    // Check game state BEFORE marking disconnected
+    const inGame = room.gameStarted || room.isSwapPhase === false;
+    const inLobby = !inGame && !room.gameOver;
+    slot.connected = false;
+    slot.socketId = null;
+    if (room.restartVotes) room.restartVotes.delete(slotIdx);
+
+    const connected = room.slots.filter(s => s.connected).length;
+
+    if (inLobby) {
+        if (connected === 0 || slotIdx === 0) {
+            broadcast(room, 'roomClosed', { reason: slotIdx === 0 ? 'המארח יצא מהחדר' : 'החדר נסגר' });
+            clearRoomTimer(roomCode);
+            clearRoomTimer(roomCode + '_swap');
+            delete rooms[roomCode];
+            return;
+        }
+        broadcast(room, 'lobbyPlayerLeft', { name, newCount: connected });
+        emitOpenLobby(room);
+        return;
+    }
+
+    if (room.gameOver) {
+        broadcast(room, 'playerLeft', { name, newPlayerCount: connected });
+        return;
+    }
+
+    // Track leavers: first leaver = last place
+    slot.finished = true;
+    slot.disqualified = true;
+    room.leaversOrder.push(slotIdx); // first leaver at index 0
+    console.log(`[leave] ${name} (slot=${slotIdx}) left. leavers=${room.leaversOrder}`);
+    broadcast(room, 'toast', `🚪 ${name} יצא מהמשחק`);
+
+    // Human players still in game (not finished, not bots)
+    const activeHumans = room.slots.filter(s => !s.finished && !s.isBot);
+    // All non-finished players (humans + bots)
+    const activeAll = room.slots.filter(s => !s.finished);
+
+    if (activeHumans.length <= 1) {
+        // Only 1 (or 0) human left — end game immediately
+        const remaining = activeAll.slice();
+        remaining.forEach(p => { p.finished = true; });
+
+        // Build final order using ONLY humans:
+        // - human winner (last standing human)
+        // - then human leavers in reverse order (latest leaver = best loser place)
+        // - leaversOrder contains both humans and bots — filter to humans only
+        const humanWinner = remaining.find(p => !p.isBot);
+        const humanLeavers = room.leaversOrder.filter(i => !room.slots[i].isBot || room.slots[i].wasHuman);
+        // humanLeavers[0] = first human to leave = last place
+        // humanLeavers[last] = latest human to leave = second to last
+        room.winnersOrder = [
+            ...(humanWinner ? [humanWinner.id] : []),
+            ...[...humanLeavers].reverse()
+        ];
+
+        room.gameOver = true;
+        clearRoomTimer(room.code);
+        console.log(`[gameOver by leave] winnersOrder=${room.winnersOrder}`);
+        broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+        setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
+    } else {
+        // More than 1 human remains — replace leaver with bot
+        // Keep leaversOrder entry — leaver's place is recorded
+        // Bot is just a gameplay placeholder, finished=false so it can play
+        slot.isBot = true;
+        slot.wasHuman = true; // was a real player — include in coin settlement
+        slot.finished = false;
+        slot.name = `🤖 ${name}`;
+        broadcast(room, 'toast', `🤖 מחשב ממשיך במקום ${name}`);
+        emitStateToAll(room);
+        if (room.currentPlayer === slotIdx) {
+            setTimeout(() => { if (rooms[roomCode]) doBotTurn(room); }, 800);
+        }
+    }
+}
+
+io.on('connection', (socket) => {
+
+    // ── Create room ──
+    socket.on('createRoom', async ({ name, playerCount, turnTimer, isPublic, bet, username, token }) => {
+        try {
+            const betAmount = parseInt(bet) || 0;
+            const uname = username?.trim().toLowerCase();
+            let validUser = false;
+            if (uname) {
+                const u = await getUser(uname);
+                if (u && u.token === token) {
+                    validUser = true;
+                    if (betAmount > 0 && u.coins < betAmount)
+                        return socket.emit('error', 'אין מספיק מטבעות');
+                } else if (betAmount > 0) {
+                    return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+                }
+            } else if (betAmount > 0) {
+                return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+            }
+            const code = createRoom(socket.id, name, playerCount, betAmount);
+            rooms[code].turnTimer = turnTimer || 0;
+            rooms[code].isPublic = !!isPublic;
+            rooms[code].createdAt = Date.now();
+            const room = rooms[code];
+            room.slots[0].name = name;
+            room.slots[0].socketId = socket.id;
+            room.slots[0].connected = true;
+            room.slots[0].username = validUser ? uname : null;
+            socket.join(code);
+            socket.data.roomCode = code;
+            socket.data.slotIdx = 0;
+            socket.emit('roomCreated', { code, slotIdx: 0, bet: betAmount });
+            emitStateToPlayer(room, 0);
+        } catch(e) { console.error('[createRoom]', e.message); }
+    });
+
+    // ── Open room (host decides when to start) ──
+    socket.on('createOpenRoom', async ({ name, turnTimer, isPublic, bet, username, token }) => {
+        const betAmount = parseInt(bet) || 0;
+        const code = [...Array(4)].map(() => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*23)]).join('');
+        const room = {
+            code,
+            slots: [{
+                id: 0, name, socketId: socket.id, connected: true,
+                username: null, // set after validation
+                hand: [], faceUp: [], faceDown: [], finished: false,
+                consecutiveTimeouts: 0
+            }],
+            playerCount: 1, // grows as players join
+            drawPile: [], pile: [],
+            currentPlayer: 0, isSwapPhase: null, // null = lobby, true/false = in game
+            winnersOrder: [],
+        leaversOrder: [], gameOver: false,
+            interruptWindow: false, lastPlayedRank: null, lastPlayerIdx: null,
+            turnTimer: turnTimer || 0,
+            bet: betAmount,        // ✅ coins per player
+            coinsSettled: false,
+            openRoom: true,  // flag: host controls start
+            isPublic: !!isPublic,
+            createdAt: Date.now(),
+            hostSocketId: socket.id,
+            restartVotes: new Set()
+        };
+        rooms[code] = room;
+        // Set username on host slot
+        const openUname = username?.trim().toLowerCase();
+        if (openUname) {
+            const ou = await getUser(openUname);
+            if (ou && ou.token === token) room.slots[0].username = openUname;
+        }
+        console.log(`[createOpenRoom] code=${code} bet=${betAmount} username=${room.slots[0].username}`);
+        socket.join(code);
+        socket.data.roomCode = code;
+        socket.data.slotIdx = 0;
+        socket.emit('openRoomCreated', { code, slotIdx: 0, bet: betAmount });
+        emitOpenLobby(room);
+    });
+
+    // ── Join open room ──
+    socket.on('joinRoom', async ({ code, name, username, token }) => {
+        const room = rooms[code];
+        if (!room) { socket.emit('error', 'חדר לא נמצא'); return; }
+
+        // Validate coins for bet rooms
+        const betAmount = room.bet || 0;
+        const uname = username?.trim().toLowerCase();
+        let validUser = false;
+        if (uname) {
+            const u = await getUser(uname);
+            if (u && u.token === token) {
+                validUser = true;
+                if (betAmount > 0 && u.coins < betAmount)
+                    return socket.emit('error', `אין מספיק מטבעות (נדרש: ${betAmount})`);
+            } else if (betAmount > 0) {
+                return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+            }
+        } else if (betAmount > 0) {
+            return socket.emit('error', 'יש להתחבר כדי לשחק בהימורים');
+        }
+
+        if (room.openRoom && !room.gameStarted) {
+            if (room.slots.length >= 4) { socket.emit('error', 'החדר מלא (4 שחקנים)'); return; }
+            const slotIdx = room.slots.length;
+            room.slots.push({
+                id: slotIdx, name, socketId: socket.id, connected: true,
+                username: validUser ? uname : null,
+                hand: [], faceUp: [], faceDown: [], finished: false,
+                consecutiveTimeouts: 0
+            });
+            room.playerCount = room.slots.length;
+            socket.join(code);
+            socket.data.roomCode = code;
+            socket.data.slotIdx = slotIdx;
+            socket.emit('openRoomCreated', { code, slotIdx });
+            emitOpenLobby(room);
+            return;
+        }
+        // Fixed-size room join
+        const slot = room.slots.find(s => !s.connected);
+        if (!slot) { socket.emit('error', 'החדר מלא'); return; }
+        slot.name = name;
+        slot.socketId = socket.id;
+        slot.connected = true;
+        slot.username = validUser ? uname : null;
+        socket.join(code);
+        socket.data.roomCode = code;
+        socket.data.slotIdx = slot.id;
+        console.log(`[joinRoom] code=${code} bet=${room.bet} username=${slot.username}`);
+        socket.emit('roomJoined', { code, slotIdx: slot.id, bet: room.bet || 0 });
+        emitStateToAll(room);
+    });
+
+    // ── Host starts open room ──
+    socket.on('hostStart', () => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || !room.openRoom || slotIdx !== 0) return;
+        if (room.slots.filter(s => s.connected).length < 2) {
+            socket.emit('error', 'צריך לפחות 2 שחקנים'); return;
+        }
+        // Initialize the game with current connected players
+        room.gameStarted = true;
+        room.openRoom = false; // behave like normal room now
+        const deck = makeDeck();
+        room.slots = room.slots.filter(s => s.connected);
+        room.playerCount = room.slots.length;
+        room.slots.forEach((s, i) => {
+            s.id = i;
+            // username preserved from join — do not overwrite
+            s.hand = deck.splice(0, 3);
+            s.faceUp = deck.splice(0, 3);
+            s.faceDown = deck.splice(0, 3);
+            s.finished = false;
+        });
+        room.drawPile = deck;
+        room.pile = [];
+        room.currentPlayer = 0;
+        room.isSwapPhase = true;
+        room.winnersOrder = [];
+    room.leaversOrder = []; // first leaver = last place
+        room.gameOver = false;
+        broadcast(room, 'toast', '🎮 המארח התחיל את המשחק!');
+        emitStateToAll(room);
+        startSwapTimer(room);
+    });
+
+    // ── Join room ──
+    // old joinRoom removed (handled above)
+;
+
+    // ── Swap cards (swap phase) ──
+    socket.on('swap', ({ handIdx, tableIdx }) => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || !room.isSwapPhase) return;
+        const p = room.slots[slotIdx];
+        [p.hand[handIdx], p.faceUp[tableIdx]] = [p.faceUp[tableIdx], p.hand[handIdx]];
+        emitStateToPlayer(room, slotIdx);
+    });
+
+    // ── End swap ──
+    socket.on('endSwap', () => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || !room.isSwapPhase) return;
+        // Prevent double-submit from same player this round
+        if (room.slots[slotIdx]._swapDone) {
+            console.log(`[endSwap] slot${slotIdx} BLOCKED (already done) swapDoneCount=${room.swapDoneCount}`);
+            return;
+        }
+        room.slots[slotIdx]._swapDone = true;
+        room.swapDoneCount = (room.swapDoneCount || 0) + 1;
+        const needed = room.slots.filter(s => s.socketId).length;
+        console.log(`[endSwap] slot${slotIdx} counted: ${room.swapDoneCount}/${needed}`);
+        if (room.swapDoneCount >= needed) {
+            clearRoomTimer(room.code + '_swap');
+            broadcast(room, 'swapTick', { remaining: 0 });
+            room.isSwapPhase = false;
+            room.gameStarted = true;
+            const starter = findStarter(room.slots);
+            room.currentPlayer = starter;
+            broadcast(room, 'toast', `המשחק התחיל! ${room.slots[starter].name} ראשון`);
+            emitStateToAll(room);
+            startTurnTimer(room);
+        } else {
+            const waiting = needed - room.swapDoneCount;
+            broadcast(room, 'toast', `${room.slots[slotIdx].name} סיים החלפה. ממתין לעוד ${waiting}...`);
+        }
+    });
+
+    // ── Play cards ──
+    // Flip faceDown card to hand (anytime, any turn)
+    socket.on('flipFaceDown', ({ cardIdx }) => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || room.isSwapPhase || room.gameOver) return;
+        const p = room.slots[slotIdx];
+        // Only in faceDown phase (no hand, no faceUp)
+        if (p.hand.length > 0 || p.faceUp.some(Boolean)) return;
+        if (!p.faceDown[cardIdx]) return;
+        // Move to hand
+        p.hand.push(p.faceDown[cardIdx]);
+        p.faceDown[cardIdx] = null;
+        broadcast(room, 'toast', `${p.name} הפך קלף`);
+        emitStateToAll(room);
+    });
+
+    socket.on('playCards', ({ cards, isInterrupt }) => {
+        // Reset timeout counter on manual play
+        if (rooms[socket.data?.roomCode]?.slots[socket.data?.slotIdx])
+            rooms[socket.data.roomCode].slots[socket.data.slotIdx].consecutiveTimeouts = 0;
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || room.isSwapPhase || room.gameOver) return;
+
+        // Handle interrupt
+        if (isInterrupt) {
+            if (!room.interruptWindow) { socket.emit('error', 'חלון ההתפרצות נסגר'); return; }
+            if (room.lastPlayerIdx !== slotIdx) { socket.emit('error', 'רק השחקן שרק שיחק יכול להתפרץ'); return; }
+            const r = cards[0].slice(0, -1);
+            if (r !== room.lastPlayedRank) { socket.emit('error', 'רק קלף זהה להתפרצות'); return; }
+            const p = room.slots[slotIdx];
+            // Remove cards from player's hand
+            for (const c of cards) {
+                const idx = p.hand.indexOf(c);
+                if (idx === -1) { socket.emit('error', 'קלף לא ביד'); return; }
+                p.hand.splice(idx, 1);
+            }
+            room.interruptWindow = false;
+            // Add to pile and execute
+            cards.forEach(c => room.pile.push(c));
+            broadcast(room, 'toast', `⚡ ${p.name} התפרץ!`);
+            broadcast(room, 'cardPlayed', { playerIdx: slotIdx, cards, isInterrupt: true });
+            // Check burn
+            const topR = room.pile[room.pile.length-1].slice(0,-1);
+            let _bs2=0; for(let i=room.pile.length-1;i>=0;i--){const _c2=room.pile[i].slice(0,-1);if(_c2===topR)_bs2++;else break;}
+            const isBurned = topR === '10' || _bs2 >= 4;
+            if (isBurned) {
+                broadcast(room, 'burn', { playerIdx: slotIdx });
+                room.pile = [];
+                drawUpToThree(room, slotIdx);
+                checkWin(room, slotIdx);
+                emitStateToAll(room);
+                startTurnTimer(room);
+            } else {
+                drawUpToThree(room, slotIdx);
+                checkWin(room, slotIdx);
+                if (room.slots[slotIdx].finished) { nextTurn(room); return; }
+                // If interrupt was with 8, apply the additional skips
+                if (topR === '8') {
+                    // cards.length = number of 8s added in THIS interrupt
+                    nextTurn(room, cards.length);
+                }
+                // Open interrupt window again so player can keep adding 8s
+                room.interruptWindow = true;
+                room.lastPlayedRank = topR;
+                room.lastPlayerIdx = slotIdx;
+                emitStateToAll(room);
+                startTurnTimer(room);
+            }
+            return;
+        }
+
+        // Normal play — close interrupt window
+        room.interruptWindow = false;
+
+        // Check burn interrupt: non-current player completing 4-of-a-kind
+        if (room.currentPlayer !== slotIdx) {
+            if (!room.pile.length) { socket.emit('error', 'לא התורו שלך'); return; }
+            // Find top rank (skip 3s)
+            let topRank = null;
+            for (let i = room.pile.length-1; i >= 0; i--) {
+                if (room.pile[i].slice(0,-1) !== '3') { topRank = room.pile[i].slice(0,-1); break; }
+            }
+            if (!topRank) { socket.emit('error', 'לא התורו שלך'); return; }
+            // Count streak
+            let streak = 0;
+            for (let i = room.pile.length-1; i >= 0; i--) {
+                if (room.pile[i].slice(0,-1) === topRank) streak++; else break;
+            }
+            const needed = 4 - streak;
+            if (needed <= 0) { socket.emit('error', 'לא התורו שלך'); return; }
+            // Validate cards
+            if (cards.length !== needed) { socket.emit('error', `צריך בדיוק ${needed} קלפי ${topRank} לשריפה`); return; }
+            if (!cards.every(c => c.slice(0,-1) === topRank)) { socket.emit('error', 'קלפים לא מתאימים לשריפה'); return; }
+            const p = room.slots[slotIdx];
+            for (const c of cards) {
+                const idx = p.hand.indexOf(c);
+                if (idx === -1) { socket.emit('error', 'קלף לא ביד'); return; }
+                p.hand.splice(idx, 1);
+            }
+            // Add to pile → burn
+            cards.forEach(c => room.pile.push(c));
+            broadcast(room, 'toast', `🔥 ${p.name} שרף את הערימה!`);
+            broadcast(room, 'cardPlayed', { playerIdx: slotIdx, cards });
+            broadcast(room, 'burn', { playerIdx: slotIdx });
+            room.pile = [];
+            drawUpToThree(room, slotIdx);
+            checkWin(room, slotIdx);
+            // Burn interrupter gets the turn
+            room.currentPlayer = slotIdx;
+            emitStateToAll(room);
+            startTurnTimer(room);
+            return;
+        }
+
+        const p = room.slots[slotIdx];
+
+        // Validate and remove cards from player
+        // Check mixed play: hand + faceUp cards of same rank when all hand cards are that rank
+        const allSameRank = cards.every(c => c.slice(0,-1) === cards[0].slice(0,-1));
+        const cardsFromHand = cards.filter(c => p.hand.includes(c));
+        const cardsFromFaceUp = cards.filter(c => p.faceUp.includes(c));
+        const isMixedPlay = allSameRank && cardsFromHand.length > 0 && cardsFromFaceUp.length > 0
+            && cardsFromHand.length === p.hand.length; // must use ALL hand cards
+
+        if (isMixedPlay) {
+            if (!canPlay(cards[0], room.pile)) { socket.emit('error', 'קלף לא חוקי'); return; }
+            for (const c of cardsFromHand) { p.hand.splice(p.hand.indexOf(c), 1); }
+            for (const c of cardsFromFaceUp) { const fi = p.faceUp.indexOf(c); if (fi !== -1) p.faceUp[fi] = null; }
+        } else if (p.hand.length > 0) {
+            // Playing from hand
+            for (const c of cards) {
+                if (!canPlay(c, room.pile)) { socket.emit('error', 'קלף לא חוקי'); return; }
+                const idx = p.hand.indexOf(c);
+                if (idx === -1) { socket.emit('error', 'קלף לא ביד'); return; }
+                p.hand.splice(idx, 1);
+            }
+        } else if (p.faceUp.some(Boolean)) {
+            // Playing from faceUp
+            for (const c of cards) {
+                if (!canPlay(c, room.pile)) { socket.emit('error', 'קלף לא חוקי'); return; }
+                const idx = p.faceUp.indexOf(c);
+                if (idx === -1) { socket.emit('error', 'קלף לא בשולחן'); return; }
+                p.faceUp[idx] = null;
+            }
+        } else {
+            // Playing from faceDown (single card, already revealed client-side)
+            const c = cards[0];
+            const idx = p.faceDown.indexOf(c);
+            if (idx === -1) { socket.emit('error', 'קלף לא נמצא'); return; }
+            p.faceDown[idx] = null;
+            if (!canPlay(c, room.pile)) {
+                // Can't play — take faceDown card + pile together
+                p.hand.push(c, ...room.pile);
+                room.pile = [];
+                broadcast(room, 'toast', `${p.name} הפך קלף לא חוקי — לקח את הערימה`);
+                nextTurn(room);
+                return;
+            }
+            // Play faceDown card normally — pass turn after
+            executeMove(room, slotIdx, [c]);
+            return;
+        }
+
+        executeMove(room, slotIdx, cards);
+    });
+
+    // ── Take pile ──
+    socket.on('takePile', ({ faceUpCards, faceDownCard, faceDownIdx }) => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || room.isSwapPhase || room.gameOver) return;
+        if (room.currentPlayer !== slotIdx) return;
+        room.slots[slotIdx].consecutiveTimeouts = 0;
+
+        const p = room.slots[slotIdx];
+
+        // faceDown phase: take revealed faceDown card + pile
+        if (faceDownCard !== undefined) {
+            const fi = faceDownIdx ?? p.faceDown.indexOf(faceDownCard);
+            if (fi !== -1 && p.faceDown[fi]) {
+                p.hand.push(p.faceDown[fi]);
+                p.faceDown[fi] = null;
+            }
+            p.hand.push(...room.pile);
+            room.pile = [];
+            broadcast(room, 'toast', `${p.name} לקח את הערימה`);
+            nextTurn(room);
+            return;
+        }
+
+        // Block taking empty pile (not faceDown case)
+        if (room.pile.length === 0) {
+            socket.emit('error', 'הערימה ריקה — אי אפשר לקחת');
+            return;
+        }
+
+        // faceUp phase: must take a faceUp card with pile — all must be same rank
+        if (p.hand.length === 0 && p.faceUp.some(Boolean) && faceUpCards?.length) {
+            const firstRank = faceUpCards[0]?.slice(0,-1);
+            const validCards = faceUpCards.filter(c => p.faceUp.includes(c) && c.slice(0,-1) === firstRank);
+            if (!validCards.length) { socket.emit('error', 'קלף לא תקין'); return; }
+            validCards.forEach(c => {
+                const idx = p.faceUp.indexOf(c);
+                if (idx !== -1) { p.hand.push(c); p.faceUp[idx] = null; }
+            });
+        }
+        p.hand.push(...room.pile);
+        room.pile = [];
+        broadcast(room, 'toast', `${p.name} לקח את הערימה`);
+        nextTurn(room);
+    });
+
+    // ── Vote to restart ──
+    socket.on('voteRestart', () => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room || !room.gameOver) return;
+        if (!room.restartVotes) room.restartVotes = new Set();
+
+        // All rooms: everyone must vote to restart
+        room.restartVotes.add(slotIdx);
+        const activePlayers = room.slots.filter(s => s.socketId);
+        broadcast(room, 'playerWantsRestart', {
+            readyCount: room.restartVotes.size,
+            totalCount: activePlayers.length
+        });
+        if (room.restartVotes.size >= activePlayers.length) {
+            room.restartVotes = new Set();
+            restartRoom(room);
+            broadcast(room, 'gameRestarted', {});
+            setTimeout(() => {
+                emitStateToAll(room);
+                startSwapTimer(room);
+            }, 300);
+        }
+    });
+
+    // ── Leave room ──
+    // ── Player voluntarily leaves ──
+    socket.on('playerLeaving', () => handlePlayerLeave(socket.data));
+
+    registerBasraHandlers(socket);
+
+    socket.on('clientLog', ({ msg }) => {
+        console.log('[CLIENT]', msg);
+    });
+
+    socket.on('disconnect', async () => {
+        // Handle shithead disconnect
+        if (socket.data?.roomCode) handlePlayerLeave(socket.data);
+        // Record abandon for shithead vs-AI if applicable
+        const shitheadRoom = socket.data?.roomCode ? rooms[socket.data.roomCode] : null;
+        if (shitheadRoom) {
+            const isBot = shitheadRoom.slots.some(s => s.isBot);
+            const humanSlot = shitheadRoom.slots.find(s => !s.isBot && s.username);
+            if (isBot && humanSlot?.username && !shitheadRoom.gameOver) {
+                setTimeout(async () => {
+                    if (shitheadRoom.gameOver) return;
+                    try {
+                        const u = await getUser(humanSlot.username);
+                        if (u) {
+                            const stats = u.stats || {};
+                            const g = stats['shithead'] || {};
+                            const m = g['bot'] || { played:0, won:0, lost:0, abandoned:0 };
+                            m.played = (m.played||0) + 1;
+                            m.lost = (m.lost||0) + 1;
+                            m.abandoned = (m.abandoned||0) + 1;
+                            g['bot'] = m; stats['shithead'] = g;
+                            await saveUser(humanSlot.username, { stats });
+                            console.log(`[disconnect-abandon] shithead ${humanSlot.username}`);
+                        }
+                    } catch(e) {}
+                }, 30000);
+            }
+        }
+
+        // Handle basra disconnect — mark slot as disconnected after grace period
+        const basraCode = socket.data?.basraRoom;
+        if (basraCode && basraRooms[basraCode]) {
+            const room = basraRooms[basraCode];
+            const slotIdx = socket.data.basraSlot;
+            const slot = room.slots?.[slotIdx];
+            if (slot && slot.socketId === socket.id) {
+                // Grace period: 30s to reconnect before marking disconnected
+                setTimeout(async () => {
+                    if (slot.socketId !== socket.id) return; // reconnected
+                    slot.connected = false;
+                    slot.socketId = null;
+                    // If vs-AI game still active — record abandon server-side
+                    const isBot = room.slots.some(s => s.isBot);
+                    if (isBot && !room.gameOver && !room.roundOver && slot.username) {
+                        try {
+                            const u = await getUser(slot.username);
+                            if (u) {
+                                const stats = u.stats || {};
+                                const g = stats['basra'] || {};
+                                const m = g['bot'] || { played:0, won:0, lost:0, abandoned:0 };
+                                m.played = (m.played||0) + 1;
+                                m.lost = (m.lost||0) + 1;
+                                m.abandoned = (m.abandoned||0) + 1;
+                                g['bot'] = m; stats['basra'] = g;
+                                await saveUser(slot.username, { stats });
+                                console.log(`[disconnect-abandon] basra ${slot.username}`);
+                                room.gameOver = true; // stop the game
+                            }
+                        } catch(e) { console.error('[disconnect-abandon] basra error:', e.message); }
+                    }
+                }, 30000);
+            }
+        }
+    });
+
+    socket.on('getOnlineStats', () => {
+        const allRooms = Object.values(rooms);
+        const inGame = allRooms.filter(r => r.gameStarted || (r.isSwapPhase === false && !r.gameOver))
+            .reduce((sum, r) => sum + r.slots.filter(s => s.connected).length, 0);
+        const online = io.engine.clientsCount;
+        socket.emit('onlineStats', { online, inGame });
+    });
+
+    socket.on('getPublicRooms', () => {
+        const timerLabel = t => t === 0 ? '♾' : `${t}s`;
+        const allRooms = Object.values(rooms).filter(r => r.isPublic);
+        const list = allRooms.map(r => {
+            const connected = r.slots.filter(s => s.connected).length;
+            const max = r.openRoom ? 4 : r.playerCount;
+            // inProgress = game actually started
+            const inProgress = r.gameStarted ||
+                (!r.openRoom && r.isSwapPhase === false && !r.gameOver);
+            const isFull = r.openRoom ? connected >= 4 : !r.slots.some(s => !s.connected);
+            // available = waiting for players
+            const isAvailable = !r.gameOver && !inProgress && !isFull;
+            const hostSlot = r.slots[0];
+            return {
+                code: r.code,
+                players: connected,
+                max,
+                timerLabel: timerLabel(r.turnTimer || 0),
+                available: isAvailable,
+                inProgress,
+                isFull,
+                bet: r.bet || 0,
+                host: hostSlot?.name || ''
+            };
+        });
+        socket.emit('publicRooms', list);
+    });
+
+    socket.on('reaction', ({ emoji }) => {
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room) return;
+        const name = room.slots[slotIdx]?.name || 'שחקן';
+        broadcast(room, 'reaction', { emoji, name });
+    });
+
+    socket.on('leaveRoom_legacy', () => {  // disabled
+        const { roomCode, slotIdx } = socket.data;
+        const room = rooms[roomCode];
+        if (!room) return;
+        const slot = room.slots[slotIdx];
+        const name = slot?.name || 'שחקן';
+        if (slot) { slot.connected = false; slot.socketId = null; }
+        if (room.restartVotes) room.restartVotes.delete(slotIdx);
+
+        const remaining = room.slots.filter(s => s.connected && !s.finished);
+
+        // ── Mid-game leave logic ──
+        if (!room.gameOver && slot && !slot.finished) {
+            // Count active (non-finished, non-leaving) players
+            const activeAfterLeave = room.slots.filter(s => s.connected && !s.finished && s !== slot);
+            if (activeAfterLeave.length <= 1) {
+                // Only 1 (or 0) active human players left → end game
+                // Mark leaver as last (loser)
+                if (!slot.finished) {
+                    slot.finished = true;
+                    room.winnersOrder.push(slotIdx);
+                }
+                // The remaining active player finishes just before leaver
+                const lastActive = room.slots.find(s => s.connected && !s.finished);
+                if (lastActive) {
+                    lastActive.finished = true;
+                    room.winnersOrder.unshift(lastActive.id); // goes one place ahead
+                }
+                room.gameOver = true;
+                clearRoomTimer(roomCode);
+                broadcast(room, 'toast', `🚪 ${name} יצא — המשחק הסתיים`);
+                broadcast(room, 'gameOver', room.winnersOrder.map(i => room.slots[i]?.name || '?'));
+                setTimeout(() => settleCoins(room).catch(e => console.error('[coins error]', e.message)), 300);
+                        recordShitheadStats(room).catch(e => console.error('[stats error]', e.message));
+                return;
+            } else {
+                // 2+ active players remain → bot takes over
+                slot.isBot = true;
+                slot.name = `🤖 ${name}`;
+                broadcast(room, 'toast', `🚪 ${name} יצא — 🤖 ממשיך במקומו`);
+                emitStateToAll(room);
+                if (room.currentPlayer === slotIdx) {
+                    setTimeout(() => { if (rooms[roomCode]) nextTurn(room); }, 1000);
+                }
+                return;
+            }
+        }
+
+        broadcast(room, 'playerLeft', { name, newPlayerCount: remaining.length });
+        if (room.slots.filter(s => s.connected).length === 0) {
+            clearRoomTimer(roomCode);
+            clearRoomTimer(roomCode + '_swap');
+            delete rooms[roomCode];
+            return;
+        }
+        // If all remaining voted restart → start (need at least 2 players)
+        if (room.gameOver && remaining.length >= 2 && room.restartVotes?.size >= remaining.length) {
+            // Shrink room to remaining players, reassign slots
+            const keepSlots = room.slots.filter(s => s.connected);
+            keepSlots.forEach((s, i) => { s.id = i; });
+            room.slots = keepSlots;
+            room.playerCount = keepSlots.length;
+            room.restartVotes = new Set();
+            restartRoom(room);
+            broadcast(room, 'gameRestarted', {});
+            setTimeout(() => {
+emitStateToAll(room);
+                startSwapTimer(room);
+            }, 300);
+        } else {
+            emitStateToAll(room);
+        }
+    });
+
+    // ── Rejoin room ──
+    socket.on('rejoinRoom', ({ code, name }) => {
+        const room = rooms[code];
+        if (!room) { socket.emit('error', 'חדר לא נמצא'); return; }
+        const slot = room.slots.find(s => s.name === name);
+        if (!slot) { socket.emit('error', 'שחקן לא נמצא'); return; }
+        if (disconnectTimers[slot.socketId]) {
+            clearTimeout(disconnectTimers[slot.socketId]);
+            delete disconnectTimers[slot.socketId];
+        }
+        slot.socketId = socket.id;
+        slot.connected = true;
+        socket.data = { roomCode: code, slotIdx: slot.id };
+        broadcast(room, 'toast', `✅ ${name} חזר למשחק`);
+        emitStateToPlayer(room, slot.id);
+        emitStateToAll(room);
+    });
+
+    // ── Disconnect ──
+    socket.on('disconnect', () => {
+        const { roomCode, slotIdx } = socket.data || {};
+        if (!roomCode || slotIdx === undefined) return;
+        const room = rooms[roomCode];
+        if (!room) return;
+        const slot = room.slots[slotIdx];
+        if (!slot) return;
+        disconnectTimers[socket.id] = setTimeout(() => {
+            delete disconnectTimers[socket.id];
+            if (room.slots[slotIdx]?.socketId !== socket.id) return;
+            slot.connected = false;
+            const remainingAfter = room.slots.filter(s => s.connected);
+            broadcast(room, 'playerLeft', { name: slot.name || 'שחקן', newPlayerCount: remainingAfter.length });
+            emitStateToAll(room);
+            if (remainingAfter.length === 0) {
+                clearRoomTimer(roomCode);
+                clearRoomTimer(roomCode + '_swap');
+                delete rooms[roomCode];
+            }
+        }, 12000);
+    });
+});
+
+// ══════════════════════════════════════════════
+//  BASRA SOCKET EVENTS
+// ══════════════════════════════════════════════
+
+function basraBroadcastExcept(room, excludeSocketId, event, data) {
+    room.slots.forEach(s => {
+        if (s.socketId && s.socketId !== excludeSocketId) {
+            io.to(s.socketId).emit(event, data);
+        }
+    });
+}
+
+function basraBroadcast(room, event, data) {
+    room.slots.forEach(s => {
+        if (s.socketId) io.to(s.socketId).emit(event, data);
+    });
+}
+
+function basraStateForPlayer(room, slotIdx) {
+    const p = room.slots[slotIdx];
+    const isMyTurn = room.currentPlayer === slotIdx;
+    return {
+        gameType: 'basra',
+        roomCode: room.code,
+        mySlotIdx: slotIdx,
+        myHand: p.hand,
+        tableCards: room.tableCards,
+        deckCount: room.deck.length,
+        currentPlayer: room.currentPlayer,
+        isMyTurn,
+        playerNames: room.slots.map(s => s.name),
+        capturedCounts: room.slots.map(s => s.captured.length),
+        handCounts: room.slots.map(s => s.hand.length),
+        scores: room.slots.map(s => s.score || 0),
+        basraCounts: room.slots.map(s => s.basras || 0),
+        basraCards: room.slots.map(s => (s.basraCards || []).map(b => typeof b === 'string' ? b : b.card)),
+        teams: room.teams || null,
+        roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+        winScore: room.winScore || 120,
+        isBot: room.isBot || false,
+        roundOver: room.roundOver,
+        gameOver: room.gameOver,
+        lastCapturer: room.lastCapturer,
+        committedCard: room.committedCard || null,
+        committedBy: room.committedBy,
+        turnTimer: room.turnTimer || 0,
+        timerStarted: !!room._timerStarted,
+        timerRemaining: room._timerStarted ? Math.max(0, room.turnTimer - Math.floor((Date.now() - room._timerStarted) / 1000)) : 0,
+    };
+}
+
+function basraEmitAll(room) {
+    room.slots.forEach((s, i) => {
+        if (s.socketId) io.to(s.socketId).emit('basraState', basraStateForPlayer(room, i));
+    });
+}
+
+function basraMakeCode() {
+    let code;
+    do { code = Math.random().toString(36).substring(2,6).toUpperCase(); }
+    while (basraRooms[code]);
+    return code;
+}
+
+io.on('basraConnection', () => {}); // no-op, handled in main io.on
+
+// We hook into the existing io.on('connection') — add extra handlers per socket
+// This is called from within the main connection handler below via separate block
+
+function basraClearBasraTimer(room) {
+    if (room._timerTimeout) { clearTimeout(room._timerTimeout); room._timerTimeout = null; }
+    if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
+    room._timerStarted = null;
+}
+
+function basraStartTimer(room) {
+    basraClearBasraTimer(room);
+    if (!room.turnTimer || room.turnTimer <= 0 || room.gameOver || room.roundOver) return;
+    basraBroadcast(room, 'basraTimerReset', {});
+    room._timerStarted = Date.now();
+    room._timerRemaining = room.turnTimer;
+    room._timerInterval = setInterval(() => {
+        room._timerRemaining--;
+        basraBroadcast(room, 'basraTimerTick', { remaining: room._timerRemaining, currentPlayer: room.currentPlayer });
+        if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
+    }, 1000);
+    room._timerTimeout = setTimeout(() => {
+        room._timerTimeout = null;
+        if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
+        if (room.gameOver || room.roundOver) return;
+        const p = room.slots[room.currentPlayer];
+        if (!p) return;
+        if (room.committedCard && room.committedBy === room.currentPlayer) {
+            const thrown = room.committedCard;
+            // RULE: if captures available, auto-capture minimum (don't just throw)
+            const allCaps = basraBotFindCaptures(thrown, room.tableCards);
+            if (allCaps.length > 0) {
+                const minGroup = allCaps.sort((a,b) => a.length - b.length)[0];
+                room.committedCard = null; room.committedBy = null;
+                const result = basra.playCard(room, room.currentPlayer, thrown, minGroup, true);
+                if (result.ok) {
+                    basraBroadcast(room, 'toast', `${p.name}|autoCollect`);
+                } else {
+                    room.tableCards.push(thrown);
+                    basraBroadcast(room, 'toast', `${p.name}|threw|${thrown}`);
+                }
+            } else {
+                room.tableCards.push(thrown); room.committedCard = null; room.committedBy = null;
+                basraBroadcast(room, 'toast', `${p.name}|threw|${thrown}`);
+            }
+            basraAdvanceTurn(room);
+        } else if (p.hand.length > 0) {
+            const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+            p.hand.splice(p.hand.indexOf(randomCard), 1);
+            room.tableCards.push(randomCard); room.committedCard = null; room.committedBy = null;
+            basraBroadcast(room, 'toast', `${p.name}|threw|${randomCard}`);
+            basraAdvanceTurn(room);
+        }
+    }, room.turnTimer * 1000);
+}
+
+function basraAdvanceTurn(room) {
+    // Check if all hands empty
+    const allHandsEmpty = room.slots.every(sl => sl.hand.length === 0);
+    if (allHandsEmpty) {
+        if (room.deck.length > 0) {
+            basraClearBasraTimer(room); // stop timer during summary+deal
+            // Show card counts summary for 2 seconds before dealing
+            basraBroadcast(room, 'basraCardSummary', {
+                names: room.slots.map(s => s.name),
+                captured: room.slots.map(s => s.captured.length),
+                teams: room.teams || null
+            });
+            room._dealInProgress = true;
+            setTimeout(() => {
+                basra.dealNewHands(room); // deal AFTER summary shown
+                const dealerIdx2 = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+                room.dealerIdx = dealerIdx2;
+                basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdx2, cardCount: 4, tableCount: 0 });
+                basraBroadcast(room, 'toast', '|newCards');
+                setTimeout(() => basraEmitAll(room), 80);
+            }, 2000);
+        } else {
+            if (room.tableCards.length > 0 && room.lastCapturer !== null) {
+                room.slots[room.lastCapturer].captured.push(...room.tableCards);
+                room.tableCards = [];
+            }
+            room.roundOver = true;
+            const roundScores = basra.scoreRound(room);
+            basraBroadcast(room, 'basraRoundOver', {
+                scores: roundScores,
+                totalScores: room.slots.map(s => s.score || 0),
+                pendingMajority: room.pendingMajorityPoints,
+                teams: room.teams || null,
+                roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+        winScore: room.winScore || 120,
+                cardCounts: room.slots.map(s => s.captured.length),
+            });
+            const winThreshold = room.winScore || 120;
+            if (room.teams) {
+                // 4p team mode: use combined team score
+                // Both team members have identical scores — just use first member's score
+                const teamScores = room.teams.map(team => room.slots[team[0]].score || 0);
+                const overThreshold = teamScores.filter(ts => ts > winThreshold);
+                if (overThreshold.length > 0) {
+                    const maxTeam = Math.max(...teamScores);
+                    if (teamScores[0] !== teamScores[1]) {
+                        room.gameOver = true;
+                        const winTeamIdx = teamScores[0] > teamScores[1] ? 0 : 1;
+                        basraBroadcast(room, 'basraGameOver', {
+                            names: room.slots.map(s=>s.name),
+                            scores: room.slots.map(s=>s.score||0),
+                            teams: room.teams, teamScores
+                        });
+                        const winnerSlot = room.teams[winTeamIdx][0];
+                        setTimeout(() => settleBasraCoins(room, winnerSlot).catch(e=>console.error('[basra coins]',e)), 300);
+                        recordBasraStats(room, winnerSlot).catch(e => console.error('[stats error]', e.message));
+                    } else {
+                        basraBroadcast(room, 'toast', '|tie');
+                    }
+                }
+            } else {
+                const overThreshold = room.slots.filter(sl => (sl.score || 0) > winThreshold);
+                if (overThreshold.length > 0) {
+                    const maxScore = Math.max(...room.slots.map(s => s.score || 0));
+                    const tied = room.slots.filter(s => (s.score || 0) === maxScore);
+                    if (tied.length === 1) {
+                        room.gameOver = true;
+                        const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                        const winnerSlotIdx = room.slots.indexOf(sorted[0]);
+                        // Send slotIndices so client can identify themselves correctly
+                        room.slots.forEach((sl, i) => {
+                            if (sl.socketId) {
+                                io.to(sl.socketId).emit('basraGameOver', {
+                                    names: sorted.map(s=>s.name),
+                                    scores: sorted.map(s=>s.score||0),
+                                    mySlot: i,
+                                    slotOrder: sorted.map(s=>room.slots.indexOf(s))
+                                });
+                            }
+                        });
+                        setTimeout(() => settleBasraCoins(room, winnerSlotIdx).catch(e => console.error('[basra coins]', e.message)), 300);
+                        recordBasraStats(room, winnerSlotIdx).catch(e => console.error('[stats error]', e.message));
+                    } else {
+                        basraBroadcast(room, 'toast', '|tie');
+                    }
+                }
+            }
+            basraEmitAll(room);
+            return;
+        }
+    }
+    // Advance turn
+    room.currentPlayer = (room.currentPlayer + 1) % room.slots.length;
+    // Trigger bot move AFTER currentPlayer advances
+    basraMaybeTriggerBot(room);
+    basraEmitAll(room);
+    // Start turn timer
+    if (room.turnTimer > 0 && !room.gameOver && !room.roundOver) {
+        basraClearBasraTimer(room);
+        room._timerStarted = Date.now();
+        room._timerRemaining = room.turnTimer;
+        room._timerInterval = setInterval(() => {
+            room._timerRemaining--;
+            console.log(`[basra] timerTick remaining=${room._timerRemaining}`);
+            basraBroadcast(room, 'basraTimerTick', { remaining: room._timerRemaining, currentPlayer: room.currentPlayer });
+            if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
+        }, 1000);
+        room._timerTimeout = setTimeout(() => {
+            room._timerTimeout = null; // clear self-reference immediately
+            if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
+            if (room.gameOver || room.roundOver) return;
+            const p = room.slots[room.currentPlayer];
+            // Allow timeout even if hand is empty — committed card may be waiting
+            if (!p) return;
+            if (p.hand.length === 0 && !room.committedCard) return;
+            console.log(`[timeout] committedCard=${room.committedCard} committedBy=${room.committedBy} currentPlayer=${room.currentPlayer}`);
+
+            // Track consecutive timeouts per player
+            if (!room._consecutiveTimeouts) room._consecutiveTimeouts = {};
+            room._consecutiveTimeouts[room.currentPlayer] = (room._consecutiveTimeouts[room.currentPlayer] || 0) + 1;
+
+            if (room._consecutiveTimeouts[room.currentPlayer] >= 2) {
+                // 2 consecutive timeouts — forfeit + coin settlement
+                room.gameOver = true;
+                basraClearBasraTimer(room);
+                const forfeitIdx = room.currentPlayer;
+                basraBroadcast(room, 'toast', `${p.name}|disqualified`);
+                basraBroadcast(room, 'basraGameOver', {
+                    names: room.slots.map(s => s.name),
+                    scores: room.slots.map(s => s.score || 0),
+                    forfeitBy: forfeitIdx,
+                    forfeitName: p.name,
+                    teams: room.teams || null,
+        roundStarter: room.roundStarter !== undefined ? room.roundStarter : 0,
+        winScore: room.winScore || 120,
+                    teamScores: room.teams ? room.teams.map(t => room.slots[t[0]].score || 0) : null,
+                });
+                basraEmitAll(room);
+                const winner = room.slots.findIndex((_, i) => i !== forfeitIdx);
+                setTimeout(() => settleBasraCoins(room, winner).catch(e => console.error('[coins]', e)), 300);
+                recordBasraStats(room, winner).catch(e => console.error('[stats error]', e.message));
+                return;
+            }
+
+            // If player already committed a card → throw it (no capture)
+            if (room.committedCard && room.committedBy === room.currentPlayer) {
+                const thrownCard = room.committedCard;
+                room.tableCards.push(thrownCard);
+                room.committedCard = null;
+                room.committedBy = null;
+                basraBroadcast(room, 'toast', `${p.name}|threw|${thrownCard}`);
+                basraAdvanceTurn(room);
+            } else {
+                const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+                p.hand.splice(p.hand.indexOf(randomCard), 1);
+                room.tableCards.push(randomCard);
+                room.committedCard = null;
+                room.committedBy = null;
+                basraBroadcast(room, 'toast', `${p.name}|threw|${randomCard}`);
+                basraAdvanceTurn(room);
+            }
+        }, room.turnTimer * 1000);
+    }
+}
+
+
+// ══ BASRA BOT ══
+function basraBotFindCaptures(card, tableCards) {
+    const rank = card.slice(0,-1);
+    const is7d = card === '7d';
+    if (rank === 'J' || is7d) return tableCards.length > 0 ? [tableCards.map((_,i)=>i)] : [];
+    if (tableCards.length === 1 && tableCards[0] === '7d') return [[0]];
+    if (rank === 'Q' || rank === 'K') {
+        const g = tableCards.map((c,i)=>c.slice(0,-1)===rank?i:-1).filter(i=>i>=0);
+        return g.length > 0 ? [g] : [];
+    }
+    const vals = {'A':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10};
+    const val = vals[rank];
+    if (!val) return [];
+    const n = tableCards.length, result = [];
+    for (let mask=1;mask<(1<<n);mask++) {
+        let sum=0, grp=[], ok=true;
+        for (let i=0;i<n;i++) if (mask&(1<<i)) {
+            const v = vals[tableCards[i].slice(0,-1)];
+            if (!v){ok=false;break;} sum+=v; grp.push(i);
+        }
+        if (ok && sum===val) result.push(grp);
+    }
+    return result;
+}
+
+function basraBotThreatScore(card, tableCards) {
+    const vals = {'A':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10};
+    const rank = card.slice(0,-1);
+    // Q/K: only capturable by same rank — very low threat even on empty table
+    if (rank === 'Q' || rank === 'K') return 1;
+    const cardVal = vals[rank] || 0;
+    if (!cardVal) return 2;
+    // Throwing to empty table: numeric card is basra risk (opponent captures alone = basra)
+    // EXCEPTION: A,2,3,4 on empty table still risky but less so — value is low
+    if (tableCards.length === 0) return cardVal <= 4 ? 15 : 50;
+    const tableVals = tableCards.map(c => vals[c.slice(0,-1)] || 0).filter(v=>v>0);
+    let threatCount = 0;
+    for (let oppVal = 1; oppVal <= 10; oppVal++) {
+        const n = tableVals.length;
+        for (let mask=0; mask<(1<<n); mask++) {
+            let sum = oppVal;
+            for (let i=0;i<n;i++) if(mask&(1<<i)) sum+=tableVals[i];
+            if (sum === cardVal) { threatCount++; break; }
+        }
+    }
+    return threatCount;
+}
+
+function basraBotCardKeepValue(card, tableCards, hand) {
+    const rank = card.slice(0,-1);
+    if (rank === 'J' || card === '7d') return 70;
+    
+    // Count duplicates in hand — having 2+ of same rank reduces basra risk if one thrown
+    const dupeCount = hand ? hand.filter(c => c.slice(0,-1) === rank).length : 1;
+    const dupeBonus = dupeCount >= 2 ? -15 : 0; // having pairs = less risky to throw one
+    
+    if (['8','9','10'].includes(rank)) return 60 + dupeBonus;
+    if (['5','6','7'].includes(rank)) return 30 + dupeBonus;
+    if (rank === 'Q' || rank === 'K') {
+        const tableHasSame = tableCards && tableCards.some(c => c.slice(0,-1) === rank);
+        return tableHasSame ? 40 : 5;
+    }
+    return ({'A':0,'2':5,'3':8,'4':10}[rank] || 10) + dupeBonus;
+}
+
+function basraBotMove(room) {
+    if (!room || room.gameOver || room.roundOver || !room.isBot) return;
+    if (room.currentPlayer !== 1) return;
+    const bot = room.slots[1];
+    if (!bot) return;
+    // If hand empty, basraAdvanceTurn will handle (deal new hands or end round)
+    // But don't call it if we're already in a deal sequence
+    if (!bot.hand || bot.hand.length === 0) {
+        if (!room._dealInProgress) basraAdvanceTurn(room);
+        return;
+    }
+
+    // Find best play
+    let bestCard = null, bestCapture = [], bestScore = -1;
+    const tableCards = room.tableCards;
+    const handSize = bot.hand.length;
+    const botCaptured = room.slots[1].captured.length;
+    const humanCaptured = room.slots[0].captured.length;
+    const conservativeMode = botCaptured >= 27; // already has majority — focus on basra only
+
+    // Rule 1: If bot has J and 7d, prefer J as throw (7d can then capture J for basra)
+    // So when evaluating 7d captures: bonus if J is on table (we put J there last turn)
+    // When evaluating J captures: if 7d also in hand and table has cards, prefer throwing J
+    const hasJ = bot.hand.some(c => c.slice(0,-1) === 'J');
+    const has7d = bot.hand.includes('7d');
+
+    bot.hand.forEach(card => {
+        const rank = card.slice(0,-1);
+        const is7d = card === '7d';
+        const isJack = rank === 'J';
+        const caps = basraBotFindCaptures(card, tableCards);
+
+        if (caps.length > 0) {
+            const used = new Set();
+            const combined = [];
+            const sorted = [...caps].sort((a,b)=>b.length-a.length);
+            for (const grp of sorted) {
+                if (grp.every(i=>!used.has(i))) {
+                    grp.forEach(i=>used.add(i));
+                    combined.push(...grp);
+                }
+            }
+            // Also capture all remaining size-1 matching groups (e.g. two 2s on table)
+            for (const grp of caps) {
+                if (grp.length === 1 && !used.has(grp[0])) {
+                    used.add(grp[0]); combined.push(grp[0]);
+                }
+            }
+            const isBasra = combined.length === tableCards.length && tableCards.length > 0;
+            const isJackCard = isJack || is7d;
+
+            let score = 0;
+            score += 200; // floor: any capture beats throw
+            score += combined.length * 15;
+            if (isBasra) score += 600;
+
+            // Rule 1: If J + 7d both in hand, DON'T use 7d to capture now
+            // Save 7d to capture after J is thrown to table
+            if (is7d && hasJ && !isBasra && tableCards.length > 0) {
+                score -= 500; // strongly prefer to wait
+            }
+
+            // Rule 2: J/7d — only play when table has 3+ cards OR it's a real basra OR last card
+            if (isJackCard && !isBasra) {
+                const handSizeAfter = handSize - 1;
+                if (tableCards.length < 3 && handSizeAfter > 1) {
+                    // Skip this option entirely — not enough cards on table and no basra
+                    return; // continue forEach
+                }
+            }
+            // Rule 2b: 7d capture on <3 cards — only allow if it's a REAL basra
+            // (basra.isBasra already computed as isBasra above)
+            if (is7d && combined.length > 0 && tableCards.length < 3 && handSize > 1) {
+                if (!isBasra) {
+                    return; // skip 7d non-basra capture when <3 cards
+                }
+                // isBasra=true: 7d makes real basra → allow
+            }
+
+            // Rule 3: Conservative mode — only care about basra, not card count
+            if (conservativeMode && !isBasra) {
+                score -= 100; // deprioritize non-basra captures
+            }
+
+            combined.forEach(idx => {
+                const tcRank = tableCards[idx]?.slice(0,-1);
+                if (['8','9','10'].includes(tcRank)) score += 20;
+            });
+            const remaining = tableCards.filter((_,i)=>!combined.includes(i));
+            if (remaining.length === 1) score -= 40;
+
+            if (score > bestScore) { bestScore = score; bestCard = card; bestCapture = combined; }
+        }
+    });
+
+    // Also consider: is throwing a weak card better than a bad capture?
+    // Compute best throw option
+    // Priority: throw safest card (lowest throwPriority = throw first)
+    // 1=best to throw (Q/K safe), 10=worst to throw (J/7d keep)
+    const throwScores = bot.hand.map(card => {
+        const rank = card.slice(0,-1);
+        const is7d = card === '7d';
+        const threat = basraBotThreatScore(card, tableCards);
+        let priority;
+        if (rank === 'Q' || rank === 'K') {
+            // Safest throw — only captured by same rank
+            priority = 1;
+        } else if (rank === 'J' || is7d) {
+            // Never throw if avoidable
+            priority = 100;
+        } else if (['A','2','3','4'].includes(rank)) {
+            // Weak cards — good to throw, but only if threat is low
+            priority = 3 + threat * 0.5;
+        } else if (['5','6','7'].includes(rank)) {
+            priority = 5 + threat * 0.3;
+        } else { // 8,9,10
+            priority = 8 + threat * 0.2;
+        }
+        // Having duplicates makes a card slightly more throwable
+        const dupes = bot.hand.filter(c=>c.slice(0,-1)===rank).length;
+        if (dupes >= 2) priority -= 1;
+        return { card, throwScore: priority };
+    });
+    throwScores.sort((a,b) => a.throwScore - b.throwScore);
+    const noJack = throwScores.filter(t => t.card.slice(0,-1)!=='J' && t.card!=='7d');
+    // Special: if 7d in hand and J in hand, throw J to empty table so 7d gets basra
+    const has7dNow = bot.hand.includes('7d');
+    const jackInHand = bot.hand.find(c => c.slice(0,-1)==='J');
+    const jackThrowOption = throwScores.find(t => t.card.slice(0,-1)==='J');
+    let bestThrow;
+    if (has7dNow && jackInHand && jackThrowOption && tableCards.length === 0 && noJack.length > 0) {
+        bestThrow = jackThrowOption; // throw J to empty table → 7d basra next turn
+    } else {
+        bestThrow = noJack[0] || throwScores[0];
+    }
+    // Throw score converted to capture-scale: negative throwScore = good throw
+    const throwValue = -bestThrow.throwScore;
+
+    if (!bestCard || bestScore < throwValue) {
+        const throwCardCaps = basraBotFindCaptures(bestThrow.card, tableCards);
+        if (throwCardCaps.length > 0 && bestCard && bestScore > 0) {
+            // Keep the capture
+        } else {
+            bestCard = bestThrow.card;
+            bestCapture = [];
+        }
+    }
+    // FINAL SAFETY: if bestCapture is empty but a capture exists — find it
+    if (bestCapture.length === 0 && bestCard) {
+        const finalCaps = basraBotFindCaptures(bestCard, tableCards);
+        if (finalCaps.length > 0) {
+            // We should capture — recalc
+            const used = new Set(), combined = [];
+            finalCaps.sort((a,b)=>b.length-a.length).forEach(grp => {
+                if(grp.every(i=>!used.has(i))){grp.forEach(i=>used.add(i));combined.push(...grp);}
+            });
+            bestCapture = combined;
+        }
+    }
+    // Also: check if bestCard can't capture but another card CAN
+    if (bestCapture.length === 0) {
+        let altCard=null, altCapture=[], altScore=-1;
+        bot.hand.forEach(c => {
+            if (c.slice(0,-1)==='J'||c==='7d') return; // J/7d handled by rules
+            const caps = basraBotFindCaptures(c, tableCards);
+            if (caps.length===0) return;
+            const used=new Set(),combined=[];
+            caps.sort((a,b)=>b.length-a.length).forEach(grp=>{
+                if(grp.every(i=>!used.has(i))){grp.forEach(i=>used.add(i));combined.push(...grp);}
+            });
+            if(combined.length > altScore){ altScore=combined.length; altCard=c; altCapture=combined; }
+        });
+        if (altCard) {
+            bestCard = altCard;
+            bestCapture = altCapture;
+        }
+    }
+
+    // ══ HARD RULES — override any scoring ══
+
+    // RULE 0: If a regular card can make basra, ALWAYS prefer it over J/7d
+    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') && bestCapture.length > 0) {
+        const isJBasra = bestCapture.length === tableCards.length && tableCards.length > 0;
+        if (isJBasra) {
+            // Check if any non-J/7d card can also make basra
+            let regularBasraCard = null, regularBasraCapture = [];
+            bot.hand.forEach(c => {
+                if (c.slice(0,-1) === 'J' || c === '7d') return;
+                const caps = basraBotFindCaptures(c, tableCards);
+                const used = new Set(), combined = [];
+                caps.sort((a,b)=>b.length-a.length).forEach(grp => {
+                    if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+                });
+                if (combined.length === tableCards.length) { // basra!
+                    regularBasraCard = c; regularBasraCapture = combined;
+                }
+            });
+            if (regularBasraCard) {
+                bestCard = regularBasraCard; bestCapture = regularBasraCapture;
+            }
+        }
+    }
+
+    // RULE A: NEVER throw J or 7d unless table has 3+ cards (or last card in hand)
+    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') &&
+        bestCapture.length === 0 && tableCards.length < 3 && handSize > 1) {
+        // Find best non-J/7d throw
+        const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+        if (safeCards.length > 0) {
+            const priority = c => {
+                const r = c.slice(0,-1);
+                if (r==='Q'||r==='K') return 1;
+                if (r==='A') return 2;
+                const v = {'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10;
+                return v;
+            };
+            safeCards.sort((a,b) => priority(a) - priority(b));
+            bestCard = safeCards[0];
+            bestCapture = [];
+        }
+    }
+
+    // RULE A2: handled after all other rules (see below)
+
+    // RULE B: J/7d capture only if:
+    //   - 3+ cards on table, OR
+    //   - ≤2 cards left in hand (burn risk), OR
+    //   - basra with 3+ cards on table, OR
+    //   - 7d basra (always allowed regardless of count)
+    const _isBasraCapture = bestCapture.length === tableCards.length && tableCards.length > 0;
+    const _is7d = bestCard === '7d';
+    const _isJ = bestCard.slice(0,-1) === 'J';
+    // 7d basra: always allowed (7d is special)
+    // J basra with <3 cards: only if ≤2 cards in hand
+    // J: only capture when table has 3+ cards (no exceptions)
+    // 7d: allow REAL basra even with <3 cards, but block non-real-basra capture
+    const _captured7dCards = _is7d ? bestCapture.map(i => tableCards[i]).filter(Boolean) : [];
+    const _7dRealBasra = _is7d && basra.isBasra('7d', _captured7dCards, tableCards);
+    if ((_isJ || (_is7d && !_7dRealBasra)) && bestCapture.length > 0 && tableCards.length < 3 && handSize > 2) {
+        // Need 3+ cards on table (J always, 7d only when no real basra)
+        if (true) {
+            // Find alternative capture with non-J/7d card
+            let altCard = null, altCapture = [], altScore = -1;
+            bot.hand.forEach(c => {
+                if (c.slice(0,-1) === 'J' || c === '7d') return;
+                const caps = basraBotFindCaptures(c, tableCards);
+                if (caps.length > 0) {
+                    const used = new Set(), combined = [];
+                    caps.sort((a,b)=>b.length-a.length).forEach(grp => {
+                        if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+                    });
+                    if (combined.length > altScore) { altScore = combined.length; altCard = c; altCapture = combined; }
+                }
+            });
+            if (altCard) { bestCard = altCard; bestCapture = altCapture; }
+            else {
+                // No alternative capture — throw safe card instead
+                const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+                if (safeCards.length > 0) {
+                    const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+                    safeCards.sort((a,b) => priority(a)-priority(b));
+                    bestCard = safeCards[0]; bestCapture = [];
+                }
+            }
+        }
+    }
+
+    // RULE C: J + 7d in hand — play J only when J is actually good to play
+    // (3+ cards on table, OR second-to-last card) — don't force J as empty throw
+    {
+        const _hasJ2 = bot.hand.some(c => c.slice(0,-1) === 'J');
+        const _has7d2 = bot.hand.includes('7d');
+        if (_hasJ2 && _has7d2) {
+            const _jackCard2 = bot.hand.find(c => c.slice(0,-1) === 'J');
+            const _capturedCards = bestCapture.map(i => tableCards[i]).filter(Boolean);
+            const _7dRealBasra = bestCard === '7d' && bestCapture.length > 0 &&
+                bestCapture.length === tableCards.length &&
+                basra.isBasra('7d', _capturedCards, tableCards);
+            // If 7d makes a real basra right now — let it go, J will follow next turn
+            if (_7dRealBasra) {
+                // keep bestCard = '7d'
+            } else if (bestCard !== _jackCard2) {
+                // Currently planning to play something else — check if J should go now instead
+                // J should go if: currently a throw (no capture) AND table has 3+ cards
+                // Otherwise keep the current plan (capture with another card, or safe throw)
+                const _jCaptures = basraBotFindCaptures(_jackCard2, tableCards);
+                const _jCanCapture = _jCaptures.length > 0;
+                if (_jCanCapture && tableCards.length >= 3 && bestCapture.length === 0) {
+                    // J can make a good capture now — use J
+                    const used = new Set(), combined = [];
+                    _jCaptures.sort((a,b)=>b.length-a.length).forEach(grp => {
+                        if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+                    });
+                    bestCard = _jackCard2; bestCapture = combined;
+                }
+                // else: keep current bestCard (could be a good capture or safe throw)
+            } else {
+                // bestCard is already J — only allow if table has 3+ cards or second-to-last
+                if (tableCards.length < 3 && handSize > 2 && bestCapture.length === 0) {
+                    // Switch to safe throw instead
+                    const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+                    if (safeCards.length > 0) {
+                        const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+                        safeCards.sort((a,b) => priority(a)-priority(b));
+                        bestCard = safeCards[0]; bestCapture = [];
+                    }
+                }
+            }
+        }
+    }
+
+    // RULE A2 (final check): J/7d with hand>1 and table<3 — block unless:
+    // - J: always block on table<3 (no exceptions)
+    // - 7d: block only if NOT a REAL basra (use actual isBasra check)
+    if (handSize > 1 && tableCards.length < 3) {
+        const _bestIsJ = bestCard.slice(0,-1) === 'J';
+        const _bestIs7d = bestCard === '7d';
+        const _a2CapturedCards = _bestIs7d ? bestCapture.map(i => tableCards[i]).filter(Boolean) : [];
+        const _a2RealBasra = _bestIs7d && bestCapture.length > 0 && basra.isBasra('7d', _a2CapturedCards, tableCards);
+        const _shouldBlock = _bestIsJ || (_bestIs7d && !_a2RealBasra);
+        if (_shouldBlock) {
+            const safeCards = bot.hand.filter(c => c.slice(0,-1) !== 'J' && c !== '7d');
+            if (safeCards.length > 0) {
+                const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+                safeCards.sort((a,b) => priority(a)-priority(b));
+                bestCard = safeCards[0];
+                bestCapture = [];
+            } else {
+                // No safe alternative — forced to throw J/7d (no capture)
+                bestCapture = [];
+                console.log(`[BOT] No safe alt for ${bestCard}, forced throw`);
+            }
+        }
+    }
+
+    // SAFETY: if somehow bestCard is still null or invalid, pick first card
+    if (!bestCard || !bot.hand.includes(bestCard)) {
+        const safeFirst = bot.hand.find(c => c.slice(0,-1)!=='J' && c!=='7d') || bot.hand[0];
+        bestCard = safeFirst; bestCapture = [];
+    }
+
+    // SAFETY: if bestCard is J/7d with no capture and there are safe alternatives, throw safe card
+    if ((bestCard.slice(0,-1) === 'J' || bestCard === '7d') && bestCapture.length === 0 && bot.hand.length > 1) {
+        const safeAlt = bot.hand.find(c => c.slice(0,-1)!=='J' && c!=='7d');
+        if (safeAlt) {
+            const priority = c => { const r=c.slice(0,-1); return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10; };
+            const safeCards = bot.hand.filter(c => c.slice(0,-1)!=='J' && c!=='7d');
+            safeCards.sort((a,b) => priority(a)-priority(b));
+            bestCard = safeCards[0]; bestCapture = [];
+        }
+    }
+
+    // Final validation
+    const bestCardIdx = bot.hand.indexOf(bestCard);
+    if (bestCardIdx === -1) {
+        console.error('[BOT] bestCard not in hand:', bestCard, bot.hand);
+        bestCard = bot.hand[0];
+        bestCapture = [];
+        if (!bestCard) { console.error('[BOT] empty hand, skipping'); return; }
+    }
+
+    // Phase 1: commit card (show it to human player)
+    try {
+    bot.hand.splice(bot.hand.indexOf(bestCard), 1);
+    room.committedCard = bestCard;
+    room.committedBy = 1;
+    basraEmitAll(room);
+
+    // Phase 2: show capture preview (900ms after commit)
+    setTimeout(() => { try {
+        if (room.gameOver || room.roundOver) return;
+        // Re-evaluate captures with current table state (table may have changed)
+        let currentCapture = bestCapture;
+        if (bestCapture.length > 0) {
+            const freshCaps = basraBotFindCaptures(bestCard, room.tableCards);
+            if (freshCaps.length > 0) {
+                const used2 = new Set();
+                currentCapture = [];
+                for (const grp of freshCaps.sort((a,b)=>b.length-a.length)) {
+                    if (grp.every(i=>!used2.has(i))) {
+                        grp.forEach(i=>used2.add(i));
+                        currentCapture.push(...grp);
+                    }
+                }
+                // Include all remaining size-1 groups
+                for (const grp of freshCaps) {
+                    if (grp.length === 1 && !used2.has(grp[0])) {
+                        used2.add(grp[0]); currentCapture.push(grp[0]);
+                    }
+                }
+            } else {
+                currentCapture = [];
+            }
+        }
+        if (currentCapture.length > 0) {
+            basraBroadcast(room, 'basraCapturePreview', {
+                captureIndices: currentCapture,
+                groups: [currentCapture]
+            });
+        }
+        // Phase 3: after another 1s, execute the play
+        setTimeout(() => { try {
+            if (room.gameOver || room.roundOver) return;
+            const result = basra.playCard(room, 1, bestCard, currentCapture, true);
+            if (result.ok) {
+                room.committedCard = null;
+                room.committedBy = null;
+                const p = room.slots[1];
+                if (result.capturedCards.length > 0) {
+                    basraBroadcast(room, 'toast', result.basra
+                        ? `⚡ BASRA! ${p.name}` : `${p.name}|captured|${result.capturedCards.length}`);
+                    if (result.basra) basraBroadcast(room, 'basraEvent', { type: 'basra', player: 1, name: p.name });
+                }
+                basraEmitAll(room);
+                setTimeout(() => basraAdvanceTurn(room), 300);
+            } else {
+                // playCard failed — re-try with no capture (throw)
+                room.tableCards.push(bestCard);
+                room.committedCard = null;
+                room.committedBy = null;
+                basraEmitAll(room);
+                setTimeout(() => basraAdvanceTurn(room), 300);
+            }
+        } catch(e2) { console.error('[BOT phase3]', e2.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
+        }, 1000);
+    } catch(e) { console.error('[BOT phase2]', e.message); room.committedCard=null; room.committedBy=null; basraEmitAll(room); setTimeout(()=>basraAdvanceTurn(room),500); }
+    }, 900);
+    } catch(e) {
+        console.error('[BOT] crash prevented:', e.message);
+        room.committedCard = null;
+        room.committedBy = null;
+        basraEmitAll(room);
+        setTimeout(() => basraAdvanceTurn(room), 500);
+    }
+}
+
+function basraMaybeTriggerBot(room) {
+    if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver && !room._dealInProgress) {
+        // Don't trigger if bot already has a committed card (already running)
+        if (room.committedBy === 1) return;
+        setTimeout(() => basraBotMove(room), 800);
+    }
+}
+
+function registerBasraHandlers(socket) {
+
+    socket.on('basraVerifyAccess', ({ accessCode }) => {
+        socket.emit('basraAccessVerified', { ok: true }); // no access code required
+    });
+
+    socket.on('basraCreate', async ({ name, playerCount, isPublic, bet, turnTimer, winScore, accessCode, username, token }) => {
+        const count = parseInt(playerCount) || 2;
+        if (![2, 4].includes(count)) { socket.emit('basraError', 'שחקנים: 2 או 4'); return; }
+
+        // Prevent same user from creating if already in a room
+        if (username && token) {
+            try {
+                const u = await getUser(username);
+                if (u && u.token === token) {
+                    const alreadyIn = Object.values(basraRooms).some(r =>
+                        r.slots.some(sl => sl.username === username && sl.socketId && sl.socketId !== socket.id)
+                    );
+                    if (alreadyIn) {
+                        socket.emit('basraError', 'כבר מחובר ממקום אחר — התנתק קודם');
+                        return;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        const code = basraMakeCode();
+        const slots = Array.from({ length: count }, (_, i) => ({
+            id: i, name: i === 0 ? name : `שחקן ${i+1}`,
+            hand: [], captured: [], basras: 0, score: 0,
+            socketId: i === 0 ? socket.id : null,
+            connected: i === 0,
+            username: i === 0 ? username : null,
+            isBot: false,
+        }));
+
+        const room = basra.createBasraRoom(code, slots, bet || 0);
+        room.winScore = winScore || 120;
+        // Validate creator token
+        let creatorUsername = null;
+        if (username && token) {
+            try { const u = await getUser(username); if (u && u.token === token) creatorUsername = username; } catch(e) {}
+        }
+        room.slots[0].username = creatorUsername;
+        room.isPublic = !!isPublic;
+        room.turnTimer = parseInt(turnTimer) || 0;
+        room.gameStarted = false;
+        room.committedCard = null;
+        room.committedBy = null;
+        basraRooms[code] = room;
+        socket.data.basraRoom = code;
+        socket.data.basraSlot = 0;
+        socket.join('basra_' + code);
+
+        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: slots.length, bet: room.bet });
+        io.to('basra_' + code).emit('basraLobbyUpdate', { players: room.slots.map(s=>({name:s.name,connected:s.connected})) });
+        console.log(`[basra] Room ${code} created by ${name} (public:${isPublic}, bet:${bet})`);
+    });
+
+    socket.on('basraGetPublicRooms', () => {
+        const open = Object.values(basraRooms).filter(r => r.isPublic && !r.gameStarted && !r.gameOver);
+        socket.emit('basraPublicRooms', open.map(r => ({
+            code: r.code,
+            players: r.slots.filter(s=>s.connected).length,
+            total: r.slots.length,
+            bet: r.bet || 0,
+            winScore: r.winScore || 120,
+        })));
+    });
+
+    socket.on('basraJoin', async ({ code, name, accessCode, username, token }) => {
+        const room = basraRooms[code?.toUpperCase()];
+        if (!room) { socket.emit('basraError', 'חדר לא נמצא'); return; }
+        if (room.gameStarted) { socket.emit('basraError', 'המשחק כבר התחיל'); return; }
+
+        // Prevent same user from joining if already in another room
+        if (username && token) {
+            try {
+                const u = await getUser(username);
+                if (u && u.token === token) {
+                    const alreadyIn = Object.values(basraRooms).some(r =>
+                        r.code !== code?.toUpperCase() &&
+                        r.slots.some(sl => sl.username === username && sl.socketId && sl.socketId !== socket.id)
+                    );
+                    if (alreadyIn) { socket.emit('basraError', 'כבר מחובר ממקום אחר — התנתק קודם'); return; }
+                }
+            } catch(e) {}
+        }
+
+        const freeSlot = room.slots.find(s => !s.connected);
+        if (!freeSlot) { socket.emit('basraError', 'החדר מלא'); return; }
+
+        freeSlot.name = name;
+        freeSlot.socketId = socket.id;
+        freeSlot.connected = true;
+        // Validate joiner token
+        let joinerUsername = null;
+        if (username && token) {
+            try { const u = await getUser(username); if (u && u.token === token) joinerUsername = username; } catch(e) {}
+        }
+        freeSlot.username = joinerUsername;
+
+        socket.data.basraRoom = code.toUpperCase();
+        socket.data.basraSlot = freeSlot.id;
+        socket.join('basra_' + code.toUpperCase());
+
+        socket.emit('basraJoined', { code: code.toUpperCase(), slotIdx: freeSlot.id, playerCount: room.slots.length, bet: room.bet || 0 });
+        io.to('basra_' + code.toUpperCase()).emit('basraLobbyUpdate', { players: room.slots.map(s=>({name:s.name,connected:s.connected})) });
+        const allConnected = room.slots.every(s => s.connected);
+        if (allConnected) {
+            room.gameStarted = true;
+            // Teams for 4-player: shuffle players into seats, then 0+2 vs 1+3
+            if (room.slots.length === 4 && !room.teams) {
+                // Shuffle the slot data (name, socketId, username) randomly
+                const indices = [0,1,2,3].sort(() => Math.random()-0.5);
+                const snapshot = room.slots.map(s => ({
+                    name: s.name, socketId: s.socketId, username: s.username,
+                    connected: s.connected, id: s.id
+                }));
+                indices.forEach((srcIdx, dstIdx) => {
+                    room.slots[dstIdx].name = snapshot[srcIdx].name;
+                    room.slots[dstIdx].socketId = snapshot[srcIdx].socketId;
+                    room.slots[dstIdx].username = snapshot[srcIdx].username;
+                    room.slots[dstIdx].connected = snapshot[srcIdx].connected;
+                    // Update socket's slot reference
+                    if (snapshot[srcIdx].socketId) {
+                        const sock = io.sockets.sockets.get(snapshot[srcIdx].socketId);
+                        if (sock) sock.data.basraSlot = dstIdx;
+                    }
+                });
+                room.teams = [[0, 2], [1, 3]];
+                // Random starting player
+                room.currentPlayer = Math.floor(Math.random() * 4);
+                room.roundStarter = room.currentPlayer;
+            }
+            // Random starting player for 2p (4p already handled above)
+            if (room.slots.length === 2) {
+                room.currentPlayer = Math.floor(Math.random() * 2);
+            }
+            room.roundStarter = room.currentPlayer; // track for rotation
+            // Send basraDeal FIRST so client sets block flag before state arrives
+            const dealerIdx = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+            basraClearBasraTimer(room); // stop timer during deal animation
+            basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
+            basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
+            // Send state slightly after so client has time to set the block flag
+            setTimeout(() => basraEmitAll(room), 80);
+
+            if (room.teams) {
+                const t0 = room.teams[0].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
+                const t1 = room.teams[1].map(i => room.slots[i].name.split(' ')[0]).join(' + ');
+                setTimeout(() => basraBroadcast(room, 'basraTeamsAnnounce', { teams: [[t0, room.teams[0]], [t1, room.teams[1]]], firstPlayer: room.slots[room.currentPlayer].name }), 500);
+            }
+            // Timer starts after deal animation via basraDealDone
+            // Fallback: if client never sends basraDealDone, start timer after 8s
+            if (room.turnTimer > 0) {
+                setTimeout(() => { if (!room._timerStarted && !room.gameOver) basraStartTimer(room); }, 8000);
+            }
+        }
+    });
+
+    // ── Phase 1: play card to table ──
+    socket.on('basraCommitCard', ({ card }) => {
+        const code = socket.data.basraRoom;
+        const slotIdx = socket.data.basraSlot;
+        const room = basraRooms[code];
+        if (!room || room.gameOver || room.roundOver) return;
+        if (room.currentPlayer !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
+        // If bot is mid-move (committedCard by bot), clear it — human reclaimed turn
+        if (room.committedCard && room.committedBy !== slotIdx) {
+            room.committedCard = null;
+            room.committedBy = null;
+        }
+        // If already committed this card, don't double-remove from hand
+        if (room.committedCard === card && room.committedBy === slotIdx) {
+            basraEmitAll(room); return;
+        }
+        const p = room.slots[slotIdx];
+        if (!p.hand.includes(card)) { socket.emit('basraError', 'קלף לא ביד'); return; }
+        p.hand.splice(p.hand.indexOf(card), 1);
+        room.committedCard = card;
+        room.committedBy = slotIdx;
+        basraEmitAll(room);
+    });
+
+    // ── Phase 2: confirm capture ──
+    socket.on('basraCapturePreview', ({ captureIndices, groups }) => {
+        const code = socket.data.basraRoom;
+        if (!code || !basraRooms[code]) return;
+        const room = basraRooms[code];
+        // Broadcast to all OTHER players in room
+        basraBroadcastExcept(room, socket.id, 'basraCapturePreview', { captureIndices, groups });
+    });
+
+    socket.on('basraPlay', ({ captureIndices }) => {
+        const code = socket.data.basraRoom;
+        const slotIdx = socket.data.basraSlot;
+        const room = basraRooms[code];
+        if (!room || room.gameOver || room.roundOver) return;
+        // If bot has stale commit but it's human's turn, clear it
+        if (room.isBot && room.committedBy !== slotIdx && room.currentPlayer === slotIdx) {
+            room.committedCard = null;
+            room.committedBy = null;
+            // Can't proceed with play — human needs to re-commit
+            basraEmitAll(room);
+            return;
+        }
+        if (room.committedBy !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
+
+        const card = room.committedCard;
+
+        // RULE: if captures are available, player MUST capture — cannot throw
+        let enforcedCaptures = captureIndices || [];
+        if (enforcedCaptures.length === 0 && room.tableCards.length > 0) {
+            const allCaps = basraBotFindCaptures(card, room.tableCards);
+            if (allCaps.length > 0) {
+                // Enforce minimum capture (smallest group)
+                const minGroup = allCaps.sort((a,b) => a.length - b.length)[0];
+                enforcedCaptures = minGroup;
+                basraBroadcast(room, 'toast', `חייב לאסוף! (כלל חובת אסיפה)`);
+            }
+        }
+
+        const result = basra.playCard(room, slotIdx, card, enforcedCaptures, true);
+        if (!result.ok) {
+            // Keep committedCard so player can retry — it's still their turn
+            socket.emit('basraError', result.error);
+            basraEmitAll(room); // re-emit so client stays in capture phase
+            return;
+        }
+
+        // Reset consecutive timeouts on successful play
+        if (room._consecutiveTimeouts) room._consecutiveTimeouts[slotIdx] = 0;
+
+        room.committedCard = null;
+        room.committedBy = null;
+
+        const p = room.slots[slotIdx];
+        if (result.capturedCards.length > 0) {
+            basraBroadcast(room, 'toast', result.basra ? `⚡ BASRA! ${p.name}` : `${p.name}|captured|${result.capturedCards.length}`);
+            if (result.basra) basraBroadcast(room, 'basraEvent', { type: 'basra', player: slotIdx, name: p.name });
+        }
+
+        basraAdvanceTurn(room);
+    });
+
+    socket.on('basraNextRound', () => {
+        const code = socket.data.basraRoom;
+        const room = basraRooms[code];
+        if (!room || !room.roundOver || room.gameOver) return;
+        // Clear any running timer before starting new round
+        basraClearBasraTimer(room);
+        room._consecutiveTimeouts = {};
+        basra.resetRound(room);
+        basraBroadcast(room, 'toast', `|roundStart|${room.roundNum + 1}`);
+        const dealerIdxNR = (room.currentPlayer - 1 + room.slots.length) % room.slots.length;
+        room.dealerIdx = dealerIdxNR;
+        basraClearBasraTimer(room); // stop timer during deal animation
+        basraBroadcast(room, 'basraDeal', { dealerIdx: dealerIdxNR, cardCount: 4, tableCount: room.tableCards.length });
+        setTimeout(() => basraEmitAll(room), 80);
+        // Bot games: timer started via basraDealDone, but also trigger bot there
+
+        // Start timer for first player of new round
+        if (room.turnTimer > 0 && !room.gameOver) {
+            room._timerStarted = Date.now();
+            room._timerRemaining = room.turnTimer;
+            room._timerInterval = setInterval(() => {
+                room._timerRemaining--;
+                basraBroadcast(room, 'basraTimerTick', { remaining: room._timerRemaining, currentPlayer: room.currentPlayer });
+                if (room._timerRemaining <= 0) { clearInterval(room._timerInterval); room._timerInterval = null; }
+            }, 1000);
+            room._timerTimeout = setTimeout(() => {
+                room._timerTimeout = null;
+                if (room._timerInterval) { clearInterval(room._timerInterval); room._timerInterval = null; }
+                if (room.gameOver || room.roundOver) return;
+                const p = room.slots[room.currentPlayer];
+                if (!p) return;
+                if (p.hand.length === 0 && !room.committedCard) return;
+                if (room.committedCard && room.committedBy === room.currentPlayer) {
+                    const thrown = room.committedCard;
+                    room.tableCards.push(thrown);
+                    room.committedCard = null; room.committedBy = null;
+                    basraBroadcast(room, 'toast', `${p.name}|threw|${thrown}`);
+                    basraAdvanceTurn(room);
+                } else {
+                    const randomCard = p.hand[Math.floor(Math.random() * p.hand.length)];
+                    p.hand.splice(p.hand.indexOf(randomCard), 1);
+                    room.tableCards.push(randomCard);
+                    room.committedCard = null; room.committedBy = null;
+                    basraBroadcast(room, 'toast', `${p.name}|threw|${randomCard}`);
+                    basraAdvanceTurn(room);
+                }
+            }, room.turnTimer * 1000);
+        }
+    });
+
+    // Client signals deal animation is done — now replace special table cards
+    socket.on('basraDealDone', () => {
+        const code = socket.data.basraRoom;
+        const room = basraRooms[code];
+        if (!room) return;
+        // Immediately reset timer display on all clients
+        basraBroadcast(room, 'basraTimerReset', {});
+        room._dealInProgress = false;
+        // Re-emit state so current player highlight updates
+        basraEmitAll(room);
+        if (!room.specialReplacements || room.specialReplacements.length === 0) {
+            basraStartTimer(room);
+            // Trigger bot if it's bot's turn after deal
+            basraMaybeTriggerBot(room);
+            return;
+        }
+        processNextSpecial(room);
+    });
+
+    function processNextSpecial(room) {
+        if (room.specialReplacements.length === 0) {
+            basraStartTimer(room); // start timer immediately
+            basraEmitAll(room);
+            basraMaybeTriggerBot(room);
+            return;
+        }
+        const specialCard = room.specialReplacements.shift();
+        const sym = {h:'♥',d:'♦',c:'♣',s:'♠'};
+        const suit = specialCard.slice(-1);
+        const rank = specialCard.slice(0,-1);
+        const displayName = rank + (sym[suit]||suit);
+        const tableIdx = room.tableCards.indexOf(specialCard);
+
+        // Draw replacement now
+        let replacement = null;
+        if (room.deck.length > 0) {
+            replacement = room.deck.shift();
+        }
+
+        // Remove special from table, insert at end of deck so dealer gets it last
+        if (tableIdx !== -1) room.tableCards.splice(tableIdx, 1);
+        const n = room.slots.length;
+        const dealerSlot = room.dealerIdx !== undefined ? room.dealerIdx : (room.currentPlayer - 1 + n) % n;
+        // Simulate block deal to find exact position of dealer's last card
+        let _pos = 0, _dealerLast = room.deck.length - 1;
+        const _deckLen = room.deck.length;
+        while (_pos < _deckLen) {
+            for (let _sl = 0; _sl < n; _sl++) {
+                for (let _c = 0; _c < 4; _c++) {
+                    if (_pos < _deckLen) {
+                        if (_sl === dealerSlot) _dealerLast = _pos;
+                        _pos++;
+                    }
+                }
+            }
+        }
+        const insertPos = _dealerLast;
+        room.deck.splice(insertPos, 0, specialCard);
+
+        // Add replacement to table
+        if (replacement) {
+            room.tableCards.push(replacement);
+            const replRank = basra.cardRank(replacement);
+            if (replRank === 'J' || replacement === '7d') {
+                room.specialReplacements.push(replacement);
+            }
+        }
+
+        // Send animation event to all clients
+        basraBroadcast(room, 'basraSpecialCard', {
+            card: specialCard,
+            display: displayName,
+            tableIdx,
+            replacement,
+            isJack: rank === 'J'
+        });
+
+        // Fallback after 7s if client never sends basraSpecialDone
+        room._specialFallback = setTimeout(() => {
+            basraEmitAll(room);
+            processNextSpecial(room);
+        }, 7000);
+    }
+
+    socket.on('basraSpecialDone', () => {
+        const code = socket.data.basraRoom;
+        const room = basraRooms[code];
+        if (!room) return;
+        if (room._specialFallback) { clearTimeout(room._specialFallback); room._specialFallback = null; }
+        basraEmitAll(room);
+        processNextSpecial(room);
+    });
+
+    // VS AI: create a room and fill second slot with a bot
+    socket.on('basraCreateVsAI', async ({ name, winScore, username, token }) => {
+        const code = basraMakeCode();
+        let uname = null;
+        if (username && token) {
+            try { const u = await getUser(username); if (u && u.token === token) uname = username; } catch(e) {} 
+        }
+        const room = basra.createBasraRoom(code, [
+            { id: 0, name: name || 'שחקן', socketId: socket.id, connected: true, username: uname },
+            { id: 1, name: 'מחשב', socketId: null, connected: true, username: null, isBot: true }
+        ], 0);
+        room.winScore = winScore || 120;
+        room.isBot = true;
+        room.gameStarted = true;
+        basraRooms[code] = room;
+        socket.data.basraRoom = code;
+        socket.data.basraSlot = 0;
+        socket.join('basra_' + code);
+        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: 2, bet: 0 });
+        // Start game
+        const dealerIdx = (room.currentPlayer - 1 + 2) % 2;
+        room.dealerIdx = dealerIdx;
+        basraBroadcast(room, 'basraStart', { playerNames: room.slots.map(s => s.name) });
+        basraBroadcast(room, 'basraDeal', { dealerIdx, cardCount: 4, tableCount: room.tableCards.length });
+        setTimeout(() => {
+            basraEmitAll(room);
+            // If bot goes first
+            basraMaybeTriggerBot(room);
+        }, 80);
+    });
+
+    socket.on('basraReconnect', ({ code, username }) => {
+        const room = basraRooms[code?.toUpperCase()];
+        if (!room) return;
+        const slot = room.slots.find(s => s.username === username || s.name === username);
+        if (!slot) return;
+        slot.socketId = socket.id;
+        slot.connected = true;
+        socket.data.basraRoom = code.toUpperCase();
+        socket.data.basraSlot = slot.id;
+        socket.join('basra_' + code.toUpperCase());
+        // If bot is in a stale committed state and it's the human's turn, clear it
+        if (room.isBot && room.currentPlayer === slot.id &&
+            room.committedCard && room.committedBy !== slot.id) {
+            room.committedCard = null;
+            room.committedBy = null;
+        }
+        if (room.gameStarted) basraEmitAll(room);
+        // Trigger bot if it's bot's turn (in case bot got stuck)
+        if (room.isBot && room.currentPlayer === 1 && !room.gameOver && !room.roundOver) {
+            setTimeout(() => basraMaybeTriggerBot(room), 500);
+        }
+    });
+
+    socket.on('basraChat', ({ msg }) => {
+        const code = socket.data.basraRoom;
+        const slotIdx = socket.data.basraSlot;
+        const room = basraRooms[code];
+        if (!room || !msg) return;
+        // Sanitize: max 40 chars, strip HTML
+        const clean = String(msg).replace(/<[^>]*>/g,'').slice(0, 40);
+        basraBroadcast(room, 'basraChat', { slotIdx, msg: clean });
+    });
+
+    socket.on('basraLeave', () => {
+        const code = socket.data.basraRoom;
+        if (code && basraRooms[code]) {
+            const room = basraRooms[code];
+            const slotIdx = socket.data.basraSlot;
+            const slot = room.slots[slotIdx];
+            if (slot) { slot.connected = false; slot.socketId = null; }
+
+            // Creator (slot 0) leaving → close room entirely
+            if (slotIdx === 0) {
+                basraClearBasraTimer(room);
+                room.gameOver = true;
+                basraBroadcastExcept(room, socket.id, 'toast', `${slot?.name || ''}|closedRoom`);
+                basraBroadcastExcept(room, socket.id, 'basraRoomClosed', {});
+                delete basraRooms[code];
+                socket.data.basraRoom = null;
+                socket.data.basraSlot = null;
+                return;
+            }
+
+            // If game already over, ensure remaining players see the result
+            if (room.gameOver) {
+                const sorted = [...room.slots].sort((a,b) => (b.score||0)-(a.score||0));
+                basraBroadcastExcept(room, socket.id, 'basraGameOver', {
+                    names: sorted.map(s=>s.name), scores: sorted.map(s=>s.score||0)
+                });
+            }
+            // If game was in progress, declare forfeit
+            if (room.gameStarted && !room.gameOver) {
+                basraClearBasraTimer(room);
+                room.gameOver = true;
+                basraBroadcast(room, 'toast', `${slot?.name || ''}|leftLost`);
+                basraBroadcast(room, 'basraGameOver', {
+                    names: room.slots.map(s => s.name),
+                    scores: room.slots.map(s => s.score || 0),
+                    forfeitBy: slotIdx,
+                    forfeitName: slot?.name || 'שחקן',
+                });
+                basraEmitAll(room);
+                const forfeitWinner = room.slots.findIndex((s,i) => i !== slotIdx);
+                setTimeout(() => settleBasraCoins(room, forfeitWinner).catch(e => console.error('[basra coins]', e.message)), 300);
+                recordBasraStats(room, forfeitWinner).catch(e => console.error('[stats error]', e.message));
+            } else {
+                basraBroadcast(room, 'toast', `${slot?.name || ''}|left`);
+            }
+        }
+        socket.data.basraRoom = null;
+        socket.data.basraSlot = null;
+    });
+
+    socket.on('basraForfeit', () => {
+        const code = socket.data.basraRoom;
+        if (!code || !basraRooms[code]) return;
+        const room = basraRooms[code];
+        const slotIdx = socket.data.basraSlot;
+        const slot = room.slots[slotIdx];
+        if (!slot) return;
+
+        basraClearBasraTimer(room);
+        room.gameOver = true;
+
+        // Find winner(s) — everyone else
+        const winners = room.slots.filter((s, i) => i !== slotIdx);
+        const loserName = slot.name;
+
+        basraBroadcast(room, 'toast', `${loserName}|leftEnd`);
+        basraBroadcast(room, 'basraGameOver', {
+            names: room.slots.map(s => s.name),
+            scores: room.slots.map(s => s.score || 0),
+            forfeitBy: slotIdx,
+            forfeitName: loserName,
+        });
+        const fWinner = room.slots.findIndex((s,i) => i !== slotIdx);
+        setTimeout(() => settleBasraCoins(room, fWinner).catch(e => console.error('[basra coins]', e.message)), 300);
+        recordBasraStats(room, fWinner).catch(e => console.error('[stats error]', e.message));
+
+        slot.connected = false;
+        slot.socketId = null;
+        socket.data.basraRoom = null;
+        socket.data.basraSlot = null;
+    });
+}
+
+
+const PORT = process.env.PORT || 3000;
+// Start server only after MongoDB is ready
+connectMongo().then(connected => {
+    if (!connected) {
+        console.warn('[mongo] Running without MongoDB — using in-memory fallback');
+    }
+    server.listen(PORT, () => {
+        console.log(`🃏 Shithead server running on port ${PORT} ✅`);
+    });
+});
