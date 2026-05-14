@@ -2706,6 +2706,8 @@ function basraBotMove(room) {
             score += 200; // floor: any capture beats throw
             score += combined.length * 15;
             if (isBasra) score += 600;
+            // J basra = 20pts > 7d basra = 10pts — prefer J when both can basra
+            if (isJack) score += 30;
 
             // Rule 1: If J + 7d both in hand, DON'T use 7d to capture now
             // Save 7d to capture after J is thrown to table
@@ -2929,17 +2931,25 @@ function basraBotMove(room) {
             const _7dRealBasra = bestCard === '7d' && bestCapture.length > 0 &&
                 bestCapture.length === tableCards.length &&
                 basra.isBasra('7d', _capturedCards, tableCards);
-            // If 7d makes a real basra right now — let it go, J will follow next turn
+            // If 7d makes a real basra — still prefer J if J can also basra (20pts > 10pts)
             if (_7dRealBasra) {
-                // keep bestCard = '7d'
+                const _jCaps = basraBotFindCaptures(_jackCard2, tableCards);
+                if (_jCaps.length > 0) {
+                    const used = new Set(), combined = [];
+                    _jCaps.sort((a,b)=>b.length-a.length).forEach(grp => {
+                        if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+                    });
+                    bestCard = _jackCard2; bestCapture = combined;
+                }
+                // else: keep 7d (J somehow can't capture)
             } else if (bestCard !== _jackCard2) {
                 // Currently planning to play something else — check if J should go now instead
                 // J should go if: currently a throw (no capture) AND table has 3+ cards
                 // Otherwise keep the current plan (capture with another card, or safe throw)
                 const _jCaptures = basraBotFindCaptures(_jackCard2, tableCards);
                 const _jCanCapture = _jCaptures.length > 0;
-                if (_jCanCapture && tableCards.length >= 3 && bestCapture.length === 0) {
-                    // J can make a good capture now — use J
+                if (_jCanCapture && tableCards.length >= 3 && (bestCapture.length === 0 || bestCard === '7d')) {
+                    // J can make a good capture now — prefer J over 7d (J basra = 20pts > 10pts)
                     const used = new Set(), combined = [];
                     _jCaptures.sort((a,b)=>b.length-a.length).forEach(grp => {
                         if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
