@@ -594,7 +594,7 @@
         <!-- Account button -->
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.288</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.289</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2295,7 +2295,9 @@ function aiThreatLevel(p) {
     if (handCount > 0 && faceUpCount === 0 && faceDownCount === 0) {
         if (handCount === 1) return 4; // 1 card in hand, no table = about to win!
         if (handCount === 2) return 3; // 2 cards, no table = very dangerous
-        return 0; // more than 2 hand cards without table = not yet threatening
+        if (handCount <= 4) return 2; // 3-4 cards, no table = dangerous
+        if (handCount <= 6) return 1; // 5-6 cards, no table = moderate threat
+        return 0;
     }
     // faceUp phase
     if (handCount === 0 && faceUpCount > 0) {
@@ -2311,10 +2313,11 @@ function aiThreatLevel(p) {
     return 0;
 }
 
-// Max threat among all opponents
+// Max threat among all opponents (skip self = currentPlayer)
 function aiMaxThreat() {
     let max = 0;
-    for (let i = 1; i < players.length; i++) {
+    for (let i = 0; i < players.length; i++) {
+        if (i === currentPlayer) continue;
         if (!players[i].finished) max = Math.max(max, aiThreatLevel(players[i]));
     }
     return max;
@@ -2354,7 +2357,8 @@ function aiPileTopAfter(card, currentPile) {
 // How many cards in opponent's hand (best opponent = fewest cards)
 function aiOpponentMinCards() {
     let min = 999;
-    for (let i = 1; i < players.length; i++) {
+    for (let i = 0; i < players.length; i++) {
+        if (i === currentPlayer) continue;
         if (!players[i].finished) {
             const cnt = players[i].hand.length +
                 players[i].faceUp.filter(Boolean).length +
@@ -2369,8 +2373,13 @@ function aiOpponentMinCards() {
 function aiOpponentCanPlay(pileTopVal, opponent) {
     const hand = opponent.hand;
     if (!hand.length) {
-        // faceUp phase — anything might work
-        return opponent.faceUp.some(Boolean);
+        return opponent.faceUp.some(c => {
+            if (!c) return false;
+            const r = c.slice(0,-1);
+            if (r === '2' || r === '10' || r === '3') return true;
+            if (r === '7') return pileTopVal <= 7;
+            return aiCardValue(c) >= pileTopVal;
+        });
     }
     return hand.some(c => {
         const r = c.slice(0,-1);
@@ -2390,7 +2399,8 @@ function aiLookaheadPenalty(card, currentPile) {
     // 2 = reset to 2 — opponent can play almost anything
     const newTopVal = aiPileTopAfter(card, currentPile);
     let penalty = 0;
-    for (let i = 1; i < players.length; i++) {
+    for (let i = 0; i < players.length; i++) {
+        if (i === currentPlayer) continue;
         if (players[i].finished) continue;
         const opp = players[i];
         const canPlay = aiOpponentCanPlay(newTopVal, opp);
@@ -2426,6 +2436,17 @@ function aiGetBestPlay(validCards, hand) {
         if (!cards.length) cards = validCards.filter(c => c.slice(0,-1) === rank);
         return cards.length ? [rank, cards] : null;
     };
+
+    // 0. PRIORITY: complete 4-of-a-kind burn right now
+    const _burnTopR = pileTopRank();
+    const _burnStreak = pileStreak();
+    if (_burnTopR && _burnStreak > 0 && _burnStreak < 4) {
+        const _burnNeeded = 4 - _burnStreak;
+        const _burnMatching = validCards.filter(c => c.slice(0,-1) === _burnTopR);
+        if (_burnMatching.length >= _burnNeeded) {
+            return [_burnTopR, _burnMatching.slice(0, _burnNeeded)];
+        }
+    }
 
     const pileSize = pile.length;
     const isPileEmpty = pileSize === 0;
@@ -2477,7 +2498,8 @@ function aiGetBestPlay(validCards, hand) {
             // Check memory: what's the highest value opponent couldn't answer?
             // Find most threatened opponent index
             let mostThreatenedIdx = -1, maxT = 0;
-            for (let i = 1; i < players.length; i++) {
+            for (let i = 0; i < players.length; i++) {
+                if (i === currentPlayer) continue;
                 const t = aiThreatLevel(players[i]);
                 if (t > maxT) { maxT = t; mostThreatenedIdx = i; }
             }
@@ -2517,7 +2539,8 @@ function aiGetBestPlay(validCards, hand) {
         // Normal: play lowest, avoid gifting opponent
         const safe = normals.find(card => {
             const r = card.slice(0,-1);
-            for (let i = 1; i < players.length; i++) {
+            for (let i = 0; i < players.length; i++) {
+                if (i === currentPlayer) continue;
                 if (players[i].finished) continue;
                 const opp = players[i];
                 if (opp.hand.length >= 2) {
