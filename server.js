@@ -3315,6 +3315,7 @@ function registerBasraHandlers(socket) {
         if (room.committedBy !== slotIdx) { socket.emit('basraError', 'לא התורך'); return; }
 
         const card = room.committedCard;
+        if (!card) { socket.emit('basraError', 'שגיאת מצב — נסה שוב'); basraEmitAll(room); return; }
 
         // RULE: if captures are available, player MUST capture — cannot throw
         let enforcedCaptures = captureIndices || [];
