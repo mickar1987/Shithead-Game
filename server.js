@@ -122,6 +122,7 @@ const mongoClient = new MongoClient(MONGO_URI, {
     connectTimeoutMS: 10000,
 });
 let usersCol = null;
+let trainingCol = null;
 
 async function connectMongo(retries = 5) {
     for (let i = 0; i < retries; i++) {
@@ -130,6 +131,9 @@ async function connectMongo(retries = 5) {
             const db = mongoClient.db('shithead');
             usersCol = db.collection('users');
             await usersCol.createIndex({ username: 1 }, { unique: true });
+            trainingCol = db.collection('shithead_training');
+            await trainingCol.createIndex({ ts: 1 });
+            await trainingCol.createIndex({ type: 1 });
             console.log('[mongo] Connected to MongoDB Atlas ✅'); mongoOk = true;
             return true;
         } catch(e) {
@@ -516,6 +520,63 @@ app.get('/api/stats/user', async (req, res) => {
 
         res.json({ ok: true, stats: user.stats || {}, username: u });
     } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+// ── AI Training Data ──
+// POST /api/ai/event — client sends game events (fire-and-forget)
+app.post('/api/ai/event', async (req, res) => {
+    res.json({ ok: true }); // respond immediately, don't block client
+    if (!trainingCol || !mongoOk) return;
+    try {
+        const { type, ...data } = req.body;
+        const allowed = ['pile_take', 'card_play', 'game_end'];
+        if (!allowed.includes(type)) return;
+        await trainingCol.insertOne({ type, ...data, ts: new Date() });
+    } catch(e) { console.error('[training] insert error:', e.message); }
+});
+
+// GET /api/ai/stats?key=... — aggregated stats for analysis
+app.get('/api/ai/stats', async (req, res) => {
+    if (req.query.key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+    if (!trainingCol || !mongoOk) return res.json({ error: 'no db' });
+    try {
+        const [takeByRank, gameStats, cardPlays, totalEvents] = await Promise.all([
+            // Which ranks caused human to take pile most
+            trainingCol.aggregate([
+                { $match: { type: 'pile_take' } },
+                { $group: { _id: '$topRank', count: { $sum: 1 }, avgPileSize: { $avg: '$pileSize' } } },
+                { $sort: { count: -1 } }
+            ]).toArray(),
+            // Win/loss and game length stats
+            trainingCol.aggregate([
+                { $match: { type: 'game_end' } },
+                { $group: { _id: null, total: { $sum: 1 },
+                    humanWins: { $sum: { $cond: ['$humanWon', 1, 0] } },
+                    avgTurns: { $avg: '$turns' },
+                    by2p: { $sum: { $cond: [{ $eq: ['$playerCount', 2] }, 1, 0] } },
+                    by4p: { $sum: { $cond: [{ $eq: ['$playerCount', 4] }, 1, 0] } }
+                }}
+            ]).toArray(),
+            // What ranks does human prefer to play (and with how many options)
+            trainingCol.aggregate([
+                { $match: { type: 'card_play' } },
+                { $group: { _id: '$rank', count: { $sum: 1 }, avgOptions: { $avg: '$optionCount' } } },
+                { $sort: { count: -1 } }
+            ]).toArray(),
+            trainingCol.countDocuments()
+        ]);
+        res.json({ takeByRank, gameStats: gameStats[0] || {}, cardPlays, totalEvents });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
+// GET /api/ai/reset?key=... — wipe training data (use after applying improvements)
+app.get('/api/ai/reset', async (req, res) => {
+    if (req.query.key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+    if (!trainingCol || !mongoOk) return res.json({ error: 'no db' });
+    try {
+        const result = await trainingCol.deleteMany({});
+        res.json({ ok: true, deleted: result.deletedCount });
+    } catch(e) { res.json({ error: e.message }); }
 });
 
 app.get('/api/admin/reset-all-stats', async (req, res) => {
