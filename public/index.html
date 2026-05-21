@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.295</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.298</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1343,6 +1343,7 @@ function startGame(count) {
     // Save active game state to localStorage — place=count means "last" until proven otherwise
     aiMemoryReset();
     _aiTurnCount = 0;
+    _aiGameId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     localStorage.setItem('_activeGame', JSON.stringify({
         game: 'shithead', mode: 'bot',
         username: authUser?.username || null,
@@ -1778,6 +1779,12 @@ function handleSwap() {
 }
 
 function _endSwapAI() {
+    aiTrackEvent('swap_done', {
+        gameId: _aiGameId,
+        faceUp: players[0].faceUp.filter(Boolean).map(c => c.slice(0,-1)),
+        hand: players[0].hand.map(c => c.slice(0,-1)),
+        playerCount: players.length
+    });
     isSwapPhase = false;
     selectedHandIndices = []; selectedTableIndices = [];
 
@@ -1953,12 +1960,24 @@ function _humanPlayAI() {
     selectedHandIndices = []; selectedTableIndices = [];
     playSound('play');
     // Track card play for AI training
+    const _cpPlayed = cards.map(c => c.slice(0,-1));
+    const _cpHandBefore = [...players[0].hand, ...cards].map(c => c.slice(0,-1));
+    const _cpOptions = [...players[0].hand, ...cards].filter(c => canPlay(c)).map(c => c.slice(0,-1));
+    const _cpWillBurn = (() => { const r = _cpPlayed[0]; if (r === '10') return true; let s=0; for(let i=pile.length-1;i>=0;i--){if(pile[i].slice(0,-1)===r)s++;else break;} return s+cards.length>=4; })();
     aiTrackEvent('card_play', {
-        rank: cards[0]?.slice(0,-1),
-        topRank: pileTopRank(),
-        pileSize: pile.length,
+        gameId: _aiGameId, turn: _aiTurnCount,
         phase: hasHand ? 'hand' : 'faceUp',
-        optionCount: cards.length + players[0].hand.filter(c => canPlay(c)).length,
+        played: _cpPlayed,
+        handBefore: _cpHandBefore,
+        handAfter: players[0].hand.map(c => c.slice(0,-1)),
+        options: _cpOptions,
+        topRank: pileTopRank(),
+        pileTop5: pile.slice(-5).map(c => c.slice(0,-1)),
+        pileSize: pile.length,
+        drawLeft: drawPile.length,
+        oppHandSizes: players.slice(1).map(p => p.hand.length),
+        oppFaceUp: players.slice(1).map(p => p.faceUp.filter(Boolean).map(c => c.slice(0,-1))),
+        willBurn: _cpWillBurn,
         playerCount: players.length
     });
     executeMove(cards);
@@ -1991,9 +2010,15 @@ function _humanTakeAI() {
     showToast(H('↙ לקחת את הערימה','↙ Taking the pile'));
     aiMemoryRecordSwallow(0, pile); // AI remembers what human swallowed
     aiTrackEvent('pile_take', {
+        gameId: _aiGameId, turn: _aiTurnCount,
         topRank: pileTopRank(),
+        pileTop5: pile.slice(-5).map(c => c.slice(0,-1)),
         pileSize: pile.length,
         phase: players[0].hand.length > 0 ? 'hand' : 'faceUp',
+        hand: players[0].hand.map(c => c.slice(0,-1)),
+        handSize: players[0].hand.length,
+        drawLeft: drawPile.length,
+        oppHandSizes: players.slice(1).map(p => p.hand.length),
         playerCount: players.length
     });
     players[0].hand.push(...pile);
@@ -2106,6 +2131,16 @@ function _doExecuteMove(played) {
 
     // Check burn: 10, or 4-of-a-kind
     const isBurned = r === '10' || pileStreak() >= 4;
+
+    if (isBurned && currentPlayer === 0) {
+        aiTrackEvent('burn', {
+            gameId: _aiGameId, turn: _aiTurnCount,
+            rank: r, pileSize: pile.length,
+            hand: players[0].hand.map(c => c.slice(0,-1)),
+            oppHandSizes: players.slice(1).map(p => p.hand.length),
+            playerCount: players.length
+        });
+    }
 
     if (isBurned) {
         playSound('burn');
@@ -2245,6 +2280,7 @@ function aiTrackEvent(type, data) {
 // _aiMemory[playerIdx] = [ {pile: [...cards], turn: N}, ... ] (last 2)
 let _aiMemory = {};
 let _aiTurnCount = 0;
+let _aiGameId = null;
 
 function aiMemoryReset() {
     _aiMemory = {};
@@ -2643,16 +2679,24 @@ function aiMove() {
             render();
             nextTurn();
         } else {
-            // Pile empty but stuck — force play lowest card or skip
-            const anyCard = p.hand[0] || p.faceUp.find(Boolean);
-            if (anyCard) {
+            // Pile empty but stuck — force play best available card via executeMove for burn check
+            const _stuckPool = p.hand.length > 0 ? [...p.hand] : p.faceUp.filter(Boolean);
+            if (_stuckPool.length > 0) {
+                const _stuckNormals = _stuckPool.filter(c => !['2','3','10'].includes(c.slice(0,-1)));
+                const _stuckCard = _stuckNormals.length > 0
+                    ? _stuckNormals.sort((a,b) => aiCardValue(a) - aiCardValue(b))[0]
+                    : (_stuckPool.find(c => c.slice(0,-1) === '2')
+                       || _stuckPool.find(c => c.slice(0,-1) === '3')
+                       || _stuckPool.find(c => c.slice(0,-1) === '10')
+                       || _stuckPool[0]);
                 showToast(H(`${p.name} מוכרח לשחק`,`${p.name} must play`));
-                if (p.hand.includes(anyCard)) p.hand.splice(p.hand.indexOf(anyCard), 1);
-                else p.faceUp.forEach((fc,i)=>{ if(fc===anyCard) p.faceUp[i]=null; });
-                pile.push(anyCard);
-                render();
+                if (p.hand.includes(_stuckCard)) p.hand.splice(p.hand.indexOf(_stuckCard), 1);
+                else p.faceUp.forEach((fc,i)=>{ if(fc===_stuckCard) p.faceUp[i]=null; });
+                playSound('play');
+                executeMove([_stuckCard]);
+            } else {
+                nextTurn();
             }
-            nextTurn();
         }
         return;
     }
@@ -2841,7 +2885,9 @@ function showResults() {
     }
     // Record game result for AI training
     if (players.some(p => p.isAI)) aiTrackEvent('game_end', {
+        gameId: _aiGameId,
         humanWon: winnersOrder[0] === 0,
+        humanPlace: winnersOrder.indexOf(0) + 1,
         turns: _aiTurnCount,
         playerCount: players.length
     });
@@ -2900,7 +2946,7 @@ function nextTurn(skips = 1) {
     // 1. Burn: human can complete 4-of-a-kind on pile
     // 2. Add-on: human can add same rank as card just played (only when prev player was NOT human)
     if (!isSwapPhase && !players[0].finished && currentPlayer !== 0) {
-        const topR = pileTopRank();
+        const topR = pile.length ? pile[pile.length-1].slice(0,-1) : null;
         const streak = pileStreak();
         const needed = topR ? 4 - streak : 0;
         const canBurn = needed > 0 && needed <= players[0].hand.filter(c => c.slice(0,-1) === topR).length;
@@ -2926,12 +2972,12 @@ function nextTurn(skips = 1) {
     // Only if human player cannot interrupt (human gets priority)
     const _humanCanBurnNow = (() => {
         if (isSwapPhase || players[0].finished || currentPlayer === 0) return false;
-        const topR2 = pileTopRank(); const str2 = pileStreak();
+        const topR2 = pile.length ? pile[pile.length-1].slice(0,-1) : null; const str2 = pileStreak();
         const need2 = topR2 ? 4 - str2 : 0;
         return need2 > 0 && players[0].hand.filter(c => c.slice(0,-1) === topR2).length >= need2;
     })();
     if (!isSwapPhase && !players[prevPlayer].finished && !_humanCanBurnNow) {
-        const topR = pileTopRank();
+        const topR = pile.length ? pile[pile.length-1].slice(0,-1) : null;
         const streak = pileStreak();
         const needed = topR ? 4 - streak : 0;
         for (let pi = 0; pi < players.length; pi++) {

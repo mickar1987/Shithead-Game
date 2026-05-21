@@ -529,7 +529,7 @@ app.post('/api/ai/event', async (req, res) => {
     if (!trainingCol || !mongoOk) return;
     try {
         const { type, ...data } = req.body;
-        const allowed = ['pile_take', 'card_play', 'game_end'];
+        const allowed = ['pile_take', 'card_play', 'game_end', 'swap_done', 'burn'];
         if (!allowed.includes(type)) return;
         await trainingCol.insertOne({ type, ...data, ts: new Date() });
     } catch(e) { console.error('[training] insert error:', e.message); }
@@ -2988,6 +2988,14 @@ function basraBotMove(room) {
                 safeCards.sort((a,b) => priority(a)-priority(b));
                 bestCard = safeCards[0];
                 bestCapture = [];
+                // If the selected safe card can capture, it must — mandatory capture rule
+                const _a2NewCaps = basraBotFindCaptures(bestCard, tableCards);
+                if (_a2NewCaps.length > 0) {
+                    const _a2Used = new Set();
+                    _a2NewCaps.sort((a,b)=>b.length-a.length).forEach(grp=>{
+                        if(grp.every(i=>!_a2Used.has(i))){grp.forEach(i=>_a2Used.add(i));bestCapture.push(...grp);}
+                    });
+                }
             } else {
                 // No safe alternative — forced to throw J/7d (no capture)
                 bestCapture = [];
