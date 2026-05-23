@@ -904,7 +904,7 @@ async function recordShitheadStats(room) {
     } catch(e) { console.error('[stats shithead] error:', e.message); }
 }
 
-async function recordBasraStats(room, winnerSlotIdx) {
+async function recordBasraStats(room, winnerSlotIdx, isAbandon = false) {
     try {
         const isBot = room.slots.some(s => s.isBot);
         const mode = isBot ? 'bot' : 'online';
@@ -922,6 +922,7 @@ async function recordBasraStats(room, winnerSlotIdx) {
                 m.won = (m.won||0) + 1;
             } else {
                 m.lost = (m.lost||0) + 1;
+                if (isAbandon) m.abandoned = (m.abandoned||0) + 1;
             }
             g[mode] = m; stats['basra'] = g;
             await saveUser(slot.username, { stats });
@@ -2110,28 +2111,15 @@ io.on('connection', (socket) => {
             const slot = room.slots?.[slotIdx];
             if (slot && slot.socketId === socket.id) {
                 // Grace period: 30s to reconnect before marking disconnected
-                setTimeout(async () => {
+                setTimeout(() => {
                     if (slot.socketId !== socket.id) return; // reconnected
                     slot.connected = false;
                     slot.socketId = null;
-                    // If vs-AI game still active — record abandon server-side
+                    // Abandon stats for close-app are recorded via client beacon
+                    // (recordBasraStats handles exit-button via basraLeave socket event)
                     const isBot = room.slots.some(s => s.isBot);
-                    if (isBot && !room.gameOver && !room.roundOver && slot.username) {
-                        try {
-                            const u = await getUser(slot.username);
-                            if (u) {
-                                const stats = u.stats || {};
-                                const g = stats['basra'] || {};
-                                const m = g['bot'] || { played:0, won:0, lost:0, abandoned:0 };
-                                m.played = (m.played||0) + 1;
-                                m.lost = (m.lost||0) + 1;
-                                m.abandoned = (m.abandoned||0) + 1;
-                                g['bot'] = m; stats['basra'] = g;
-                                await saveUser(slot.username, { stats });
-                                console.log(`[disconnect-abandon] basra ${slot.username}`);
-                                room.gameOver = true; // stop the game
-                            }
-                        } catch(e) { console.error('[disconnect-abandon] basra error:', e.message); }
+                    if (isBot && !room.gameOver) {
+                        room.gameOver = true; // stop the bot from continuing
                     }
                 }, 30000);
             }
@@ -3608,7 +3596,7 @@ function registerBasraHandlers(socket) {
                 basraEmitAll(room);
                 const forfeitWinner = room.slots.findIndex((s,i) => i !== slotIdx);
                 setTimeout(() => settleBasraCoins(room, forfeitWinner).catch(e => console.error('[basra coins]', e.message)), 300);
-                recordBasraStats(room, forfeitWinner).catch(e => console.error('[stats error]', e.message));
+                recordBasraStats(room, forfeitWinner, true).catch(e => console.error('[stats error]', e.message));
             } else {
                 basraBroadcast(room, 'toast', `${slot?.name || ''}|left`);
             }
