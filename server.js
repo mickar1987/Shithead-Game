@@ -412,7 +412,7 @@ app.post('/api/log', (req, res) => {
     res.json({ ok: true });
 });
 
-app.get('/api/stats/beacon', async (req, res) => {
+app.all('/api/stats/beacon', async (req, res) => {
     try {
         let { u, t, game, mode, result, place, total } = req.query;
         if (!u || !t) return res.status(200).send('ok');
