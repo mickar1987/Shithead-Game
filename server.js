@@ -2931,17 +2931,18 @@ function basraBotMove(room) {
             const _7dRealBasra = bestCard === '7d' && bestCapture.length > 0 &&
                 bestCapture.length === tableCards.length &&
                 basra.isBasra('7d', _capturedCards, tableCards);
-            // If 7d makes a real basra — still prefer J if J can also basra (20pts > 10pts)
+            // If 7d makes a real basra — prefer J only when table has 3+ cards
+            // (with <3 cards, RULE A2 would block J anyway, wasting the 7d basra opportunity)
             if (_7dRealBasra) {
                 const _jCaps = basraBotFindCaptures(_jackCard2, tableCards);
-                if (_jCaps.length > 0) {
+                if (_jCaps.length > 0 && tableCards.length >= 3) {
                     const used = new Set(), combined = [];
                     _jCaps.sort((a,b)=>b.length-a.length).forEach(grp => {
                         if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
                     });
                     bestCard = _jackCard2; bestCapture = combined;
                 }
-                // else: keep 7d (J somehow can't capture)
+                // else: keep 7d basra (J would be blocked by RULE A2 on <3 cards)
             } else if (bestCard !== _jackCard2) {
                 // Currently planning to play something else — check if J should go now instead
                 // J should go if: currently a throw (no capture) AND table has 3+ cards
