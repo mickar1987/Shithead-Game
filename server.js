@@ -3566,6 +3566,13 @@ function registerBasraHandlers(socket) {
             // Creator (slot 0) leaving → close room entirely
             if (slotIdx === 0) {
                 basraClearBasraTimer(room);
+                // Record abandon if game was in progress
+                if (room.gameStarted && !room.gameOver) {
+                    const botWinner = room.slots.findIndex((s, i) => i !== slotIdx);
+                    if (botWinner !== -1) {
+                        recordBasraStats(room, botWinner, true).catch(e => console.error('[stats error]', e.message));
+                    }
+                }
                 room.gameOver = true;
                 basraBroadcastExcept(room, socket.id, 'toast', `${slot?.name || ''}|closedRoom`);
                 basraBroadcastExcept(room, socket.id, 'basraRoomClosed', {});
