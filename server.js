@@ -600,6 +600,20 @@ app.get('/api/admin/reset-user-stats', async (req, res) => {
     } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
+app.get('/api/admin/reset-game-stats', async (req, res) => {
+    try {
+        const { key, u, game } = req.query;
+        if (key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+        if (!u || !game) return res.json({ ok: false, error: 'Missing username or game' });
+        const user = await getUser(u);
+        if (!user) return res.json({ ok: false, error: 'User not found' });
+        const stats = user.stats || {};
+        stats[game] = {};
+        await saveUser(u, { stats });
+        res.json({ ok: true, game, user: u });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.get('/api/admin/set-coins', async (req, res) => {
     try {
         const { key, u, coins } = req.query;
