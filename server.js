@@ -922,7 +922,6 @@ async function recordBasraStats(room, winnerSlotIdx) {
                 m.won = (m.won||0) + 1;
             } else {
                 m.lost = (m.lost||0) + 1;
-                m.abandoned = (m.abandoned||0) + 1; // losing = always abandoning in vs-bot
             }
             g[mode] = m; stats['basra'] = g;
             await saveUser(slot.username, { stats });
