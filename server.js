@@ -905,6 +905,7 @@ async function recordShitheadStats(room) {
 }
 
 async function recordBasraStats(room, winnerSlotIdx, isAbandon = false) {
+    console.log(`[recordBasraStats] winner=${winnerSlotIdx} isAbandon=${isAbandon}`);
     try {
         const isBot = room.slots.some(s => s.isBot);
         const mode = isBot ? 'bot' : 'online';
@@ -3567,11 +3568,15 @@ function registerBasraHandlers(socket) {
             if (slotIdx === 0) {
                 basraClearBasraTimer(room);
                 // Record abandon if game was in progress
+                console.log(`[basraLeave] slot0 gameStarted=${room.gameStarted} gameOver=${room.gameOver} username=${slot?.username}`);
                 if (room.gameStarted && !room.gameOver) {
                     const botWinner = room.slots.findIndex((s, i) => i !== slotIdx);
+                    console.log(`[basraLeave] recording abandon botWinner=${botWinner}`);
                     if (botWinner !== -1) {
                         recordBasraStats(room, botWinner, true).catch(e => console.error('[stats error]', e.message));
                     }
+                } else {
+                    console.log(`[basraLeave] skipping abandon — game already over or not started`);
                 }
                 room.gameOver = true;
                 basraBroadcastExcept(room, socket.id, 'toast', `${slot?.name || ''}|closedRoom`);
