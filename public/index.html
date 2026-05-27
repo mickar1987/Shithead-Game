@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.311</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.312</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3286,6 +3286,7 @@ function startDailyCountdown(msLeft) {
 
 async function claimDaily() {
     if (!authUser) return;
+    if (!navigator.onLine) { showToast(H('אין חיבור לאינטרנט','No internet connection')); return; }
     setDailyBtnsState(true, '...');
     try {
         console.log('[daily] claiming for', authUser.username);
@@ -3312,13 +3313,18 @@ async function claimDaily() {
         showToast(H(`🎁 קיבלת 200 מטבעות! סה"כ: 🪙${data.coins}`,`🎁 You got 200 coins! Total: 🪙${data.coins}`));
         startDailyCountdown(24 * 60 * 60 * 1000);
     } catch(e) {
-        showToast(H('שגיאת חיבור לשרת','Server connection error'));
-        setDailyBtnsState(false, '');
+        if (!navigator.onLine) {
+            setDailyBtnsState(true, H('⚠️ אין חיבור','⚠️ No connection'));
+        } else {
+            showToast(H('שגיאת חיבור לשרת','Server connection error'));
+            setDailyBtnsState(false, '');
+        }
     }
 }
 
 async function checkDailyAvailable() {
     if (!authUser) return;
+    if (!navigator.onLine) { setDailyBtnsState(true, H('⚠️ אין חיבור','⚠️ No connection')); return; }
     try {
         const r = await fetch('/api/daily-status', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: authUser.username, token: authUser.token }) });
         const data = await r.json();
@@ -5106,12 +5112,17 @@ function _offlineEnqueue(url, options) {
 window.addEventListener('online', () => {
     try {
         const q = JSON.parse(localStorage.getItem('_offlineQueue') || '[]');
-        if (!q.length) return;
-        localStorage.removeItem('_offlineQueue');
-        q.forEach(({ url, method, headers, body }) => {
-            fetch(url, { method, headers, body }).catch(() => _offlineEnqueue(url, { method, headers, body }));
-        });
+        if (q.length) {
+            localStorage.removeItem('_offlineQueue');
+            q.forEach(({ url, method, headers, body }) => {
+                fetch(url, { method, headers, body }).catch(() => _offlineEnqueue(url, { method, headers, body }));
+            });
+        }
     } catch(e) {}
+    if (typeof checkDailyAvailable === 'function' && typeof authUser !== 'undefined' && authUser) checkDailyAvailable();
+});
+window.addEventListener('offline', () => {
+    if (typeof setDailyBtnsState === 'function') setDailyBtnsState(true, H('⚠️ אין חיבור','⚠️ No connection'));
 });
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
