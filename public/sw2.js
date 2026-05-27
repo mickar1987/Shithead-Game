@@ -1,5 +1,5 @@
-// v4.321 — fix offline Basra: player always starts first (match server)
-const CACHE = 'basrhead-v4.321';
+// v4.322 — fix offline Basra: round starter goes first every new-hand deal
+const CACHE = 'basrhead-v4.322';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
