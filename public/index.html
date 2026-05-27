@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.323</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.324</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3512,7 +3512,7 @@ function initSocket() {
     socket.on('connect', () => {
         if (window._basraOfflineActive && window._basraIsVsBot) {
             // Already switched to offline mid-game — stay offline, don't reconnect
-            showToast(H('התקשורת חזרה — ממשיך אופליין','Connection restored — finishing offline'));
+            _showConnStatus(H('התקשורת חזרה — ממשיך אופליין','Connection restored — finishing offline'));
             return;
         }
         if (basraRoomCode && basraMySlot !== null) {
@@ -6610,7 +6610,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.323 ══
+// ══ BASRA OFFLINE ENGINE v4.324 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -6956,6 +6956,12 @@ function _bOfflineCleanup(){
     if(_origSocketEmit&&socket){socket.emit=_origSocketEmit;_origSocketEmit=null;}
     _offlineRoom=null;window._basraOfflineActive=false;
 }
+function _showConnStatus(msg){
+    const el=document.getElementById('basraConnStatus');
+    if(!el)return;
+    el.textContent=msg;el.style.opacity='1';
+    clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity='0',3000);
+}
 
 function _bSwitchToOffline(){
     if(!basraState||window._basraOfflineActive||!window._basraIsVsBot)return;
@@ -6966,8 +6972,12 @@ function _bSwitchToOffline(){
     const unknown=_bShuffle(allCards.filter(c=>!known.has(c)));
     let botHandCount=(basraState.handCounts||[])[1]||0;
     if(basraState.committedCard&&basraState.committedBy===1)botHandCount=Math.max(0,botHandCount-1);
+    // Correct deck size: exclude captured cards (they're in unknown but shouldn't be in deck)
+    const capturedTotal=((basraState.capturedCounts||[])[0]||0)+((basraState.capturedCounts||[])[1]||0);
+    const knownCount=(basraState.myHand||[]).length+(basraState.tableCards||[]).length+(basraState.committedCard?1:0);
+    const actualDeckSize=Math.max(0,52-knownCount-botHandCount-capturedTotal);
     const botHand=unknown.slice(0,botHandCount);
-    const deck=unknown.slice(botHandCount);
+    const deck=unknown.slice(botHandCount,botHandCount+actualDeckSize);
     _offlineRoom={
         slots:[
             {id:0,name:(basraState.playerNames||[])[0]||'שחקן',hand:(basraState.myHand||[]).slice(),
@@ -6997,9 +7007,21 @@ function _bSwitchToOffline(){
             else _origSocketEmit(event,data,...rest);
         };
     }
-    showToast(H('אין תקשורת — ממשיך אופליין','No connection — continuing offline'));
+    _showConnStatus(H('אין תקשורת — ממשיך אופליין','No connection — continuing offline'));
     _bEmit('basraState',_bStateFor(_offlineRoom,0));
-    if(_offlineRoom.currentPlayer===1&&!_offlineRoom.committedCard){
+    // Resume pending bot committed card (server resolved it async; we simulate that here)
+    if(_offlineRoom.committedBy===1&&_offlineRoom.committedCard){
+        setTimeout(()=>{
+            const bc=_offlineRoom.committedCard,bot=_offlineRoom.slots[1];
+            _offlineRoom.committedCard=null;_offlineRoom.committedBy=null;
+            const caps=_bFindIdxs(bc,_offlineRoom.tableCards);
+            const res=_bPlayCard(_offlineRoom,1,bc,caps.length>0?caps[0]:[],true);
+            if(res.ok&&res.capturedCards.length){_bEmit('toast',res.basra?`⚡ BASRA! ${bot.name}`:`${bot.name}|captured|${res.capturedCards.length}`);if(res.basra)_bEmit('basraEvent',{type:'basra',player:1,name:bot.name});}
+            else if(!res.ok)_offlineRoom.tableCards.push(bc);
+            _bEmit('basraState',_bStateFor(_offlineRoom,0));
+            setTimeout(()=>_bAdvanceTurn(_offlineRoom,_bEmit),300);
+        },800);
+    }else if(_offlineRoom.currentPlayer===1&&!_offlineRoom.committedCard){
         setTimeout(()=>_bBotMove(_offlineRoom,_bEmit),800);
     }
 }
@@ -7642,6 +7664,7 @@ function basraCancelSelection() {
     <!-- Top bar -->
     <div style="position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 44px);background:var(--bg);z-index:503;"></div>
     <div style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 12px;z-index:504;">
+        <div id="basraConnStatus" style="position:absolute;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,180,0.8);letter-spacing:0.5px;pointer-events:none;opacity:0;transition:opacity 0.5s;white-space:nowrap;"></div>
         <div id="basraScoreBar" style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.6);letter-spacing:1.5px;"></div>
         <div style="display:flex;gap:6px;align-items:center;">
             <button onclick="toggleLog()" style="background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:9px;padding:4px 8px;border-radius:4px;cursor:pointer;">📜 LOG</button>

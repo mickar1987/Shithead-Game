@@ -1,5 +1,5 @@
-// v4.323 — mid-game connectivity switch: vs-bot online game falls back to offline engine on disconnect
-const CACHE = 'basrhead-v4.323';
+// v4.324 — fix offline switch: correct deck size, resolve pending bot committed card, small connection status
+const CACHE = 'basrhead-v4.324';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
