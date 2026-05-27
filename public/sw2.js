@@ -1,5 +1,5 @@
-// v4.320 — fix offline Basra: bot timing + special card state sync
-const CACHE = 'basrhead-v4.320';
+// v4.321 — fix offline Basra: player always starts first (match server)
+const CACHE = 'basrhead-v4.321';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
