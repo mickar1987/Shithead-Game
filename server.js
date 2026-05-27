@@ -364,6 +364,16 @@ app.get('/api/health', (req, res) => {
     res.json({ ok: true, mongo: !!usersCol, time: new Date().toISOString() });
 });
 
+// Version endpoint — reads from index.html at startup so only one file needs updating
+const _serverAppVer = (() => {
+    try {
+        const html = require('fs').readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+        const m = html.match(/v(\d+\.\d+)/);
+        return m ? m[0] : '';
+    } catch(e) { return ''; }
+})();
+app.get('/api/version', (req, res) => res.json({ v: _serverAppVer }));
+
 // Debug: check specific user raw data
 app.get('/api/debug/user', async (req, res) => {
     const key = req.query.key;
