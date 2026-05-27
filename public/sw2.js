@@ -1,5 +1,5 @@
-// v4.316 — cache app shell for offline support
-const CACHE = 'basrhead-v4.316';
+// v4.317 — cache app shell for offline support
+const CACHE = 'basrhead-v4.317';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
