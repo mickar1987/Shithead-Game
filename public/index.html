@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.312</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.313</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -3210,6 +3210,7 @@ function updateAuthNamePreview() {
 }
 
 async function submitAuth() {
+    if (!navigator.onLine) { showToast(H('📵 אין חיבור לאינטרנט','📵 No internet connection')); return; }
     const username  = document.getElementById('authUsername').value.trim();
     const pin       = document.getElementById('authPin').value.trim();
     const pin2El    = document.getElementById('authPin2');
@@ -3339,6 +3340,7 @@ async function checkDailyAvailable() {
 
 // ── Edit Profile ──
 function showEditProfile() {
+    if (!navigator.onLine) { showToast(H('📵 אין חיבור — עריכת פרופיל דורשת אינטרנט','📵 No internet — profile editing requires connection')); return; }
     const modal = document.getElementById('editProfileModal');
     const step1 = document.getElementById('editProfileStep1');
     const step2 = document.getElementById('editProfileStep2');
@@ -3451,6 +3453,15 @@ function setBet(amount) {
 }
 
 function showMenu(id) {
+    const _netMenus = ['menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuBasraOnline','menuBasraCreate','menuBasraJoin'];
+    if (!navigator.onLine && _netMenus.includes(id)) {
+        showToast(H('📵 אין חיבור לאינטרנט — פעולה זו דורשת תקשורת','📵 No internet connection'));
+        return;
+    }
+    if (!navigator.onLine && id === 'menuAuth' && !authUser) {
+        showToast(H('📵 אין חיבור — ההתחברות דורשת אינטרנט','📵 No internet — login requires connection'));
+        return;
+    }
     if (id === 'menuBasraVsAI') setTimeout(() => setBasraAIWinScore(basraAIWinScore || 120), 10);
 
     fetchOnlineStats();
@@ -6530,6 +6541,7 @@ function setBasraAIWinScore(score) {
 }
 
 function startBasraVsAI() {
+    if (!navigator.onLine) { showToast(H('📵 אין חיבור — בסרה מול מחשב דורשת אינטרנט','📵 No internet — Basra vs AI requires connection')); return; }
     if (!socket) initSocket();
     window._basraStatsRecorded = false;
     window._basraIsVsBot = true;
