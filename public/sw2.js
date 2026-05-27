@@ -1,5 +1,5 @@
-// v4.322 — fix offline Basra: round starter goes first every new-hand deal
-const CACHE = 'basrhead-v4.322';
+// v4.323 — mid-game connectivity switch: vs-bot online game falls back to offline engine on disconnect
+const CACHE = 'basrhead-v4.323';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
