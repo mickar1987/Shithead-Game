@@ -1,5 +1,5 @@
-// v4.324 — fix offline switch: correct deck size, resolve pending bot committed card, small connection status
-const CACHE = 'basrhead-v4.324';
+// v4.325 — fix offline switch: preserve captured card count from online phase
+const CACHE = 'basrhead-v4.325';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {

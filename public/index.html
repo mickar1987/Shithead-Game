@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.324</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.325</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6610,7 +6610,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.324 ══
+// ══ BASRA OFFLINE ENGINE v4.325 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -6981,10 +6981,10 @@ function _bSwitchToOffline(){
     _offlineRoom={
         slots:[
             {id:0,name:(basraState.playerNames||[])[0]||'שחקן',hand:(basraState.myHand||[]).slice(),
-             captured:[],basras:(basraState.basraCounts||[])[0]||0,basraCards:[],jackBasras:0,
+             captured:Array((basraState.capturedCounts||[])[0]||0).fill('?'),basras:(basraState.basraCounts||[])[0]||0,basraCards:[],jackBasras:0,
              score:(basraState.scores||[])[0]||0,isBot:false},
             {id:1,name:(basraState.playerNames||[])[1]||H('מחשב','Computer'),hand:botHand,
-             captured:[],basras:(basraState.basraCounts||[])[1]||0,basraCards:[],jackBasras:0,
+             captured:Array((basraState.capturedCounts||[])[1]||0).fill('?'),basras:(basraState.basraCounts||[])[1]||0,basraCards:[],jackBasras:0,
              score:(basraState.scores||[])[1]||0,isBot:true}
         ],
         deck,tableCards:(basraState.tableCards||[]).slice(),
