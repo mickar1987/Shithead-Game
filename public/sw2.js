@@ -1,5 +1,5 @@
-// v4.319 — cache app shell for offline support
-const CACHE = 'basrhead-v4.319';
+// v4.320 — fix offline Basra: bot timing + special card state sync
+const CACHE = 'basrhead-v4.320';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {

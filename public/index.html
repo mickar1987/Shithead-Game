@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.319</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.320</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6598,7 +6598,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.319 ══
+// ══ BASRA OFFLINE ENGINE v4.320 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -6903,12 +6903,13 @@ function _bHandleClientEvent(event,data){
         _bEmit('basraState',_bStateFor(room,0));
         _bProcessNextSpecial(room,_bEmit);
     }else if(event==='basraSpecialDone'){
+        _bEmit('basraState',_bStateFor(room,0));
         _bProcessNextSpecial(room,_bEmit);
     }else if(event==='basraNextRound'){
         if(!room.roundOver||room.gameOver)return;
         _bResetRound(room);
         _bEmit('basraDeal',{dealerIdx:room.dealerIdx,cardCount:4,tableCount:room.tableCards.length});
-        setTimeout(()=>{_bEmit('basraState',_bStateFor(room,0));if(room.currentPlayer===1)setTimeout(()=>_bBotMove(room,_bEmit),800);},80);
+        setTimeout(()=>{_bEmit('basraState',_bStateFor(room,0));},80);
     }else if(event==='basraForfeit'){
         if(room.gameOver)return;room.gameOver=true;
         const sorted=[...room.slots].sort((a,b)=>(b.score||0)-(a.score||0));
@@ -6935,10 +6936,7 @@ function startBasraOffline(){
     basraMySlot=0;
     _bEmit('basraStart',{playerNames:_offlineRoom.slots.map(s=>s.name)});
     _bEmit('basraDeal',{dealerIdx:_offlineRoom.dealerIdx,cardCount:4,tableCount:_offlineRoom.tableCards.length});
-    setTimeout(()=>{
-        _bEmit('basraState',_bStateFor(_offlineRoom,0));
-        if(_offlineRoom.currentPlayer===1)setTimeout(()=>_bBotMove(_offlineRoom,_bEmit),800);
-    },80);
+    setTimeout(()=>{_bEmit('basraState',_bStateFor(_offlineRoom,0));},80);
 }
 
 function _bOfflineCleanup(){
