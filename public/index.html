@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.313</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.314</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5135,10 +5135,19 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
     if (typeof setDailyBtnsState === 'function') setDailyBtnsState(true, H('⚠️ אין חיבור','⚠️ No connection'));
 });
+// Reload when new SW activates so user gets the latest version
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (window._swUpdating) window.location.reload();
+    });
+}
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw2.js').catch(() => {});
+        navigator.serviceWorker.register('/sw2.js').then(reg => {
+            reg.addEventListener('updatefound', () => { window._swUpdating = true; });
+            if (navigator.onLine) reg.update().catch(() => {});
+        }).catch(() => {});
     });
 }
 
@@ -6232,7 +6241,10 @@ function requestNewGame() {
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw2.js').catch(() => {});
+        navigator.serviceWorker.register('/sw2.js').then(reg => {
+            reg.addEventListener('updatefound', () => { window._swUpdating = true; });
+            if (navigator.onLine) reg.update().catch(() => {});
+        }).catch(() => {});
     });
 }
 
