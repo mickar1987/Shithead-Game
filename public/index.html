@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.318</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.319</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5435,6 +5435,7 @@ function basraLeave() {
     const chatBtn = document.getElementById('basraChatToggleBtn');
     if (chatBtn) chatBtn.classList.remove('visible');
     const sgc = document.getElementById('shitheadGameContainer'); if (sgc) sgc.style.display='';
+    if (window._basraOfflineActive) _bOfflineCleanup();
     if (socket) socket.emit('basraLeave');
     document.getElementById('basraGame').style.display = 'none';
     document.getElementById('basraResultOverlay').style.display = 'none';
@@ -6576,7 +6577,7 @@ function setBasraAIWinScore(score) {
 }
 
 function startBasraVsAI() {
-    if (!navigator.onLine) { showOfflineMsg(); return; }
+    if (!navigator.onLine) { startBasraOffline(); return; }
     if (!socket) initSocket();
     window._basraStatsRecorded = false;
     window._basraIsVsBot = true;
@@ -6596,6 +6597,355 @@ function startBasraVsAI() {
     });
     // Response handled by existing basraJoined + basraStart + basraState events
 }
+
+// ══ BASRA OFFLINE ENGINE v4.319 ══
+// Runs Basra vs AI entirely client-side when offline.
+// Ports all pure logic from basra-server.js and the bot from server.js.
+// Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
+
+let _offlineRoom = null, _origSocketEmit = null;
+window._basraOfflineActive = false;
+
+// ── Pure game logic (from basra-server.js) ──
+function _bMakeDeck(){const s=['h','d','c','s'],r=['A','2','3','4','5','6','7','8','9','10','J','Q','K'],d=[];for(const a of s)for(const b of r)d.push(b+a);return d;}
+function _bShuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function _bR(c){return c.slice(0,-1);}
+function _bIs7d(c){return c==='7d';}
+function _bIsJ(c){return _bR(c)==='J';}
+function _bRV(r){return r==='A'?1:['J','Q','K'].includes(r)?null:parseInt(r);}
+
+function _bFindIdxs(card,tc){
+    const rank=_bR(card);
+    if(_bIsJ(card)||_bIs7d(card))return tc.length>0?[tc.map((_,i)=>i)]:[];
+    if(tc.length===1&&_bIs7d(tc[0]))return[[0]];
+    if(rank==='Q'||rank==='K'){const g=tc.map((c,i)=>_bR(c)===rank?i:-1).filter(i=>i>=0);return g.length?[g]:[];}
+    const val=_bRV(rank);if(!val)return[];
+    const n=tc.length,res=[];
+    for(let m=1;m<(1<<n);m++){let s=0,g=[],ok=true;for(let i=0;i<n;i++)if(m&(1<<i)){const v=_bRV(_bR(tc[i]));if(v===null){ok=false;break;}s+=v;g.push(i);}if(ok&&s===val)res.push(g);}
+    return res;
+}
+
+function _bIsBasra(played,cap,table){
+    if(cap.length!==table.length||!table.length)return false;
+    const rank=_bR(played);
+    if(rank==='J')return table.every(c=>_bR(c)==='J')||(table.length===1&&_bIs7d(table[0]));
+    if(_bIs7d(played)){
+        if(table.length===1)return true;
+        if(table.every(c=>_bR(c)===_bR(table[0]))&&['Q','K'].includes(_bR(table[0])))return true;
+        if(table.some(c=>_bR(c)==='J'))return true;
+        const rv=r=>r==='A'?1:['J','Q','K'].includes(r)?null:parseInt(r);
+        const vals=table.map(c=>rv(_bR(c)));if(vals.some(v=>v===null))return false;
+        for(let v=1;v<=10;v++){const rem=[...vals];let ok=true;while(rem.length){const nn=rem.length;let f=false;for(let m=1;m<(1<<nn);m++){let s2=0;const ix=[];for(let i=0;i<nn;i++)if(m&(1<<i)){s2+=rem[i];ix.push(i);}if(s2===v){ix.reverse().forEach(i=>rem.splice(i,1));f=true;break;}}if(!f){ok=false;break;}}if(ok)return true;}
+        return false;
+    }
+    if(table.length===1&&_bIs7d(table[0]))return true;
+    return true;
+}
+
+function _bCreateRoom(pName,bName,ws){
+    const deck=_bShuffle(_bMakeDeck());
+    let tc=[];for(let i=0;i<4;i++)tc.push(deck.shift());
+    const specials=tc.filter(c=>_bIsJ(c)||_bIs7d(c));
+    const slots=[
+        {id:0,name:pName,hand:[],captured:[],basras:0,basraCards:[],jackBasras:0,score:0,isBot:false},
+        {id:1,name:bName,hand:[],captured:[],basras:0,basraCards:[],jackBasras:0,score:0,isBot:true}
+    ];
+    for(let i=0;i<4;i++)slots.forEach(s=>s.hand.push(deck.shift()));
+    const cp=Math.floor(Math.random()*2);
+    return{slots,deck,tableCards:tc,currentPlayer:cp,roundStarter:cp,lastCapturer:null,
+        roundOver:false,gameOver:false,committedCard:null,committedBy:null,
+        pendingMajorityPoints:0,roundNum:0,winScore:ws||120,isBot:true,
+        specialReplacements:specials,_dealInProgress:false,dealerIdx:(cp+1)%2};
+}
+function _bDealNewHands(room){room.slots.forEach(s=>{for(let i=0;i<4&&room.deck.length>0;i++)s.hand.push(room.deck.shift());});}
+
+function _bPlayCard(room,si,cardStr,capIdxs,alreadyRemoved){
+    const p=room.slots[si];
+    if(!alreadyRemoved){const i=p.hand.indexOf(cardStr);if(i===-1)return{ok:false};p.hand.splice(i,1);}
+    const rank=_bR(cardStr),tc=room.tableCards;let cg=[];
+    if(capIdxs&&capIdxs.length>0){
+        if(_bIsJ(cardStr)||_bIs7d(cardStr))cg=tc.slice();
+        else if(rank==='Q'||rank==='K')cg=tc.filter(c=>_bR(c)===rank);
+        else cg=capIdxs.map(i=>tc[i]).filter(Boolean);
+    }else if(_bIsJ(cardStr)||_bIs7d(cardStr))cg=tc.slice();
+    if(cg.length>0){
+        p.captured.push(cardStr,...cg);room.tableCards=tc.filter(c=>!cg.includes(c));room.lastCapturer=si;
+        if(!room.tableCards.length){
+            const bs=_bIsBasra(cardStr,cg,tc);
+            if(bs){p.basras++;if(!p.basraCards)p.basraCards=[];
+                const pJ=_bIsJ(cardStr),p7=_bIs7d(cardStr),tJ=cg.some(c=>_bIsJ(c));
+                const jack=pJ||(p7&&tJ);
+                p.basraCards.push({card:jack?(pJ?cardStr:cg.find(c=>_bIsJ(c))):cardStr,jack});
+                if(jack)p.jackBasras=(p.jackBasras||0)+1;}
+            return{ok:true,basra:bs,capturedCards:cg};
+        }
+        return{ok:true,basra:false,capturedCards:cg};
+    }
+    room.tableCards.push(cardStr);return{ok:true,basra:false,capturedCards:[]};
+}
+
+function _bScoreRound(room){
+    const sc=room.slots.map((s,i)=>({slotIdx:i,name:s.name,cards:s.captured.length,basras:s.basras||0,jackBasras:s.jackBasras||0,majorityPoints:0,points:0}));
+    const mx=Math.max(...sc.map(s=>s.cards)),leaders=sc.filter(s=>s.cards===mx);
+    if(leaders.length===1){const pts=30+room.pendingMajorityPoints;leaders[0].points+=pts;leaders[0].majorityPoints=pts;room.pendingMajorityPoints=0;}
+    else room.pendingMajorityPoints+=30;
+    room.slots.forEach((s,i)=>{sc[i].points+=((s.basras||0)-(s.jackBasras||0))*10+(s.jackBasras||0)*20;});
+    room.slots.forEach((s,i)=>{s.score=(s.score||0)+sc[i].points;});
+    return sc;
+}
+
+function _bResetRound(room){
+    const deck=_bShuffle(_bMakeDeck());let tc=[];
+    for(let i=0;i<4;i++)tc.push(deck.shift());
+    room.specialReplacements=tc.filter(c=>_bIsJ(c)||_bIs7d(c));
+    room.deck=deck;room.tableCards=tc;room.lastCapturer=null;room.roundOver=false;room.roundNum++;
+    const prev=room.roundStarter!==undefined?room.roundStarter:0;
+    room.currentPlayer=(prev+1)%2;room.roundStarter=room.currentPlayer;
+    room.slots.forEach(s=>{s.hand=[];s.captured=[];s.basras=0;s.basraCards=[];s.jackBasras=0;});
+    for(let i=0;i<4;i++)room.slots.forEach(s=>{if(room.deck.length>0)s.hand.push(room.deck.shift());});
+    room.dealerIdx=(room.currentPlayer+1)%2;
+}
+
+function _bStateFor(room,si){
+    const p=room.slots[si];
+    return{gameType:'basra',roomCode:'OFFLINE',mySlotIdx:si,myHand:p.hand,tableCards:room.tableCards,
+        deckCount:room.deck.length,currentPlayer:room.currentPlayer,isMyTurn:room.currentPlayer===si,
+        playerNames:room.slots.map(s=>s.name),capturedCounts:room.slots.map(s=>s.captured.length),
+        handCounts:room.slots.map(s=>s.hand.length),scores:room.slots.map(s=>s.score||0),
+        basraCounts:room.slots.map(s=>s.basras||0),
+        basraCards:room.slots.map(s=>(s.basraCards||[]).map(b=>typeof b==='string'?b:b.card)),
+        teams:null,roundStarter:room.roundStarter||0,winScore:room.winScore||120,isBot:true,
+        roundOver:room.roundOver,gameOver:room.gameOver,lastCapturer:room.lastCapturer,
+        committedCard:room.committedCard||null,committedBy:room.committedBy,
+        turnTimer:0,timerStarted:false,timerRemaining:0};
+}
+
+function _bEmit(event,data){
+    try{const cbs=socket&&socket._callbacks&&socket._callbacks['$'+event];if(cbs)cbs.slice().forEach(fn=>{try{fn(data);}catch(e){}});}catch(e){}
+}
+
+// ── Bot AI (ported from server.js basraBotMove) ──
+function _bBotMove(room,emit){
+    if(!room||room.gameOver||room.roundOver||room.currentPlayer!==1)return;
+    const bot=room.slots[1];
+    if(!bot||!bot.hand||!bot.hand.length){_bAdvanceTurn(room,emit);return;}
+    const tc=room.tableCards,hs=bot.hand.length;
+    const cons=room.slots[1].captured.length>=27;
+    const hasJ=bot.hand.some(c=>_bIsJ(c)),has7d=bot.hand.includes('7d');
+    let bc=null,bcp=[],bcs=-1;
+    const pri=c=>{const r=_bR(c);return r==='Q'||r==='K'?1:r==='A'?2:{'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,'10':11}[r]||10;};
+    const safeSorted=()=>{const sa=bot.hand.filter(c=>_bR(c)!=='J'&&c!=='7d');if(!sa.length)return null;sa.sort((a,b)=>pri(a)-pri(b));return sa[0];};
+
+    bot.hand.forEach(card=>{
+        const rank=_bR(card),is7d=_bIs7d(card),isJ=rank==='J';
+        const caps=_bFindIdxs(card,tc);if(!caps.length)return;
+        const used=new Set(),combined=[];
+        [...caps].sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!used.has(i))){g.forEach(i=>used.add(i));combined.push(...g);}});
+        caps.forEach(g=>{if(g.length===1&&!used.has(g[0])){used.add(g[0]);combined.push(g[0]);}});
+        const isBasra=combined.length===tc.length&&tc.length>0,isJC=isJ||is7d;
+        if(isJC&&!isBasra&&tc.length<3&&hs-1>1)return;
+        if(is7d&&combined.length>0&&tc.length<3&&hs>1&&!isBasra)return;
+        let score=200+combined.length*15;
+        if(isBasra)score+=600;if(isJ)score+=30;
+        if(is7d&&hasJ&&!isBasra&&tc.length>0)score-=500;
+        if(cons&&!isBasra)score-=100;
+        combined.forEach(idx=>{const r2=tc[idx]?.slice(0,-1);if(['8','9','10'].includes(r2))score+=20;});
+        if(tc.filter((_,i)=>!combined.includes(i)).length===1)score-=40;
+        if(score>bcs){bcs=score;bc=card;bcp=combined;}
+    });
+
+    // Throw scoring
+    const throwVals={'A':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10};
+    const ts=bot.hand.map(card=>{
+        const rank=_bR(card),is7d=_bIs7d(card);
+        const cv=throwVals[rank]||0;
+        const threat=(()=>{if(rank==='Q'||rank==='K')return 1;if(!cv)return 2;if(!tc.length)return cv<=4?15:50;const tv=tc.map(c=>throwVals[_bR(c)]||0).filter(v=>v>0);let cnt=0;for(let ov=1;ov<=10;ov++){const nn=tv.length;for(let m=0;m<(1<<nn);m++){let s=ov;for(let i=0;i<nn;i++)if(m&(1<<i))s+=tv[i];if(s===cv){cnt++;break;}}}return cnt;})();
+        let p2;if(rank==='Q'||rank==='K')p2=1;else if(rank==='J'||is7d)p2=100;else if(['A','2','3','4'].includes(rank))p2=3+threat*0.5;else if(['5','6','7'].includes(rank))p2=5+threat*0.3;else p2=8+threat*0.2;
+        const dupes=bot.hand.filter(c=>_bR(c)===rank).length;if(dupes>=2)p2-=1;
+        return{card,throwScore:p2};
+    });
+    ts.sort((a,b)=>a.throwScore-b.throwScore);
+    const noJ=ts.filter(t=>_bR(t.card)!=='J'&&t.card!=='7d');
+    let bt;
+    if(has7d&&hasJ&&tc.length===0&&noJ.length>0)bt=ts.find(t=>_bIsJ(t.card))||ts[0];
+    else bt=noJ[0]||ts[0];
+    const tv2=-bt.throwScore;
+    if(!bc||bcs<tv2){const fc=_bFindIdxs(bt.card,tc);if(fc.length&&bc&&bcs>0){}else{bc=bt.card;bcp=[];}}
+    if(!bcp.length&&bc){const fc=_bFindIdxs(bc,tc);if(fc.length){const u2=new Set();fc.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u2.has(i))){g.forEach(i=>u2.add(i));bcp.push(...g);}});}}
+    if(!bcp.length){let ac=null,acp=[],acs=-1;bot.hand.forEach(c=>{if(_bIsJ(c)||c==='7d')return;const caps=_bFindIdxs(c,tc);if(!caps.length)return;const u3=new Set(),comb=[];caps.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u3.has(i))){g.forEach(i=>u3.add(i));comb.push(...g);}});if(comb.length>acs){acs=comb.length;ac=c;acp=comb;}});if(ac){bc=ac;bcp=acp;}}
+
+    // Hard rules
+    if((_bIsJ(bc)||_bIs7d(bc))&&bcp.length>0&&bcp.length===tc.length){
+        let rc=null,rcp=[];bot.hand.forEach(c=>{if(_bIsJ(c)||_bIs7d(c))return;const caps=_bFindIdxs(c,tc);const u=new Set(),comb=[];caps.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));comb.push(...g);}});if(comb.length===tc.length){rc=c;rcp=comb;}});
+        if(rc){bc=rc;bcp=rcp;}
+    }
+    if((_bIsJ(bc)||_bIs7d(bc))&&bcp.length===0&&tc.length<3&&hs>1){const sa=safeSorted();if(sa){bc=sa;bcp=[];}}
+    const _i7=_bIs7d(bc),_iJ=_bIsJ(bc);
+    const _c7=_i7?bcp.map(i=>tc[i]).filter(Boolean):[];const _rb=_i7&&bcp.length>0&&_bIsBasra('7d',_c7,tc);
+    if((_iJ||(_i7&&!_rb))&&bcp.length>0&&tc.length<3&&hs>2){
+        let ac=null,acp=[],acs=-1;bot.hand.forEach(c=>{if(_bIsJ(c)||c==='7d')return;const caps=_bFindIdxs(c,tc);if(!caps.length)return;const u=new Set(),comb=[];caps.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));comb.push(...g);}});if(comb.length>acs){acs=comb.length;ac=c;acp=comb;}});
+        if(ac){bc=ac;bcp=acp;}else{const sa=safeSorted();if(sa){bc=sa;bcp=[];}}
+    }
+    {const hJ=bot.hand.some(c=>_bIsJ(c)),h7=bot.hand.includes('7d');
+    if(hJ&&h7){const jc=bot.hand.find(c=>_bIsJ(c));
+        const cc2=bcp.map(i=>tc[i]).filter(Boolean);const rb7=bc==='7d'&&bcp.length===tc.length&&_bIsBasra('7d',cc2,tc);
+        if(rb7){const jcaps=_bFindIdxs(jc,tc);if(jcaps.length&&tc.length>=3){const u=new Set(),comb=[];jcaps.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));comb.push(...g);}});bc=jc;bcp=comb;}}
+        else if(bc!==jc){const jcaps=_bFindIdxs(jc,tc);if(jcaps.length&&tc.length>=3&&(bcp.length===0||bc==='7d')){const u=new Set(),comb=[];jcaps.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));comb.push(...g);}});bc=jc;bcp=comb;}}
+        else if(tc.length<3&&hs>2&&bcp.length===0){const sa=safeSorted();if(sa){bc=sa;bcp=[];}}
+    }}
+    if(hs>1&&tc.length<3){const _bJ=_bIsJ(bc),_b7=_bIs7d(bc);const _a2c=_b7?bcp.map(i=>tc[i]).filter(Boolean):[];const _a2rb=_b7&&bcp.length>0&&_bIsBasra('7d',_a2c,tc);
+        if(_bJ||(_b7&&!_a2rb)){const sa=safeSorted();if(sa){bc=sa;bcp=[];const c2=_bFindIdxs(bc,tc);if(c2.length){const u=new Set();c2.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));bcp.push(...g);}});}}}}
+    if(!bc||!bot.hand.includes(bc)){bc=bot.hand.find(c=>_bR(c)!=='J'&&c!=='7d')||bot.hand[0];bcp=[];}
+    if((_bIsJ(bc)||_bIs7d(bc))&&bcp.length===0&&bot.hand.length>1){const sa=safeSorted();if(sa)bc=sa;}
+
+    // Execute: phase 1 — commit
+    bot.hand.splice(bot.hand.indexOf(bc),1);
+    room.committedCard=bc;room.committedBy=1;
+    emit('basraState',_bStateFor(room,0));
+    setTimeout(()=>{
+        if(room.gameOver||room.roundOver)return;
+        let cc=bcp;
+        if(bcp.length>0){const fc=_bFindIdxs(bc,room.tableCards);if(fc.length){const u=new Set();cc=[];fc.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));cc.push(...g);}});fc.forEach(g=>{if(g.length===1&&!u.has(g[0])){u.add(g[0]);cc.push(g[0]);}});}else cc=[];}
+        if(cc.length)emit('basraCapturePreview',{captureIndices:cc,groups:[cc]});
+        setTimeout(()=>{
+            if(room.gameOver||room.roundOver)return;
+            const res=_bPlayCard(room,1,bc,cc,true);
+            room.committedCard=null;room.committedBy=null;
+            if(res.ok&&res.capturedCards.length){emit('toast',res.basra?`⚡ BASRA! ${bot.name}`:`${bot.name}|captured|${res.capturedCards.length}`);if(res.basra)emit('basraEvent',{type:'basra',player:1,name:bot.name});}
+            else if(!res.ok)room.tableCards.push(bc);
+            emit('basraState',_bStateFor(room,0));
+            setTimeout(()=>_bAdvanceTurn(room,emit),300);
+        },1000);
+    },900);
+}
+
+function _bAdvanceTurn(room,emit){
+    if(room.gameOver)return;
+    const allEmpty=room.slots.every(s=>s.hand.length===0);
+    if(allEmpty){
+        if(room.deck.length>0){
+            emit('basraCardSummary',{names:room.slots.map(s=>s.name),captured:room.slots.map(s=>s.captured.length),teams:null});
+            room._dealInProgress=true;
+            setTimeout(()=>{
+                _bDealNewHands(room);
+                const di=(room.currentPlayer+1)%2;room.dealerIdx=di;
+                emit('basraDeal',{dealerIdx:di,cardCount:4,tableCount:0});
+                setTimeout(()=>emit('basraState',_bStateFor(room,0)),80);
+            },2000);
+        }else{
+            if(room.tableCards.length>0&&room.lastCapturer!==null){room.slots[room.lastCapturer].captured.push(...room.tableCards);room.tableCards=[];}
+            room.roundOver=true;
+            const rs=_bScoreRound(room);
+            emit('basraRoundOver',{scores:rs,totalScores:room.slots.map(s=>s.score||0),pendingMajority:room.pendingMajorityPoints,teams:null,roundStarter:room.roundStarter||0,winScore:room.winScore||120,cardCounts:room.slots.map(s=>s.captured.length)});
+            const wt=room.winScore||120,over=room.slots.filter(s=>(s.score||0)>wt);
+            if(over.length){
+                const mx=Math.max(...room.slots.map(s=>s.score||0)),tied=room.slots.filter(s=>(s.score||0)===mx);
+                if(tied.length===1){
+                    room.gameOver=true;
+                    const sorted=[...room.slots].sort((a,b)=>(b.score||0)-(a.score||0));
+                    const wi=room.slots.indexOf(sorted[0]);
+                    emit('basraGameOver',{names:sorted.map(s=>s.name),scores:sorted.map(s=>s.score||0),mySlot:0,slotOrder:sorted.map(s=>room.slots.indexOf(s))});
+                    _bRecordStats(room,wi,false);
+                }else emit('toast','|tie');
+            }
+            emit('basraState',_bStateFor(room,0));
+        }
+        return;
+    }
+    room.currentPlayer=(room.currentPlayer+1)%2;
+    emit('basraState',_bStateFor(room,0));
+    if(room.currentPlayer===1&&!room.gameOver&&!room.roundOver)setTimeout(()=>_bBotMove(room,emit),800);
+}
+
+function _bRecordStats(room,wi,isAbandon){
+    if(!authUser?.username||!authUser?.token)return;
+    _queuedStatsFetch('/api/stats/record',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:authUser.username,token:authUser.token,game:'basra',mode:'bot',result:isAbandon?'abandon_lose':(wi===0?'win':'lose')})});
+    window._basraStatsRecorded=true;
+}
+
+function _bProcessNextSpecial(room,emit){
+    if(!room.specialReplacements||!room.specialReplacements.length){
+        emit('basraState',_bStateFor(room,0));
+        if(room.currentPlayer===1&&!room.gameOver&&!room.roundOver)setTimeout(()=>_bBotMove(room,emit),800);
+        return;
+    }
+    const sc=room.specialReplacements.shift();
+    const sym={h:'♥',d:'♦',c:'♣',s:'♠'},suit=sc.slice(-1),rank=sc.slice(0,-1);
+    const ti=room.tableCards.indexOf(sc);let rep=null;if(room.deck.length>0)rep=room.deck.shift();
+    if(ti!==-1)room.tableCards.splice(ti,1);
+    const ds=room.dealerIdx||0,dl2=room.deck.length;let pos=0,dl=dl2-1;
+    while(pos<dl2){for(let sl=0;sl<2;sl++){for(let c=0;c<4;c++){if(pos<dl2){if(sl===ds)dl=pos;pos++;}}}}
+    room.deck.splice(dl,0,sc);
+    if(rep){room.tableCards.push(rep);if(_bIsJ(rep)||_bIs7d(rep))room.specialReplacements.push(rep);}
+    emit('basraSpecialCard',{card:sc,display:rank+(sym[suit]||suit),tableIdx:ti,replacement:rep,isJack:rank==='J'});
+}
+
+function _bHandleClientEvent(event,data){
+    const room=_offlineRoom;if(!room)return;
+    if(event==='basraCommitCard'){
+        if(room.gameOver||room.roundOver||room.currentPlayer!==0)return;
+        const card=data.card,p=room.slots[0];if(!p.hand.includes(card))return;
+        if(room.committedCard===card&&room.committedBy===0){_bEmit('basraState',_bStateFor(room,0));return;}
+        p.hand.splice(p.hand.indexOf(card),1);room.committedCard=card;room.committedBy=0;
+        _bEmit('basraState',_bStateFor(room,0));
+    }else if(event==='basraPlay'){
+        if(room.gameOver||room.roundOver||room.committedBy!==0)return;
+        const card=room.committedCard;if(!card)return;
+        let ci=data.captureIndices||[];
+        if(!ci.length&&room.tableCards.length){const ac=_bFindIdxs(card,room.tableCards);if(ac.length)ci=ac.sort((a,b)=>a.length-b.length)[0];}
+        const res=_bPlayCard(room,0,card,ci,true);room.committedCard=null;room.committedBy=null;
+        if(!res.ok){_bEmit('basraState',_bStateFor(room,0));return;}
+        const p=room.slots[0];
+        if(res.capturedCards.length){_bEmit('toast',res.basra?`⚡ BASRA! ${p.name}`:`${p.name}|captured|${res.capturedCards.length}`);if(res.basra)_bEmit('basraEvent',{type:'basra',player:0,name:p.name});}
+        _bAdvanceTurn(room,_bEmit);
+    }else if(event==='basraDealDone'){
+        room._dealInProgress=false;
+        _bEmit('basraState',_bStateFor(room,0));
+        _bProcessNextSpecial(room,_bEmit);
+    }else if(event==='basraSpecialDone'){
+        _bProcessNextSpecial(room,_bEmit);
+    }else if(event==='basraNextRound'){
+        if(!room.roundOver||room.gameOver)return;
+        _bResetRound(room);
+        _bEmit('basraDeal',{dealerIdx:room.dealerIdx,cardCount:4,tableCount:room.tableCards.length});
+        setTimeout(()=>{_bEmit('basraState',_bStateFor(room,0));if(room.currentPlayer===1)setTimeout(()=>_bBotMove(room,_bEmit),800);},80);
+    }else if(event==='basraForfeit'){
+        if(room.gameOver)return;room.gameOver=true;
+        const sorted=[...room.slots].sort((a,b)=>(b.score||0)-(a.score||0));
+        _bEmit('basraGameOver',{names:sorted.map(s=>s.name),scores:sorted.map(s=>s.score||0),forfeitBy:0,forfeitName:room.slots[0].name,mySlot:0,slotOrder:sorted.map(s=>room.slots.indexOf(s))});
+        _bRecordStats(room,1,true);
+    }
+}
+
+function startBasraOffline(){
+    if(!socket)initSocket();
+    const pName=authUser?.username||localStorage.getItem('guestName')||'שחקן';
+    _offlineRoom=_bCreateRoom(pName,H('מחשב','Computer'),basraAIWinScore);
+    window._basraOfflineActive=true;
+    window._basraStatsRecorded=false;
+    window._basraIsVsBot=true;
+    if(authUser?.username&&authUser?.token)localStorage.setItem('_activeGame',JSON.stringify({game:'basra',mode:'bot',username:authUser.username,token:authUser.token,ts:Date.now()}));
+    if(!_origSocketEmit&&socket){
+        _origSocketEmit=socket.emit.bind(socket);
+        socket.emit=function(event,data,...rest){
+            if(_offlineRoom&&event.startsWith('basra'))_bHandleClientEvent(event,data);
+            else _origSocketEmit(event,data,...rest);
+        };
+    }
+    basraMySlot=0;
+    _bEmit('basraStart',{playerNames:_offlineRoom.slots.map(s=>s.name)});
+    _bEmit('basraDeal',{dealerIdx:_offlineRoom.dealerIdx,cardCount:4,tableCount:_offlineRoom.tableCards.length});
+    setTimeout(()=>{
+        _bEmit('basraState',_bStateFor(_offlineRoom,0));
+        if(_offlineRoom.currentPlayer===1)setTimeout(()=>_bBotMove(_offlineRoom,_bEmit),800);
+    },80);
+}
+
+function _bOfflineCleanup(){
+    if(_origSocketEmit&&socket){socket.emit=_origSocketEmit;_origSocketEmit=null;}
+    _offlineRoom=null;window._basraOfflineActive=false;
+}
+// ══ END BASRA OFFLINE ENGINE ══
 
 function basraAutoSelectCaptures(card, tableCards) {
     basraSelectedCaptures = [];
