@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.310</div>
+    <div style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.311</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -2895,10 +2895,10 @@ function showResults() {
     if (!window._suppressStatsRecord && authUser?.username && authUser?.token && players.some(p => p.isAI)) {
         const humanPlace = winnersOrder.indexOf(0) + 1;
         if (humanPlace > 0) {
-            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+            _queuedStatsFetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({ username: authUser.username, token: authUser.token,
                     game: 'shithead', mode: 'bot', result: humanPlace === 1 ? 'win' : 'lose', place: humanPlace })
-            }).catch(()=>{});
+            });
         }
     }
     const list = document.getElementById('leaderboardList');
@@ -5086,6 +5086,33 @@ function requestNewGame() {
     document.getElementById('waitingRestart').style.display = 'block';
 }
 
+
+// Offline queue: stats API calls saved to localStorage and retried on reconnect
+function _queuedStatsFetch(url, options) {
+    if (!navigator.onLine) { _offlineEnqueue(url, options); return; }
+    fetch(url, options).catch(() => _offlineEnqueue(url, options));
+}
+function _offlineEnqueue(url, options) {
+    try {
+        const q = JSON.parse(localStorage.getItem('_offlineQueue') || '[]');
+        const body = options?.body || '';
+        const now = Date.now();
+        if (!q.some(r => r.url === url && r.body === body && now - r.ts < 10000)) {
+            q.push({ url, method: options?.method || 'POST', headers: options?.headers || {}, body, ts: now });
+            localStorage.setItem('_offlineQueue', JSON.stringify(q.slice(-20)));
+        }
+    } catch(e) {}
+}
+window.addEventListener('online', () => {
+    try {
+        const q = JSON.parse(localStorage.getItem('_offlineQueue') || '[]');
+        if (!q.length) return;
+        localStorage.removeItem('_offlineQueue');
+        q.forEach(({ url, method, headers, body }) => {
+            fetch(url, { method, headers, body }).catch(() => _offlineEnqueue(url, { method, headers, body }));
+        });
+    } catch(e) {}
+});
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -6206,10 +6233,10 @@ function leaveToMenu() {
         const realAbandonPlace = players.length; // leaving = always last place
         // Record stats
         if (authUser?.username && authUser?.token) {
-            fetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
+            _queuedStatsFetch('/api/stats/record', { method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({ username: authUser.username, token: authUser.token,
                     game: 'shithead', mode: 'bot', result: 'abandon', place: realAbandonPlace })
-            }).catch(()=>{});
+            });
         }
         // Build winnersOrder: already-finished first, then remaining AIs, then human LAST
         players.forEach(p => { if (p.isAI && !p.finished && !winnersOrder.includes(p.id)) winnersOrder.push(p.id); });
