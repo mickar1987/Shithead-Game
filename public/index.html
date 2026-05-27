@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.315</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.316</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -5283,16 +5283,26 @@ let selectedBasraWinScore = 120;
 document.addEventListener('DOMContentLoaded', () => {
     applyLang();
 
-    // Version check: if the cached page is older than what the server has, wipe caches and reload
+    // Version check: compare the CACHED index.html version against what the server has.
+    // When online the SW is network-first so the live page always looks current, but the
+    // offline cache may still hold an old version. Reading the cached file exposes this.
     if (navigator.onLine && 'caches' in window) {
         fetch('/api/version').then(r => r.json()).then(d => {
-            const _pageVer = document.getElementById('appVersionEl')?.textContent?.trim() || '';
-            if (d.v && _pageVer && d.v !== _pageVer) {
-                Promise.all([
-                    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))),
-                    navigator.serviceWorker?.getRegistrations?.().then(regs => Promise.all(regs.map(r => r.unregister()))) || Promise.resolve()
-                ]).then(() => window.location.reload());
-            }
+            if (!d.v) return;
+            caches.match('/index.html').then(cached => {
+                if (!cached) return;
+                cached.text().then(html => {
+                    const m = html.match(/v\d+\.\d+/);
+                    const cachedVer = m ? m[0] : '';
+                    if (cachedVer && cachedVer !== d.v) {
+                        // Cached version is stale — wipe all caches + unregister SW + reload fresh
+                        Promise.all([
+                            caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))),
+                            navigator.serviceWorker?.getRegistrations?.().then(regs => Promise.all(regs.map(r => r.unregister()))) || Promise.resolve()
+                        ]).then(() => window.location.reload());
+                    }
+                });
+            });
         }).catch(() => {});
     }
 
