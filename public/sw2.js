@@ -1,5 +1,5 @@
-// v4.327 — fix 7d jack basra: some→every for J check in _bIsBasra and _bPlayCard
-const CACHE = 'basrhead-v4.327';
+// v4.328 — Shithead AI: swap tuning, 7 trap check, smart 10/2 timing, faceUp aggression, deeper memory
+const CACHE = 'basrhead-v4.328';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
