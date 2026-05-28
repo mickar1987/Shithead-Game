@@ -1,5 +1,5 @@
-// v4.326 — fix card summary timing; stats safety net in basraGameOver
-const CACHE = 'basrhead-v4.326';
+// v4.327 — fix 7d jack basra: some→every for J check in _bIsBasra and _bPlayCard
+const CACHE = 'basrhead-v4.327';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {

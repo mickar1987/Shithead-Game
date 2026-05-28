@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.326</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.327</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6622,7 +6622,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.326 ══
+// ══ BASRA OFFLINE ENGINE v4.327 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -6656,7 +6656,7 @@ function _bIsBasra(played,cap,table){
     if(_bIs7d(played)){
         if(table.length===1)return true;
         if(table.every(c=>_bR(c)===_bR(table[0]))&&['Q','K'].includes(_bR(table[0])))return true;
-        if(table.some(c=>_bR(c)==='J'))return true;
+        if(table.every(c=>_bIsJ(c)))return true;
         const rv=r=>r==='A'?1:['J','Q','K'].includes(r)?null:parseInt(r);
         const vals=table.map(c=>rv(_bR(c)));if(vals.some(v=>v===null))return false;
         for(let v=1;v<=10;v++){const rem=[...vals];let ok=true;while(rem.length){const nn=rem.length;let f=false;for(let m=1;m<(1<<nn);m++){let s2=0;const ix=[];for(let i=0;i<nn;i++)if(m&(1<<i)){s2+=rem[i];ix.push(i);}if(s2===v){ix.reverse().forEach(i=>rem.splice(i,1));f=true;break;}}if(!f){ok=false;break;}}if(ok)return true;}
@@ -6697,8 +6697,8 @@ function _bPlayCard(room,si,cardStr,capIdxs,alreadyRemoved){
         if(!room.tableCards.length){
             const bs=_bIsBasra(cardStr,cg,tc);
             if(bs){p.basras++;if(!p.basraCards)p.basraCards=[];
-                const pJ=_bIsJ(cardStr),p7=_bIs7d(cardStr),tJ=cg.some(c=>_bIsJ(c));
-                const jack=pJ||(p7&&tJ);
+                const pJ=_bIsJ(cardStr),p7=_bIs7d(cardStr);
+                const jack=pJ||(p7&&cg.every(c=>_bIsJ(c)));
                 p.basraCards.push({card:jack?(pJ?cardStr:cg.find(c=>_bIsJ(c))):cardStr,jack});
                 if(jack)p.jackBasras=(p.jackBasras||0)+1;}
             return{ok:true,basra:bs,capturedCards:cg};

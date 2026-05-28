@@ -115,7 +115,7 @@ function isBasra(playedCard, capturedCards, tableCards) {
             ['Q','K'].includes(cardRank(tableCards[0]));
         if (allSameFace) return true;
         // Any J on table → basra (J basra = 20pts)
-        if (tableCards.some(c => cardRank(c) === 'J')) return true;
+        if (tableCards.every(c => cardRank(c) === 'J')) return true;
         const faceRanks = ['J','Q','K'];
         const rv = r => r==='A' ? 1 : (faceRanks.includes(r) ? null : parseInt(r));
         const vals = tableCards.map(c => rv(cardRank(c)));
@@ -297,7 +297,7 @@ function playCard(room, slotIdx, cardStr, selectedCapture, alreadyRemoved) {
                 // 2. Played 7d and table had J (captured J via 7d)
                 const playedJ = cardRank(cardStr) === 'J';
                 const played7d = is7D(cardStr);
-                const tableHadJ = capturedCards.some(cc => cardRank(cc) === 'J');
+                const tableHadJ = capturedCards.every(cc => cardRank(cc) === 'J');
                 const jackInvolved = playedJ || (played7d && tableHadJ);
                 const basraCard = jackInvolved ? (cardRank(cardStr) === 'J' ? cardStr : capturedCards.find(cc => cardRank(cc) === 'J')) : cardStr;
                 p.basraCards.push({ card: basraCard, jack: jackInvolved });
