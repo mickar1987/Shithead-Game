@@ -1,5 +1,5 @@
-// v4.325 — fix offline switch: preserve captured card count from online phase
-const CACHE = 'basrhead-v4.325';
+// v4.326 — fix card summary timing; stats safety net in basraGameOver
+const CACHE = 'basrhead-v4.326';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
