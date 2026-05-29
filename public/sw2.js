@@ -1,5 +1,5 @@
-// v4.328 — Shithead AI: swap tuning, 7 trap check, smart 10/2 timing, faceUp aggression, deeper memory
-const CACHE = 'basrhead-v4.328';
+// v4.329 — Fix faceUp AI: 10 last resort always; lowest-card-unless-trap strategy
+const CACHE = 'basrhead-v4.329';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
