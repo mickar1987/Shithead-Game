@@ -1,5 +1,5 @@
-// v4.329 — Fix faceUp AI: 10 last resort always; lowest-card-unless-trap strategy
-const CACHE = 'basrhead-v4.329';
+// v4.330 — Fix AI turn skip: remove duplicate aiMove from token-mismatch branch; log human take
+const CACHE = 'basrhead-v4.330';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
