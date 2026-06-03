@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.330</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.331</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1576,7 +1576,9 @@ function render() {
             const handAllSameAI = players[0].hand.length > 0 && drawPile.length === 0
                 && fuRankAI === handRank0
                 && players[0].hand.every(c => c.slice(0,-1) === handRank0);
-            if (!isSwapPhase && currentPlayer === 0 && !isPeeking) {
+            if (aiInterrupt && players[0].hand.length === 0 && fuRankAI === aiInterrupt.rank) {
+                u.classList.add('playable-hint'); // burnable faceUp card during interrupt window
+            } else if (!isSwapPhase && currentPlayer === 0 && !isPeeking) {
                 if (players[0].hand.length === 0) {
                     if (canPlay(players[0].faceUp[i])) u.classList.add('playable-hint');
                     else u.classList.add('not-playable');
@@ -1590,6 +1592,12 @@ function render() {
                 if (animating) return;
                 if (revealedFaceDownIndex !== null) return;
                 if (isSwapPhase) { selectedTableIndices = [i]; handleSwap(); return; }
+                // Allow selecting faceUp cards during burn interrupt (hand empty, card matches burn rank)
+                if (aiInterrupt && players[0].hand.length === 0) {
+                    const fuR = players[0].faceUp[i]?.slice(0,-1);
+                    if (fuR === aiInterrupt.rank) { toggleSel(selectedTableIndices, i, players[0].faceUp, true); render(); }
+                    return;
+                }
                 if (players[0].hand.length > 0) {
                     if (drawPile.length > 0) return;
                     // Recalculate at click time (hand may have changed due to selection)
@@ -1843,7 +1851,10 @@ function _humanPlayAI() {
     // Handle interrupt (not player's turn)
     if (aiInterrupt) {
 
-        const sel = selectedHandIndices.map(i => players[0].hand[i]);
+        const _intHasHand = players[0].hand.length > 0;
+        const sel = _intHasHand
+            ? selectedHandIndices.map(i => players[0].hand[i]).filter(Boolean)
+            : selectedTableIndices.map(i => players[0].faceUp[i]).filter(Boolean);
         if (!sel.length) { showToast(t('mustSelectCard')); return; }
         if (!sel.every(c => c.slice(0,-1) === aiInterrupt.rank)) {
             showToast(H('בחר קלפי ' + aiInterrupt.rank + ' בלבד', 'Select only ' + aiInterrupt.rank + ' cards')); return;
@@ -1854,9 +1865,14 @@ function _humanPlayAI() {
         // Cancel AI timer
         clearTimeout(aiInterrupt.timer);
         aiInterrupt = null;
-        // Remove hand cards from hand
-        sel.forEach(c => { const i = players[0].hand.indexOf(c); if (i !== -1) players[0].hand.splice(i, 1); });
-        selectedHandIndices = [];
+        // Remove cards from the correct pool (hand or faceUp)
+        if (_intHasHand) {
+            sel.forEach(c => { const i = players[0].hand.indexOf(c); if (i !== -1) players[0].hand.splice(i, 1); });
+            selectedHandIndices = [];
+        } else {
+            sel.forEach(c => { const i = players[0].faceUp.indexOf(c); if (i !== -1) players[0].faceUp[i] = null; });
+            selectedTableIndices = [];
+        }
         // Add cards to pile
         sel.forEach(c => pile.push(c));
         const topR = pileTopRank();
@@ -2574,6 +2590,16 @@ function aiGetBestPlay(validCards, hand) {
     if (normals.length > 0) {
         normals.sort((a,b) => aiCardValue(a) - aiCardValue(b));
 
+        // FaceUp awareness: next player's faceUp cards are public — use that info
+        let _nextFUP = null;
+        { let ni = (currentPlayer+1)%players.length;
+          while(players[ni]?.finished&&ni!==currentPlayer)ni=(ni+1)%players.length;
+          if(ni!==currentPlayer&&!players[ni]?.hand.length&&players[ni]?.faceUp.some(c=>c))_nextFUP=players[ni]; }
+        const _nextFUImmune = !!_nextFUP?.faceUp.some(c=>c&&['2','3','10'].includes(c.slice(0,-1)));
+
+        // Immune next player (has 2/3/10 faceUp) + no emergency → play lowest, save hard cards
+        if (_nextFUImmune && threat < 3) return _ret(normals[0].slice(0,-1));
+
         if (threat >= 2) {
             // Check memory: what's the highest value opponent couldn't answer?
             // Find most threatened opponent index
@@ -2600,11 +2626,13 @@ function aiGetBestPlay(validCards, hand) {
                 if (two && normals.length === 0) return _ret('2');
             }
 
-            // No memory info — use hard cards
+            // No memory info — use hard cards (skip any that next faceUp player can answer)
             const hardCards = normals.filter(c => {
                 const r = c.slice(0,-1);
                 if (r === '7' && !sevenTrapOk) return false;
-                return aiIsHardCard(r, isPileEmpty ? 0 : lastVal);
+                if (!aiIsHardCard(r, isPileEmpty ? 0 : lastVal)) return false;
+                if (_nextFUP && aiOpponentCanPlay(aiCardValue(c), _nextFUP)) return false;
+                return true;
             });
             if (hardCards.length > 0) {
                 if (threat >= 3) {
@@ -2618,6 +2646,12 @@ function aiGetBestPlay(validCards, hand) {
                 normals.sort((a,b) => aiCardValue(b) - aiCardValue(a));
                 return _ret(normals[0].slice(0,-1));
             }
+        }
+
+        // FaceUp trap: if next player is vulnerable (visible, no power cards) → use a card they can't answer
+        if (_nextFUP && !_nextFUImmune) {
+            const trapFU = normals.find(c => !aiOpponentCanPlay(aiCardValue(c), _nextFUP));
+            if (trapFU) return _ret(trapFU.slice(0,-1));
         }
 
         // Normal: play lowest, avoid gifting opponent
@@ -2986,7 +3020,8 @@ function nextTurn(skips = 1) {
         const topR = pile.length ? pile[pile.length-1].slice(0,-1) : null;
         const streak = pileStreak();
         const needed = topR ? 4 - streak : 0;
-        const canBurn = needed > 0 && needed <= players[0].hand.filter(c => c.slice(0,-1) === topR).length;
+        const _hBurnPool = players[0].hand.length > 0 ? players[0].hand : players[0].faceUp.filter(Boolean);
+        const canBurn = needed > 0 && needed <= _hBurnPool.filter(c => c.slice(0,-1) === topR).length;
         if (canBurn) {
             if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
             aiInterrupt = {
@@ -6658,7 +6693,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.330 ══
+// ══ BASRA OFFLINE ENGINE v4.331 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.

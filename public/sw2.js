@@ -1,5 +1,5 @@
-// v4.330 — Fix AI turn skip: remove duplicate aiMove from token-mismatch branch; log human take
-const CACHE = 'basrhead-v4.330';
+// v4.331 — Shithead: faceUp burn interrupt for human+AI; AI reads opponent faceUp cards
+const CACHE = 'basrhead-v4.331';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
