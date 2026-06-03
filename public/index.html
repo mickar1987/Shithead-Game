@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.331</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.332</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1213,6 +1213,7 @@ let authUser = null; // { username, token, coins }
 
 let mySwapDone = false;
 let winnersOrder = [], isPeeking = false, revealedFaceDownIndex = null;
+let _consecutiveTakes = 0;
 
 
 let animating = false;
@@ -1359,7 +1360,7 @@ function startGame(count) {
     // Reset global state
     pile = []; winnersOrder = []; gameOver = false; fastMode = false;
     isSwapPhase = true; selectedHandIndices = []; selectedTableIndices = [];
-    aiMoveCount = 0; aiLastPileSize = -1; aiStaleCount = 0;
+    aiMoveCount = 0; aiLastPileSize = -1; aiStaleCount = 0; _consecutiveTakes = 0;
     isPeeking = false; revealedFaceDownIndex = null; animating = false;
     if (aiInterrupt?.timer) clearTimeout(aiInterrupt.timer);
     aiInterrupt = null;
@@ -2019,6 +2020,9 @@ function _humanTakeAI() {
         pile = [];
         playSound('take');
         showToast(H('↙ לקחת את הערימה','↙ Taking the pile'));
+        _consecutiveTakes++;
+        checkStalemateLimit();
+        if (gameOver) return;
         nextTurn();
         return;
     }
@@ -2041,6 +2045,9 @@ function _humanTakeAI() {
     });
     players[0].hand.push(...pile);
     pile = [];
+    _consecutiveTakes++;
+    checkStalemateLimit();
+    if (gameOver) return;
     nextTurn();
 }
 
@@ -2178,6 +2185,7 @@ function _doExecuteMove(played) {
                 // Phase 2: Burn animation (800ms)
                 setTimeout(() => {
                     pile = [];
+                    _consecutiveTakes = 0; // burn = progress
                     pileEl.classList.remove('burn-effect');
                     animating = false;
                     drawUpToThree(currentPlayer);
@@ -2742,6 +2750,9 @@ function aiMove() {
             playSound('take');
             p.hand.push(...pile);
             pile = [];
+            _consecutiveTakes++;
+            checkStalemateLimit();
+            if (gameOver) return;
             render();
             nextTurn();
         } else {
@@ -2895,6 +2906,9 @@ function aiMove() {
             playSound('take');
             p.hand.push(...pile);
             pile = [];
+            _consecutiveTakes++;
+            checkStalemateLimit();
+            if (gameOver) return;
         } else {
             log(H(`${p.name} אין מהלך - דולג`,`${p.name} no move — skip`));
         }
@@ -2938,7 +2952,18 @@ function checkWin(idx) {
             gameOver = true; // stop all further moves immediately
             setTimeout(showResults, 800);
         }
+        _consecutiveTakes = 0; // progress made — someone finished
     }
+}
+
+function checkStalemateLimit() {
+    if (gameOver) return;
+    if (_consecutiveTakes < 25) return;
+    gameOver = true;
+    log(H('🤝 תיקו — לולאת משחק', '🤝 Draw — stalemate'));
+    showToast(H('🤝 תיקו!', '🤝 Draw!'));
+    players.forEach(p => { if (!p.finished) winnersOrder.push(p.id); });
+    setTimeout(showResults, 1000);
 }
 
 function showResults() {
@@ -6693,7 +6718,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.331 ══
+// ══ BASRA OFFLINE ENGINE v4.332 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.

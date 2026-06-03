@@ -1,5 +1,5 @@
-// v4.331 — Shithead: faceUp burn interrupt for human+AI; AI reads opponent faceUp cards
-const CACHE = 'basrhead-v4.331';
+// v4.332 — Shithead: stalemate detection (25 consecutive takes → draw)
+const CACHE = 'basrhead-v4.332';
 const PRECACHE = ['/index.html', '/socket.io/socket.io.js'];
 
 self.addEventListener('install', e => {
