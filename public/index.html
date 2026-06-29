@@ -600,7 +600,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.335</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.336</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6755,7 +6755,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.335 ══
+// ══ BASRA OFFLINE ENGINE v4.336 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -7702,12 +7702,13 @@ function basraRender(state) {
     } else if (inCommitPhase) {
         // RULE: if captures available, hide throw button — must capture
         // If no captures available, hide confirm button — only throw allowed
-        const _caps = basraFindValidCaptures(state.committedCard, state.tableCards);
+        // J / 7♦ capture automatically — never show any action button
+        const _isAuto = basraIsAutoCapture(state.committedCard);
+        const _caps = _isAuto ? [] : basraFindValidCaptures(state.committedCard, state.tableCards);
         const _mustCapture = _caps.length > 0;
-        const _canCapture = _mustCapture || (state.tableCards.length > 0 && basraSelectedCaptures.length > 0);
         playBtn.style.display    = 'none';
-        confirmBtn.style.display = _mustCapture ? 'block' : 'none';
-        throwBtn.style.display   = _mustCapture ? 'none' : 'block';
+        confirmBtn.style.display = (!_isAuto && _mustCapture) ? 'block' : 'none';
+        throwBtn.style.display   = (!_isAuto && !_mustCapture) ? 'block' : 'none';
         cancelBtn.style.display  = 'none';
     } else {
         playBtn.style.display = confirmBtn.style.display = throwBtn.style.display = cancelBtn.style.display = 'none';
