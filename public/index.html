@@ -493,6 +493,18 @@
             opacity: 0; transition: opacity 0.15s;
         }
         #gameMessage.show { opacity: 1; }
+        #basraMsgEl {
+            position: fixed;
+            top: calc(env(safe-area-inset-top) + 158px);
+            left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.82); border: 1px solid rgba(240,192,64,0.35);
+            color: var(--gold); font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.3rem; letter-spacing: 2px;
+            padding: 10px 22px; border-radius: 8px;
+            z-index: 505; pointer-events: none;
+            opacity: 0; transition: opacity 0.15s; white-space: nowrap;
+        }
+        #basraMsgEl.show { opacity: 1; }
 
         /* Special card glow - border only, no background tint */
         .card-special-2  { border-color: rgba(99,179,237,0.7)  !important; }
@@ -588,7 +600,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.333</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.334</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1313,7 +1325,9 @@ function toggleSound() {
 }
 let toastTimer;
 function showToast(msg, duration = 900) {
-    const el = document.getElementById('gameMessage');
+    const basraGame = document.getElementById('basraGame');
+    const inBasra = basraGame && basraGame.style.display !== 'none';
+    const el = document.getElementById(inBasra ? 'basraMsgEl' : 'gameMessage');
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toastTimer);
@@ -6733,7 +6747,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.333 ══
+// ══ BASRA OFFLINE ENGINE v4.334 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -6932,6 +6946,15 @@ function _bBotMove(room,emit){
         if(_bJ||(_b7&&!_a2rb)){const sa=safeSorted();if(sa){bc=sa;bcp=[];const c2=_bFindIdxs(bc,tc);if(c2.length){const u=new Set();c2.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));bcp.push(...g);}});}}}}
     if(!bc||!bot.hand.includes(bc)){bc=bot.hand.find(c=>_bR(c)!=='J'&&c!=='7d')||bot.hand[0];bcp=[];}
     if((_bIsJ(bc)||_bIs7d(bc))&&bcp.length===0&&bot.hand.length>1){const sa=safeSorted();if(sa)bc=sa;}
+    // Last-hand rule: never let J be the bot's very last card when deck is empty
+    if(room.deck.length===0&&bot.hand.length===2&&!_bIsJ(bc)){
+        const jCard=bot.hand.find(c=>_bIsJ(c));
+        if(jCard){
+            bc=jCard;bcp=[];
+            const jc=_bFindIdxs(jCard,tc);
+            if(jc.length){const u=new Set();jc.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));bcp.push(...g);}});}
+        }
+    }
 
     // Execute: phase 1 — commit
     bot.hand.splice(bot.hand.indexOf(bc),1);
@@ -7784,6 +7807,7 @@ function basraCancelSelection() {
 
 <!-- BASRA GAME -->
 <div id="basraGame" style="display:none;position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 50%, #115530 0%, #083d22 60%, #04261a 100%);z-index:500;overflow:hidden;">
+    <div id="basraMsgEl"></div>
     <button class="basra-chat-btn" id="basraChatToggleBtn" onclick="basraToggleChat()">💬</button>
     <!-- Top bar -->
     <div style="position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 44px);background:var(--bg);z-index:503;"></div>
