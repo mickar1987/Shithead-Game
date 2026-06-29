@@ -588,7 +588,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.332</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.333</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4419,6 +4419,7 @@ if (!onlineMode) return; // already left to menu
         // Show win score target
         const winScoreTarget = (basraState && basraState.winScore) ? basraState.winScore : '—';
         scoresEl.innerHTML += `<div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin-top:8px;letter-spacing:1px;">${H(`יעד: ${winScoreTarget} נקודות`,`Target: ${winScoreTarget} pts`)}</div>`;
+        window._pendingBasraGameOver = null;
         let _countdown = 7;
         btnsEl.innerHTML=`<div id="basraNextCountdown" style="font-size:13px;color:rgba(255,255,255,0.5);">${H('סיבוב הבא בעוד ','Next round in ')}${_countdown}...</div>`;
         if (window._basraRoundTimer) clearInterval(window._basraRoundTimer);
@@ -4428,9 +4429,17 @@ if (!onlineMode) return; // already left to menu
             if (_countdown <= 0) {
                 clearInterval(window._basraRoundTimer);
                 window._basraRoundTimer = null;
-                basraNextRound();
+                if (window._pendingBasraGameOver) {
+                    const d = window._pendingBasraGameOver;
+                    window._pendingBasraGameOver = null;
+                    _showBasraGameOver(d);
+                } else {
+                    basraNextRound();
+                }
             } else if (el) {
-                el.textContent = H('סיבוב הבא בעוד ','Next round in ') + _countdown + '...';
+                el.textContent = window._pendingBasraGameOver
+                    ? H('סיום משחק בעוד ', 'Game over in ') + _countdown + '...'
+                    : H('סיבוב הבא בעוד ', 'Next round in ') + _countdown + '...';
             }
         }, 1000);
         overlay.style.display='flex';
@@ -4464,13 +4473,7 @@ if (!onlineMode) return; // already left to menu
         }
     });
 
-    socket.on('basraGameOver', ({names, scores, forfeitBy, forfeitName, teams, teamScores, mySlot, slotOrder}) => {
-        if (window._forfeitTimeout) { clearTimeout(window._forfeitTimeout); window._forfeitTimeout = null; }
-        if (window._forfeitTimeout) { clearTimeout(window._forfeitTimeout); window._forfeitTimeout = null; }
-        // Update basraMySlot if server sent corrected slot info
-        if (mySlot !== undefined) basraMySlot = mySlot;
-        // Cancel round countdown if running
-        if (window._basraRoundTimer) { clearInterval(window._basraRoundTimer); window._basraRoundTimer = null; }
+    function _showBasraGameOver({names, scores, forfeitBy, forfeitName, teams, teamScores, slotOrder}) {
         const overlay=document.getElementById('basraResultOverlay');
         let html = '';
         if (forfeitName !== undefined) {
@@ -4479,22 +4482,17 @@ if (!onlineMode) return; // already left to menu
             if (!iMeLost) basraFireworks();
             html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:12px;">${forfeitName} ${H('עזב/פסל עצמו','left/disqualified')}</div>`;
         } else if (!teams) {
-            // 2p: determine winner
-            // slotOrder[i] = original slot index of position i in sorted list
-            // Find where my slot appears in slotOrder
             let myPositionInSorted;
             if (slotOrder) {
                 myPositionInSorted = slotOrder.indexOf(basraMySlot);
             } else {
-                // Fallback: highest score wins
                 myPositionInSorted = scores[0] >= scores[1] ? 0 : 1;
                 if (basraMySlot === 1) myPositionInSorted = scores[1] > scores[0] ? 0 : 1;
             }
-            const iWon = myPositionInSorted === 0; // position 0 = winner (sorted descending)
+            const iWon = myPositionInSorted === 0;
             html += `<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;color:${iWon?'#22c55e':'#ef4444'};letter-spacing:3px;text-align:center;margin-bottom:12px;">${iWon ? H('🏆 ניצחת!','🏆 You won!') : H('😞 הפסדת','😞 You lost')}</div>`;
             if (iWon) basraFireworks();
         } else {
-            // 4p team with no forfeit
             const winTeamIdx2 = teamScores ? (teamScores[0] >= teamScores[1] ? 0 : 1) : 0;
             const myTeamIdx = teams ? teams.findIndex(t => t.includes(basraMySlot)) : -1;
             const iWon4 = myTeamIdx === winTeamIdx2;
@@ -4503,7 +4501,6 @@ if (!onlineMode) return; // already left to menu
         }
         html += '<div style="display:flex;flex-direction:column;gap:8px;">';
         if (teams && teamScores) {
-            // 4p team mode — show 2 rows
             const teamColors = ['rgba(251,191,36,0.8)','rgba(96,165,250,0.8)'];
             const winTeamIdx = teamScores[0] >= teamScores[1] ? 0 : 1;
             teams.forEach((team, ti) => {
@@ -4522,9 +4519,7 @@ if (!onlineMode) return; // already left to menu
         document.getElementById('basraRoundScores').innerHTML = html;
         document.getElementById('basraRoundBtns').innerHTML=H('<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 צא לתפריט</button>','<button onclick="basraLeave()" class="setup-btn" style="background:linear-gradient(135deg,#374151,#1f2937);width:220px;">🚪 Exit to Menu</button>');
         overlay.style.display='flex';
-        // Apply pending coins if already arrived
         if (pendingBasraCoins) { applyBasraCoins(pendingBasraCoins); pendingBasraCoins = null; }
-        // For offline/switched games: record stats client-side if not already done by _bRecordStats
         if (window._basraOfflineActive && !window._basraStatsRecorded && authUser?.username && authUser?.token) {
             const iWonGO = forfeitName !== undefined ? forfeitBy !== basraMySlot
                 : slotOrder ? slotOrder.indexOf(basraMySlot) === 0
@@ -4534,10 +4529,30 @@ if (!onlineMode) return; // already left to menu
                     result: forfeitName!==undefined && forfeitBy===basraMySlot ? 'abandon_lose' : (iWonGO?'win':'lose')})
             });
         }
-        // Stats recorded server-side for online — suppress any remaining abandon paths
         window._basraStatsRecorded = true;
         try { const _ag=JSON.parse(localStorage.getItem('_activeGame')||'null'); if(_ag){_ag.cleanExit=true;localStorage.setItem('_activeGame',JSON.stringify(_ag));} } catch(e){}
+    }
 
+    socket.on('basraGameOver', (data) => {
+        if (window._forfeitTimeout) { clearTimeout(window._forfeitTimeout); window._forfeitTimeout = null; }
+        if (data.mySlot !== undefined) basraMySlot = data.mySlot;
+        if (data.forfeitName !== undefined) {
+            // Forfeit: cancel any countdown and show immediately
+            if (window._basraRoundTimer) { clearInterval(window._basraRoundTimer); window._basraRoundTimer = null; }
+            _showBasraGameOver(data);
+            return;
+        }
+        // Normal game end: if round-summary countdown is still running, wait for it
+        if (window._basraRoundTimer) {
+            window._pendingBasraGameOver = data;
+            const el = document.getElementById('basraNextCountdown');
+            if (el) {
+                const m = el.textContent.match(/\d+/);
+                el.textContent = H('סיום משחק בעוד ', 'Game over in ') + (m ? m[0] : '') + '...';
+            }
+            return;
+        }
+        _showBasraGameOver(data);
     });
     let pendingBasraCoins = null;
     function applyBasraCoins(results) {
@@ -6718,7 +6733,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.332 ══
+// ══ BASRA OFFLINE ENGINE v4.333 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
