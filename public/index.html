@@ -600,7 +600,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.339</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.340</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1851,7 +1851,7 @@ function _endSwapAI() {
     }
     currentPlayer = starter;
     log(H(`🎮 התחלנו! ${players[starter].name} ראשון`,`🎮 Game on! ${players[starter].name} goes first`));
-    if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 30 : 300);
+    if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 150 : 300);
     render();
 }
 
@@ -2227,14 +2227,14 @@ function _doExecuteMove(played) {
                     checkWin(currentPlayer);
                     if (gameOver) { render(); return; } // game ended during burn
                     if (!players[currentPlayer].finished) {
-                        if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 30 : 300);
+                        if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 150 : 300);
                     } else {
                         nextTurn();
                     }
                     render();
-                }, fastMode ? 80 : 800);
-            }, fastMode ? 0 : 350);
-        }, fastMode ? 0 : 100);
+                }, fastMode ? 440 : 800);
+            }, fastMode ? 175 : 350);
+        }, fastMode ? 50 : 100);
         return;
     }
 
@@ -2753,7 +2753,7 @@ let aiStaleCount = 0;
 
 function aiMove() {
     if (gameOver) return;
-    if (animating) { setTimeout(aiMove, fastMode ? 30 : 200); return; }
+    if (animating) { setTimeout(aiMove, fastMode ? 100 : 200); return; }
     if (players[currentPlayer]?.finished) { log(`[skip] ${players[currentPlayer]?.name} already finished`); nextTurn(); return; }
     const p = players[currentPlayer];
 
@@ -2967,7 +2967,6 @@ function checkWin(idx) {
         log(H(`🏁 ${_pFinName} ${_pFinVerb} במקום ${winnersOrder.length}!`,`🏁 ${_pFinName} finished #${winnersOrder.length}!`));
         showToast(H(`🏁 ${_pFinName} ${_pFinVerb}!`,`🏁 ${_pFinName} finished!`));
         if (idx === 0) {
-            fastMode = true;
             // Save place directly to server — most reliable method
             if (authUser?.username && authUser?.token) {
                 fetch('/api/stats/save-place', {
@@ -3168,17 +3167,17 @@ function nextTurn(skips = 1) {
                                     currentPlayer = pi;
                                     render();
                                     if (!gameOver && !players[pi].finished)
-                                        setTimeout(aiMove, fastMode ? 30 : 300);
-                                }, fastMode ? 80 : 800);
-                            }, fastMode ? 0 : 350);
-                        }, fastMode ? 0 : 100);
+                                        setTimeout(aiMove, fastMode ? 150 : 300);
+                                }, fastMode ? 440 : 800);
+                            }, fastMode ? 175 : 350);
+                        }, fastMode ? 50 : 100);
                     } else {
                         showToast(H(`⚡ ${players[pi].name} התפרץ!`,`⚡ ${players[pi].name} burst!`));
                         drawUpToThree(pi);
                         checkWin(pi);
                         render();
                         if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
-                            setTimeout(aiMove, fastMode ? 30 : 300);
+                            setTimeout(aiMove, fastMode ? 150 : 300);
                     }
                 }, pi);
                 return;
@@ -3188,7 +3187,7 @@ function nextTurn(skips = 1) {
 
     render();
     if (!players[currentPlayer].finished && players[currentPlayer].isAI)
-        setTimeout(aiMove, fastMode ? 30 : 300);
+        setTimeout(aiMove, fastMode ? 150 : 300);
 }
 
 
@@ -6772,7 +6771,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.339 ══
+// ══ BASRA OFFLINE ENGINE v4.340 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
