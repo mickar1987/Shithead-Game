@@ -131,6 +131,24 @@
         .lobby-dot { width:8px; height:8px; border-radius:50%; background:#4ade80; flex-shrink:0; }
         .lobby-dot.empty { background:rgba(255,255,255,0.2); }
 
+        /* ── BIG MODE (accessibility) ── */
+        body.big-mode {
+            --card-w: 62px;
+            --card-h: 90px;
+            --card-mini-w: 44px;
+            --card-mini-h: 64px;
+        }
+        body.big-mode .card { font-size: 1.375rem; }
+        body.big-mode #basraGame .card {
+            width: 50px !important;
+            height: 72px !important;
+            font-size: 0.95rem !important;
+            --card-w: 50px !important;
+            --card-h: 72px !important;
+        }
+        body.big-mode #basraGame .card-rank { font-size: 1.15rem; }
+        body.big-mode #basraGame .card-suit { font-size: 1.05rem; }
+
         /* ── CARDS ── */
         #basraGame .card {
             width: 38px !important;
@@ -571,6 +589,7 @@
             <div id="authCoinsDisplay" style="font-size:13px;color:var(--gold);text-align:center;margin-bottom:8px;"></div>
             <div id="dailyCountdown" style="display:none;"></div>
             <button onclick="showEditProfile()" id="btn_editProfile" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);">✏️ עריכת פרופיל</button>
+            <button onclick="toggleBigMode()" id="btn_bigMode" class="setup-btn" style="display:none;font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);"></button>
             <button onclick="toggleLangMenu()" class="setup-btn" style="font-size:0.85rem;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:space-between;">
               <span>🌐 Language</span><span id="currentLangLabel" style="color:var(--gold);font-size:0.8rem;letter-spacing:1px;"></span>
             </button>
@@ -600,7 +619,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.341</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.342</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1119,6 +1138,25 @@ function setLang(lang) {
 function toggleLangMenu() {
   const lm = document.getElementById('langMenu');
   if(lm) lm.style.display = lm.style.display==='none' ? 'block' : 'none';
+}
+
+function toggleBigMode() {
+    const on = !document.body.classList.contains('big-mode');
+    document.body.classList.toggle('big-mode', on);
+    localStorage.setItem('basrhead_bigMode', on ? '1' : '0');
+    _updateBigModeBtn();
+}
+function _updateBigModeBtn() {
+    const btn = document.getElementById('btn_bigMode');
+    if (!btn) return;
+    const on = document.body.classList.contains('big-mode');
+    btn.textContent = on ? H('🔍 תצוגה מוגדלת: פעיל','🔍 Large view: ON') : H('🔍 תצוגה מוגדלת: כבוי','🔍 Large view: OFF');
+}
+function _applyBigModePref() {
+    if (localStorage.getItem('basrhead_bigMode') === '1') {
+        document.body.classList.add('big-mode');
+    }
+    _updateBigModeBtn();
 }
 
 function _el(id, txt) { const e=document.getElementById(id); if(e) e.textContent=txt; }
@@ -2108,7 +2146,9 @@ function animateCardToPile(played, callback, fromPlayer) {
         srcY = rect.top + rect.height / 2;
     }
 
-    const cardW = 52, cardH = 76;
+    const _cs = getComputedStyle(document.documentElement);
+    const cardW = parseInt(_cs.getPropertyValue('--card-w')) || 52;
+    const cardH = parseInt(_cs.getPropertyValue('--card-h')) || 76;
     const flyDuration = 380;
     const landPause = 80;   // קלף נוחת ונשאר רגע לפני שנעלם
     const fadeDuration = 120;
@@ -3292,6 +3332,8 @@ function updateCoinsUI() {
         if (coinsDisp) coinsDisp.textContent = '🪙 ' + authUser.coins.toLocaleString() + H(' מטבעות',' coins');
         if (tabs) tabs.style.display = 'none';
         form.forEach(el => el.classList.add('hidden'));
+        const bigModeBtn = document.getElementById('btn_bigMode');
+        if (bigModeBtn) { bigModeBtn.style.display = (authUser.username === 'mickar') ? 'block' : 'none'; _updateBigModeBtn(); }
         // Check daily
         checkDailyAvailable();
     } else {
@@ -4797,6 +4839,7 @@ function fetchOnlineStats() {
 
 // Fetch stats on page load
 window.addEventListener('load', () => {
+    _applyBigModePref();
     loadAuth();
     loadProfile();
     setTimeout(fetchOnlineStats, 500);
@@ -5957,6 +6000,7 @@ function fetchOnlineStats() {
 
 // Fetch stats on page load
 window.addEventListener('load', () => {
+    _applyBigModePref();
     loadAuth();
     loadProfile();
     setTimeout(fetchOnlineStats, 500);
@@ -6771,7 +6815,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.341 ══
+// ══ BASRA OFFLINE ENGINE v4.342 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
