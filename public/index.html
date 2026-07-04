@@ -206,7 +206,7 @@
         body.big-mode .basra-chat-emojis { gap: 12px !important; }
         body.big-mode .basra-chat-emojis span { font-size: 36px !important; }
         body.big-mode .basra-chat-msg { font-size: 18px !important; padding: 8px 12px !important; }
-        body.big-mode .basra-bubble { font-size: 20px !important; }
+        body.big-mode .basra-bubble { font-size: 44px !important; padding: 12px 22px !important; }
         /* ── Result/leaderboard ── */
         body.big-mode .result-title { font-size: 3.5rem !important; }
         body.big-mode .lb-name { font-size: 1.2rem !important; }
@@ -657,8 +657,8 @@
         .basra-chat-msg:active { background:rgba(240,192,64,0.2); }
         .basra-bubble {
             background:rgba(15,50,25,0.96); border:1px solid rgba(240,192,64,0.6);
-            border-radius:16px; padding:7px 14px; font-size:14px; color:white;
-            pointer-events:none; text-align:center; line-height:1.4;
+            border-radius:16px; padding:10px 18px; font-size:32px; color:white;
+            pointer-events:none; text-align:center; line-height:1.3;
             animation:bubblePop 0.2s ease-out;
             box-shadow:0 4px 16px rgba(0,0,0,0.5);
         }
@@ -724,7 +724,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.353</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.354</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6934,7 +6934,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.353 ══
+// ══ BASRA OFFLINE ENGINE v4.354 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
