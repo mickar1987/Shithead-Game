@@ -141,11 +141,8 @@
         /* ── Shithead cards (renderCard uses .card-rank/.card-suit classes — CSS works fine) ── */
         body.big-mode .card { font-size: 1.6rem; }
         body.big-mode .card-mini { font-size: 1rem; }
-        /* ── Shithead: my hand + center pile symbols only −30% ── */
-        body.big-mode #playerArea .card-rank,
-        body.big-mode #playerArea .card-suit,
-        body.big-mode #pile .card-rank,
-        body.big-mode #pile .card-suit { font-size: 1.1rem !important; }
+        /* ── Shithead: suit symbols (♦♣♠♥) only −30% ── */
+        body.big-mode .card-suit { font-size: 1.1rem !important; }
         body.big-mode #pos-top { height: 190px !important; }
         /* ── Basra cards (basraRenderCard now uses .card-rank/.card-suit classes) ── */
         body.big-mode #basraGame .card {
@@ -726,7 +723,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.348</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.349</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4407,6 +4404,9 @@ if (!onlineMode) return; // already left to menu
         }
 
         overlay.innerHTML = html;
+        if (document.body.classList.contains('big-mode')) {
+            overlay.querySelectorAll('[style]').forEach(ch => { const fs=ch.style.fontSize; if (!fs) return; if (fs.endsWith('px')) ch.style.fontSize=Math.round(parseFloat(fs)*1.4)+'px'; else if (fs.endsWith('rem')) ch.style.fontSize=(parseFloat(fs)*1.4).toFixed(1)+'rem'; });
+        }
         document.body.appendChild(overlay);
         setTimeout(() => {
             overlay.style.transition = 'opacity 0.4s';
@@ -6933,7 +6933,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.348 ══
+// ══ BASRA OFFLINE ENGINE v4.349 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
