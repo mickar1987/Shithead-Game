@@ -133,13 +133,13 @@
 
         /* ══ BIG MODE (accessibility) ══ */
         body.big-mode {
-            --card-w: 62px;
-            --card-h: 90px;
+            --card-w: 56px;
+            --card-h: 82px;
             --card-mini-w: 44px;
             --card-mini-h: 64px;
         }
         /* ── Shithead cards (renderCard uses .card-rank/.card-suit classes — CSS works fine) ── */
-        body.big-mode .card { font-size: 2.4rem; }
+        body.big-mode .card { font-size: 2rem; }
         body.big-mode .card-mini { font-size: 1rem; }
         body.big-mode #pos-top { height: 190px !important; }
         /* ── Basra cards (basraRenderCard now uses .card-rank/.card-suit classes) ── */
@@ -231,6 +231,19 @@
         body.big-mode .setup-back { font-size: 16px !important; padding: 10px 20px !important; }
         body.big-mode .lobby-player { font-size: 16px !important; }
         body.big-mode #appVersionEl { font-size: 14px !important; }
+        /* ── LOG button (matches EXIT size) ── */
+        body.big-mode .log-btn { font-size: 14px !important; padding: 5px 10px !important; }
+        body.big-mode #logWindow { font-size: 13px !important; }
+        /* ── Basra round/game result overlay — zoom scales all inline-styled content ── */
+        body.big-mode #basraResultOverlay { zoom: 1.35; }
+        body.big-mode #lbl_roundResults { font-size: 2.4rem !important; }
+        body.big-mode #basraNextCountdown { font-size: 18px !important; }
+        /* ── Basra exit confirm modal ── */
+        body.big-mode #basraExitConfirm { zoom: 1.3; }
+        body.big-mode #lbl_exitTitle { font-size: 2rem !important; }
+        body.big-mode #lbl_exitSub { font-size: 16px !important; }
+        body.big-mode #btn_exitYes,
+        body.big-mode #btn_exitNo { font-size: 1.3rem !important; padding: 14px 32px !important; }
 
         /* ── CARDS ── */
         #basraGame .card {
@@ -702,7 +715,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.345</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.346</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6901,7 +6914,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.345 ══
+// ══ BASRA OFFLINE ENGINE v4.346 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
