@@ -193,6 +193,7 @@
         body.big-mode #gameTopBar button { font-size: 16px !important; padding: 5px 10px !important; }
         body.big-mode #basraGame button[onclick="basraConfirmExit()"] { font-size: 14px !important; padding: 4px 10px !important; }
         body.big-mode #basraGame button[onclick="toggleLog()"] { font-size: 11px !important; }
+        body.big-mode #basraReplayBtn { font-size: 11px !important; padding: 4px 8px !important; }
         /* ── Toast messages ── */
         body.big-mode #gameMessage { font-size: 1.8rem !important; }
         body.big-mode #basraMsgEl { font-size: 1.8rem !important; }
@@ -724,7 +725,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.354</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.355</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -4424,6 +4425,8 @@ if (!onlineMode) return; // already left to menu
     });
 
     socket.on('basraStart', () => {
+        window._basraLastOppMove = null;
+        const rb = document.getElementById('basraReplayBtn'); if (rb) rb.style.display = 'none';
         window._basraDealInProgress = true; // block renders until deal animation plays
         document.getElementById('basraGame').style.display='block';
         document.getElementById('setupOverlay').style.display='none';
@@ -4453,6 +4456,11 @@ if (!onlineMode) return; // already left to menu
         showToast(H('המשחק התחיל!','Game started!'));
     });
     socket.on('basraState', state => {
+        // Track opponent committed card (before play) for replay button
+        if (state.committedCard && state.committedBy !== undefined && state.committedBy !== state.mySlotIdx) {
+            window._basraLastOppMove = { card: state.committedCard, tableBefore: [...(state.tableCards||[])] };
+            const rb = document.getElementById('basraReplayBtn'); if (rb) rb.style.display = 'inline-block';
+        }
         basraMySlot=state.mySlotIdx;
         document.getElementById('basraGame').style.display='block';
         document.getElementById('setupOverlay').style.display='none';
@@ -6934,7 +6942,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.354 ══
+// ══ BASRA OFFLINE ENGINE v4.355 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -7597,6 +7605,58 @@ function basraShowBubble(slotIdx, msg) {
     setTimeout(() => { bubble.style.opacity='0'; bubble.style.transition='opacity 0.4s'; setTimeout(()=>bubble.remove(),400); }, 2600);
 }
 
+function basraShowLastMove(show) {
+    const overlay = document.getElementById('basraLastMoveOverlay');
+    if (!overlay) return;
+    if (!show) { overlay.style.display = 'none'; return; }
+    const data = window._basraLastOppMove;
+    if (!data) return;
+    const suitMap = {h:'♥',d:'♦',c:'♣',s:'♠'};
+    const isRed = s => s==='h'||s==='d';
+    function makeCardEl(cardStr) {
+        const s = cardStr.slice(-1), r = cardStr.slice(0,-1);
+        const el = document.createElement('div');
+        el.style.cssText = `width:40px;height:58px;background:#fff;border-radius:6px;border:1px solid rgba(0,0,0,0.15);display:flex;flex-direction:column;align-items:center;justify-content:center;color:${isRed(s)?'#cc2200':'#1a1a1a'};font-weight:700;gap:2px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.6);`;
+        el.innerHTML = `<span style="font-size:1.1rem;line-height:1">${r}</span><span style="font-size:0.7rem;line-height:1">${suitMap[s]||s}</span>`;
+        return el;
+    }
+    const content = document.getElementById('basraLastMoveContent');
+    content.innerHTML = '';
+    // Played card
+    const playedWrap = document.createElement('div');
+    playedWrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:5px;';
+    const lbl1 = document.createElement('div');
+    lbl1.style.cssText = 'font-size:9px;color:var(--gold);letter-spacing:1px;';
+    lbl1.textContent = 'שוחק';
+    playedWrap.appendChild(lbl1);
+    playedWrap.appendChild(makeCardEl(data.card));
+    content.appendChild(playedWrap);
+    // Arrow + table
+    const arrow = document.createElement('div');
+    arrow.style.cssText = 'font-size:20px;color:rgba(255,255,255,0.35);';
+    arrow.textContent = '→';
+    content.appendChild(arrow);
+    const tableWrap = document.createElement('div');
+    tableWrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:5px;';
+    const lbl2 = document.createElement('div');
+    lbl2.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.45);letter-spacing:1px;';
+    lbl2.textContent = H('שולחן','table');
+    tableWrap.appendChild(lbl2);
+    if (data.tableBefore.length) {
+        const cards = document.createElement('div');
+        cards.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:180px;';
+        data.tableBefore.forEach(c => cards.appendChild(makeCardEl(c)));
+        tableWrap.appendChild(cards);
+    } else {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:11px;color:rgba(255,255,255,0.3);padding:8px;';
+        empty.textContent = H('שולחן ריק','empty');
+        tableWrap.appendChild(empty);
+    }
+    content.appendChild(tableWrap);
+    overlay.style.display = 'flex';
+}
+
 function basraFireworks() {
     const colors = ['#ff0','#f80','#f0f','#0ff','#0f0','#ff6600','#fff'];
     const container = document.createElement('div');
@@ -8003,6 +8063,7 @@ function basraCancelSelection() {
         <div id="basraConnStatus" style="position:absolute;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,180,0.8);letter-spacing:0.5px;pointer-events:none;opacity:0;transition:opacity 0.5s;white-space:nowrap;"></div>
         <div id="basraScoreBar" style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.6);letter-spacing:1.5px;"></div>
         <div style="display:flex;gap:6px;align-items:center;">
+            <button id="basraReplayBtn" onmousedown="basraShowLastMove(true)" onmouseup="basraShowLastMove(false)" onmouseleave="basraShowLastMove(false)" ontouchstart="basraShowLastMove(true);event.preventDefault();" ontouchend="basraShowLastMove(false)" ontouchcancel="basraShowLastMove(false)" style="display:none;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:9px;padding:4px 8px;border-radius:4px;cursor:pointer;">👁 מהלך</button>
             <button onclick="toggleLog()" style="background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-size:9px;padding:4px 8px;border-radius:4px;cursor:pointer;">📜 LOG</button>
             <button onclick="basraConfirmExit()" style="background:rgba(0,0,0,0.5);border:1px solid #555;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;"><span id='btn_exit'>EXIT</span></button>
         </div>
@@ -8067,6 +8128,14 @@ function basraCancelSelection() {
             <button id="basraPlayBtn" onclick="basraPlaySelected()" class="action-btn" style="display:none;"><span id='btn_basraPlay'>▶ Play Card</span></button>
         </div>
         <div id="basraStatusMsg" style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;min-height:16px;"></div>
+    </div>
+</div>
+
+<!-- BASRA LAST MOVE OVERLAY -->
+<div id="basraLastMoveOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9050;pointer-events:none;align-items:center;justify-content:center;">
+    <div style="background:rgba(10,30,20,0.97);border:1.5px solid rgba(240,192,64,0.45);border-radius:16px;padding:18px 22px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:90vw;">
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;">מהלך אחרון של היריב</div>
+        <div id="basraLastMoveContent" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
     </div>
 </div>
 
