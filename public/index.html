@@ -142,7 +142,7 @@
         body.big-mode .card { font-size: 1.6rem; }
         body.big-mode .card-mini { font-size: 1rem; }
         /* ── Shithead: suit symbols (♦♣♠♥) −50% ── */
-        body.big-mode .card-suit { font-size: 0.55rem !important; line-height: 1 !important; }
+        body.big-mode .card-suit { font-size: 0.7rem !important; line-height: 1 !important; }
         body.big-mode .card-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1; }
         body.big-mode #pos-top { height: 190px !important; }
         /* ── Basra cards (basraRenderCard now uses .card-rank/.card-suit classes) ── */
@@ -724,7 +724,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.350</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.351</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6934,7 +6934,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.350 ══
+// ══ BASRA OFFLINE ENGINE v4.351 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
