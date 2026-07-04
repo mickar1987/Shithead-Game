@@ -138,7 +138,10 @@
             --card-mini-w: 44px;
             --card-mini-h: 64px;
         }
-        body.big-mode .card { font-size: 1.375rem; }
+        /* Shithead cards */
+        body.big-mode .card { font-size: 1.7rem; }
+        body.big-mode #pos-top { height: 180px !important; }
+        /* Basra cards */
         body.big-mode #basraGame .card {
             width: 50px !important;
             height: 72px !important;
@@ -146,8 +149,62 @@
             --card-w: 50px !important;
             --card-h: 72px !important;
         }
-        body.big-mode #basraGame .card-rank { font-size: 1.15rem; }
-        body.big-mode #basraGame .card-suit { font-size: 1.05rem; }
+        body.big-mode #basraGame .card-rank { font-size: 1.4rem !important; }
+        body.big-mode #basraGame .card-suit { font-size: 1.25rem !important; }
+        /* Basra pile displays (captured card stacks) */
+        body.big-mode #basraMyPile>div,
+        body.big-mode #basraOppPile>div,
+        body.big-mode #basraLeftPile>div,
+        body.big-mode #basraRightPile>div { width: 44px !important; }
+        body.big-mode #basraMyPile>div>div,
+        body.big-mode #basraOppPile>div>div,
+        body.big-mode #basraLeftPile>div>div,
+        body.big-mode #basraRightPile>div>div { width: 44px !important; height: 64px !important; }
+        /* Basra deck display */
+        body.big-mode #basraDeckDisplay {
+            width: 44px !important;
+            height: 64px !important;
+            font-size: 1.3rem !important;
+            border-radius: 7px !important;
+        }
+        body.big-mode #basraDeckDisplay span:last-child { font-size: 9px !important; }
+        /* Draw deck (Shithead) */
+        body.big-mode .draw-deck { font-size: 18px !important; }
+        /* Basra player hand — single row */
+        body.big-mode #basraMyHand { flex-wrap: nowrap !important; gap: 5px !important; }
+        body.big-mode #basraPlayerArea { min-width: 330px !important; max-width: 420px !important; }
+        body.big-mode #basraTableCards { gap: 8px !important; max-width: 380px !important; min-height: 90px !important; }
+        /* Action buttons */
+        body.big-mode .action-btn { font-size: 1.35rem !important; padding: 12px 24px !important; }
+        /* Score / status */
+        body.big-mode #basraScoreBar { font-size: 1rem !important; }
+        body.big-mode #basraStatusMsg { font-size: 15px !important; }
+        body.big-mode #basraMyInfo,
+        body.big-mode #basraOpponentInfo { font-size: 14px !important; }
+        body.big-mode #basraOpponentName { font-size: 15px !important; }
+        /* Player name badges & pile label */
+        body.big-mode .ai-name-badge { font-size: 13px !important; letter-spacing: 1px !important; }
+        body.big-mode .pile-label { font-size: 11px !important; }
+        body.big-mode #pileStatus { font-size: 12px !important; }
+        /* Toast messages */
+        body.big-mode #gameMessage { font-size: 1.7rem !important; }
+        body.big-mode #basraMsgEl { font-size: 1.7rem !important; }
+        /* Reaction emojis */
+        body.big-mode .react-btn { font-size: 26px !important; }
+        /* Result/leaderboard */
+        body.big-mode .result-title { font-size: 3.5rem !important; }
+        body.big-mode .lb-name { font-size: 1.2rem !important; }
+        body.big-mode .lb-medal { font-size: 1.9rem !important; }
+        body.big-mode .lb-coins { font-size: 1.2rem !important; }
+        body.big-mode .new-game-btn { font-size: 1.7rem !important; padding: 18px 44px !important; }
+        /* Setup/menu */
+        body.big-mode .setup-btn { font-size: 1.6rem !important; padding: 18px 32px !important; }
+        body.big-mode .setup-title { font-size: clamp(3.5rem, 14vw, 7rem) !important; }
+        body.big-mode .setup-subtitle { font-size: 0.9rem !important; letter-spacing: 3px !important; }
+        body.big-mode .setup-input { font-size: 1.2rem !important; padding: 16px !important; }
+        body.big-mode .setup-back { font-size: 16px !important; }
+        body.big-mode .lobby-player { font-size: 16px !important; }
+        body.big-mode #appVersionEl { font-size: 14px !important; }
 
         /* ── CARDS ── */
         #basraGame .card {
@@ -619,7 +676,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.342</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.343</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1807,7 +1864,8 @@ function renderAI(p, id) {
 
     const handRow = document.createElement('div');
     handRow.className = 'ai-hand-container';
-    const W = 36, overlap = 18;
+    const W = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-mini-w')) || 36;
+    const overlap = Math.round(W / 2);
     const totalW = p.hand.length > 0 ? (p.hand.length - 1) * overlap + W : 0;
     handRow.style.width = totalW + 'px';
     p.hand.forEach((_, idx) => {
@@ -6815,7 +6873,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.342 ══
+// ══ BASRA OFFLINE ENGINE v4.343 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
