@@ -49,16 +49,12 @@
             height: 100dvh; width: 100vw;
             padding: 0;
             position: relative;
-            background:
-                radial-gradient(ellipse 80% 60% at 50% 50%, #0f5c35 0%, #073d22 60%, #031a0f 100%);
+            background: url('/table-bg.jpg') center center / cover no-repeat;
             background-attachment: fixed;
         }
         .game-container::before {
             content: '';
             position: absolute; inset: 0; pointer-events: none;
-            background-image:
-                repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 40px),
-                repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 40px);
         }
 
         /* ── SETUP OVERLAY ── */
@@ -725,7 +721,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.357</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.358</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6956,7 +6952,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.357 ══
+// ══ BASRA OFFLINE ENGINE v4.358 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -8068,7 +8064,7 @@ function basraCancelSelection() {
 </script>
 
 <!-- BASRA GAME -->
-<div id="basraGame" style="display:none;position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 50%, #115530 0%, #083d22 60%, #04261a 100%);z-index:500;overflow:hidden;">
+<div id="basraGame" style="display:none;position:fixed;inset:0;background:url('/table-bg.jpg') center center / cover no-repeat;z-index:500;overflow:hidden;">
     <div id="basraMsgEl"></div>
     <button class="basra-chat-btn" id="basraChatToggleBtn" onclick="basraToggleChat()">💬</button>
     <button id="basraReplayBtn" onmousedown="basraShowLastMove(true)" onmouseup="basraShowLastMove(false)" onmouseleave="basraShowLastMove(false)" ontouchstart="basraShowLastMove(true);event.preventDefault();" ontouchend="basraShowLastMove(false)" ontouchcancel="basraShowLastMove(false)" style="display:none;position:fixed;top:180px;right:8px;background:rgba(10,40,20,0.85);border:1px solid rgba(240,192,64,0.4);border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;z-index:502;box-shadow:0 2px 8px rgba(0,0,0,0.4);">👁</button>
