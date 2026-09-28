@@ -725,7 +725,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.356</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.357</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1996,7 +1996,7 @@ function _endSwapAI() {
     }
     currentPlayer = starter;
     log(H(`🎮 התחלנו! ${players[starter].name} ראשון`,`🎮 Game on! ${players[starter].name} goes first`));
-    if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 210 : 300);
+    if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 210 : 300, currentPlayer);
     render();
 }
 
@@ -2071,7 +2071,7 @@ function _humanPlayAI() {
                 } else {
                     currentPlayer = 0;
                     render();
-                    if (players[0].isAI) aiMove();
+                    if (players[0].isAI) aiMove(0);
                 }
             }, 600);
         } else {
@@ -2374,7 +2374,7 @@ function _doExecuteMove(played) {
                     checkWin(currentPlayer);
                     if (gameOver) { render(); return; } // game ended during burn
                     if (!players[currentPlayer].finished) {
-                        if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 210 : 300);
+                        if (players[currentPlayer].isAI) setTimeout(aiMove, fastMode ? 210 : 300, currentPlayer);
                     } else {
                         nextTurn();
                     }
@@ -2898,9 +2898,11 @@ let aiMoveCount = 0;
 let aiLastPileSize = -1;
 let aiStaleCount = 0;
 
-function aiMove() {
+function aiMove(expectedPlayer) {
     if (gameOver) return;
-    if (animating) { setTimeout(aiMove, fastMode ? 140 : 200); return; }
+    // Stale-call guard: if scheduled for a different player, ignore (another code path advanced the turn)
+    if (expectedPlayer !== undefined && currentPlayer !== expectedPlayer) return;
+    if (animating) { setTimeout(aiMove, fastMode ? 140 : 200, expectedPlayer); return; }
     if (players[currentPlayer]?.finished) { log(`[skip] ${players[currentPlayer]?.name} already finished`); nextTurn(); return; }
     const p = players[currentPlayer];
 
@@ -2927,6 +2929,7 @@ function aiMove() {
             p.hand = p.hand.filter(c => c !== card);
             executeMove([card]);
         } else if (pile.length > 0) {
+            log(H(`${p.name} לוקח את הערימה`,`${p.name} takes the pile`));
             showToast(H(`${p.name} לוקח את הערימה`,`${p.name} takes the pile`));
             playSound('take');
             p.hand.push(...pile);
@@ -2953,7 +2956,18 @@ function aiMove() {
                 playSound('play');
                 executeMove([_stuckCard]);
             } else {
-                nextTurn();
+                // No hand/faceUp cards — try faceDown (pile is empty so any card is valid)
+                const _fdIdx = p.faceDown.findIndex(c => c);
+                if (_fdIdx !== -1) {
+                    const _fdCard = p.faceDown[_fdIdx];
+                    p.faceDown[_fdIdx] = null;
+                    log(H(`${p.name} מוכרח להפוך קלף`,`${p.name} must flip a card`));
+                    playSound('play');
+                    executeMove([_fdCard]);
+                } else {
+                    log(H(`${p.name} אין קלפים - דולג`,`${p.name} no cards — skip`));
+                    nextTurn();
+                }
             }
         }
         return;
@@ -3238,7 +3252,7 @@ function nextTurn(skips = 1) {
                     aiInterrupt = null;
                     render();
                     if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
-                        aiMove();
+                        aiMove(currentPlayer);
                 }, 3000)
             };
             render();
@@ -3314,7 +3328,7 @@ function nextTurn(skips = 1) {
                                     currentPlayer = pi;
                                     render();
                                     if (!gameOver && !players[pi].finished)
-                                        setTimeout(aiMove, fastMode ? 210 : 300);
+                                        setTimeout(aiMove, fastMode ? 210 : 300, currentPlayer);
                                 }, fastMode ? 560 : 800);
                             }, fastMode ? 245 : 350);
                         }, fastMode ? 70 : 100);
@@ -3324,7 +3338,7 @@ function nextTurn(skips = 1) {
                         checkWin(pi);
                         render();
                         if (!gameOver && !players[currentPlayer].finished && players[currentPlayer].isAI)
-                            setTimeout(aiMove, fastMode ? 210 : 300);
+                            setTimeout(aiMove, fastMode ? 210 : 300, currentPlayer);
                     }
                 }, pi);
                 return;
@@ -3334,7 +3348,7 @@ function nextTurn(skips = 1) {
 
     render();
     if (!players[currentPlayer].finished && players[currentPlayer].isAI)
-        setTimeout(aiMove, fastMode ? 210 : 300);
+        setTimeout(aiMove, fastMode ? 210 : 300, currentPlayer);
 }
 
 
@@ -6942,7 +6956,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.356 ══
+// ══ BASRA OFFLINE ENGINE v4.357 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
