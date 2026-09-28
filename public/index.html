@@ -382,9 +382,9 @@
         .pile-area {
             width: 86px; height: 76px;
             border-radius: 10px;
-            background: rgba(0,0,0,0.28);
-            border: 1px solid rgba(255,255,255,0.13);
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+            background: transparent;
+            border: none;
+            box-shadow: none;
             display: flex; align-items: center; justify-content: center;
             position: relative;
             pointer-events: all;
@@ -465,7 +465,8 @@
         #speedToggleBtn { background: linear-gradient(135deg, #4a4a4a, #2a2a2a); }
         #interruptBtn { background: linear-gradient(135deg,#dc2626,#991b1b); }
         .action-btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 6px 0 rgba(0,0,0,0.5), 0 10px 22px rgba(0,0,0,0.45); }
-        .action-btn:active { transform: translateY(5px) !important; box-shadow: 0 0px 0 rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3) !important; filter: brightness(0.96) !important; }
+        .action-btn:active,
+        .action-btn.btn-pressing { transform: translateY(5px) !important; box-shadow: 0 0px 0 rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3) !important; filter: brightness(0.96) !important; transition: none !important; }
 
         /* ── ACTIVE TURN HIGHLIGHT ── */
         .active-turn-player {
@@ -669,7 +670,7 @@
         @keyframes bubblePop { from{opacity:0;transform:translateX(-50%) scale(0.7)} to{opacity:1;transform:translateX(-50%) scale(1)} }
     </style>
 </head>
-<body>
+<body ontouchstart="">
 <div id="animLayer" style="position:fixed;inset:0;pointer-events:none;z-index:9000;overflow:visible;"></div>
 
 <!-- SETUP -->
@@ -728,7 +729,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.359</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.360</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -1074,7 +1075,7 @@
     <div id="pile-wrapper">
         <div id="pos-left" class=""></div>
         <div id="pos-right" class=""></div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:28px">
             <div class="draw-pile-area">
                 <div class="draw-deck" id="drawCountDisplay">0</div>
                 <div class="pile-label" id="lbl_deck">Deck</div>
@@ -5729,6 +5730,33 @@ document.addEventListener('DOMContentLoaded', () => {
         selectBasraCount(2);
     }, 100);
 });
+
+// ── Button 3D press effect (touch) ──
+// CSS :active alone doesn't fire reliably on iOS Safari.
+// We track the pressed button and add/remove .btn-pressing via touch events.
+(function() {
+    let _pressedBtn = null;
+    document.body.addEventListener('touchstart', function(e) {
+        const btn = e.target.closest('.action-btn');
+        if (!btn) return;
+        _pressedBtn = btn;
+        btn.classList.add('btn-pressing');
+    }, { passive: true });
+    function _release() {
+        if (_pressedBtn) { _pressedBtn.classList.remove('btn-pressing'); _pressedBtn = null; }
+    }
+    document.body.addEventListener('touchend', _release, { passive: true });
+    document.body.addEventListener('touchcancel', _release, { passive: true });
+    document.body.addEventListener('touchmove', function(e) {
+        if (!_pressedBtn) return;
+        const t = e.touches[0];
+        const r = _pressedBtn.getBoundingClientRect();
+        if (t.clientX < r.left || t.clientX > r.right || t.clientY < r.top || t.clientY > r.bottom) {
+            _release();
+        }
+    }, { passive: true });
+})();
+
 function setBasraWinScore(s) {
     selectedBasraWinScore = s;
     [40,80,120,180,220].forEach(v => {
@@ -6959,7 +6987,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.359 ══
+// ══ BASRA OFFLINE ENGINE v4.360 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -8121,7 +8149,7 @@ function basraCancelSelection() {
     <!-- Table (center) -->
     <div id="basraTableArea" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:501;">
         <div id="basraTurnTimer" style="display:none;font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:var(--gold);letter-spacing:3px;text-align:center;min-width:60px;transition:color 0.3s;text-shadow:0 0 12px rgba(240,192,64,0.5);"></div>
-        <div id="basraTableCards" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:72px;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:12px;border:1px solid rgba(255,255,255,0.08);min-width:200px;max-width:320px;"></div>
+        <div id="basraTableCards" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:72px;align-items:center;padding:8px;background:transparent;border:none;min-width:200px;max-width:320px;"></div>
         <div id="basraTableEmpty" style="font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:1px;display:none;">שולחן ריק</div>
         <!-- Committed card shown separately below table -->
         <div id="basraCommittedArea" style="display:none;flex-direction:column;align-items:center;gap:4px;margin-top:6px;">
