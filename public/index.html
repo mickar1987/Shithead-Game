@@ -2,10 +2,10 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BasrHead 🃏</title>
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0a3d22">
+    <meta name="theme-color" content="#1a1a2e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -33,17 +33,13 @@
         *, *::before, *::after { box-sizing: border-box; }
         .hidden { display: none !important; }
 
-        html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background: #031a0f;
-        }
-        body {
+        body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             overflow: hidden; position: fixed;
             touch-action: manipulation;
             font-family: 'Rubik', sans-serif;
             color: white;
-            background: transparent;
+            background: #031a0f; /* same as felt-dark, fills ALL safe areas */
         }
 
 
@@ -53,7 +49,7 @@
             height: 100dvh; width: 100vw;
             padding: 0;
             position: relative;
-            background: transparent;
+            background: url('/table-bg.jpg') center center / cover no-repeat;
         }
         .game-container::before {
             content: '';
@@ -679,7 +675,6 @@
     </style>
 </head>
 <body ontouchstart="">
-<div id="globalBg" style="position:fixed;inset:0;background:url('/table-bg.jpg') center center / cover no-repeat;z-index:0;pointer-events:none;"></div>
 <div id="animLayer" style="position:fixed;inset:0;pointer-events:none;z-index:9000;overflow:visible;"></div>
 
 <!-- SETUP -->
@@ -738,7 +733,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.369</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.370</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -6996,7 +6991,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.369 ══
+// ══ BASRA OFFLINE ENGINE v4.370 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -8110,7 +8105,7 @@ function basraCancelSelection() {
 </script>
 
 <!-- BASRA GAME -->
-<div id="basraGame" style="display:none;position:fixed;inset:0;background:transparent;z-index:500;overflow:hidden;">
+<div id="basraGame" style="display:none;position:fixed;inset:0;background:url('/table-bg.jpg') center center / cover no-repeat;z-index:500;overflow:hidden;">
     <div id="basraMsgEl"></div>
     <button class="basra-chat-btn" id="basraChatToggleBtn" onclick="basraToggleChat()">💬</button>
     <button id="basraReplayBtn" onmousedown="basraShowLastMove(true)" onmouseup="basraShowLastMove(false)" onmouseleave="basraShowLastMove(false)" ontouchstart="basraShowLastMove(true);event.preventDefault();" ontouchend="basraShowLastMove(false)" ontouchcancel="basraShowLastMove(false)" style="display:none;position:fixed;top:180px;right:8px;background:rgba(10,40,20,0.85);border:1px solid rgba(240,192,64,0.4);border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;z-index:502;box-shadow:0 2px 8px rgba(0,0,0,0.4);">👁</button>
