@@ -750,7 +750,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.382</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.383</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -7036,7 +7036,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.382 ══
+// ══ BASRA OFFLINE ENGINE v4.383 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -7125,8 +7125,8 @@ function _bPlayCard(room,si,cardStr,capIdxs,alreadyRemoved){
 function _bScoreRound(room){
     const sc=room.slots.map((s,i)=>({slotIdx:i,name:s.name,cards:s.captured.length,basras:s.basras||0,jackBasras:s.jackBasras||0,majorityPoints:0,points:0}));
     const mx=Math.max(...sc.map(s=>s.cards)),leaders=sc.filter(s=>s.cards===mx);
-    if(leaders.length===1){const pts=30+room.pendingMajorityPoints;leaders[0].points+=pts;leaders[0].majorityPoints=pts;room.pendingMajorityPoints=0;}
-    else room.pendingMajorityPoints+=30;
+    if(leaders.length===1){leaders[0].points+=30;leaders[0].majorityPoints=30;}
+    room.pendingMajorityPoints=0; // tie on cards: no majority points, no carry-over
     room.slots.forEach((s,i)=>{sc[i].points+=((s.basras||0)-(s.jackBasras||0))*10+(s.jackBasras||0)*20;});
     room.slots.forEach((s,i)=>{s.score=(s.score||0)+sc[i].points;});
     return sc;

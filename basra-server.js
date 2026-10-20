@@ -351,7 +351,7 @@ function scoreRound(room) {
             let teamPts = 0;
             let majorityPts = 0;
             if (!tiedMajority && ti === winningTeamIdx) {
-                majorityPts = 30 + room.pendingMajorityPoints;
+                majorityPts = 30;
                 teamPts += majorityPts;
             }
             const regularBasras = st.teamBasras - st.teamJackBasras;
@@ -362,24 +362,19 @@ function scoreRound(room) {
                 scores[idx].majorityPoints = majorityPts;
             });
         });
-        if (!tiedMajority) {
-            room.pendingMajorityPoints = 0;
-        } else {
-            room.pendingMajorityPoints += 30;
-        }
+        // Tie on cards: nobody gets the 30 majority points (no carry-over)
+        room.pendingMajorityPoints = 0;
 
     } else {
         // 2-player mode
         const maxCards = Math.max(...scores.map(p => p.cards));
         const leaders = scores.filter(p => p.cards === maxCards);
         if (leaders.length === 1) {
-            const pts = 30 + room.pendingMajorityPoints;
-            leaders[0].points += pts;
-            leaders[0].majorityPoints = pts;
-            room.pendingMajorityPoints = 0;
-        } else {
-            room.pendingMajorityPoints += 30;
+            leaders[0].points += 30;
+            leaders[0].majorityPoints = 30;
         }
+        // Tie on cards: nobody gets the 30 majority points (no carry-over)
+        room.pendingMajorityPoints = 0;
         for (const s of room.slots) {
             const idx = room.slots.indexOf(s);
             scores[idx].points += ((s.basras||0)-(s.jackBasras||0))*10 + (s.jackBasras||0)*20;

@@ -27,7 +27,7 @@
 - After last card played → last capturer takes remaining table cards (no basra)
 
 ## Scoring (per round)
-- Most cards (27+): 30 pts (tie = 0, carried to next round)
+- Most cards (27+): 30 pts (tie = 0 for everyone, nothing carried over)
 - Each Ace: 1 pt
 - Each Jack: 1 pt
 - 2♣: 2 pts
