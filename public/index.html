@@ -750,7 +750,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.383</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.384</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -7036,7 +7036,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.383 ══
+// ══ BASRA OFFLINE ENGINE v4.384 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.
@@ -7244,6 +7244,18 @@ function _bBotMove(room,emit){
             if(jc.length){const u=new Set();jc.sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));bcp.push(...g);}});}
         }
     }
+    // MANDATORY BASRA (overrides all rules above): if any card makes a basra, play it.
+    // Jack basra (20) > regular basra (10); for a regular basra keep J/7d and use a normal card.
+    {let mb=null,mbp=[],mbs=-1;
+    bot.hand.forEach(c=>{const caps=_bFindIdxs(c,tc);if(!caps.length)return;
+        const u=new Set(),comb=[];[...caps].sort((a,b)=>b.length-a.length).forEach(g=>{if(g.every(i=>!u.has(i))){g.forEach(i=>u.add(i));comb.push(...g);}});
+        caps.forEach(g=>{if(g.length===1&&!u.has(g[0])){u.add(g[0]);comb.push(g[0]);}});
+        if(comb.length!==tc.length)return;
+        const cg=comb.map(i=>tc[i]);if(!_bIsBasra(c,cg,tc))return;
+        const sp=_bIsJ(c)||_bIs7d(c),jack=_bIsJ(c)||(_bIs7d(c)&&cg.every(x=>_bIsJ(x)));
+        const s=jack?2000+(_bIsJ(c)?50:0):1000+(sp?0:100);
+        if(s>mbs){mbs=s;mb=c;mbp=comb;}});
+    if(mb){bc=mb;bcp=mbp;}}
 
     // Execute: phase 1 — commit
     bot.hand.splice(bot.hand.indexOf(bc),1);

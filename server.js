@@ -3033,6 +3033,30 @@ function basraBotMove(room) {
         }
     }
 
+    // MANDATORY BASRA (overrides all rules above): if any card makes a basra, play it.
+    // Jack basra (20) > regular basra (10); for a regular basra keep J/7d and use a normal card.
+    {
+        let mbCard = null, mbCapture = [], mbScore = -1;
+        bot.hand.forEach(c => {
+            const caps = basraBotFindCaptures(c, tableCards);
+            if (caps.length === 0) return;
+            // Same capture selection as the execution phase (largest groups first + leftover singles)
+            const used = new Set(), combined = [];
+            [...caps].sort((a,b)=>b.length-a.length).forEach(grp => {
+                if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+            });
+            caps.forEach(grp => { if (grp.length === 1 && !used.has(grp[0])) { used.add(grp[0]); combined.push(grp[0]); } });
+            if (combined.length !== tableCards.length) return;
+            const capturedCards = combined.map(i => tableCards[i]);
+            if (!basra.isBasra(c, capturedCards, tableCards)) return;
+            const isJ = c.slice(0,-1) === 'J', is7d = c === '7d';
+            const jack = isJ || (is7d && capturedCards.every(cc => cc.slice(0,-1) === 'J'));
+            const score = jack ? 2000 + (isJ ? 50 : 0) : 1000 + (isJ || is7d ? 0 : 100);
+            if (score > mbScore) { mbScore = score; mbCard = c; mbCapture = combined; }
+        });
+        if (mbCard) { bestCard = mbCard; bestCapture = mbCapture; }
+    }
+
     // Final validation
     const bestCardIdx = bot.hand.indexOf(bestCard);
     if (bestCardIdx === -1) {
