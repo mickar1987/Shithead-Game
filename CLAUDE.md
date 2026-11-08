@@ -10,3 +10,10 @@
 - `basra-server.js` — Basra online game logic and scoring.
 - `public/index.html` — the whole client, including an offline Basra bot engine with its own copy of the scoring (`_bScoreRound`) — keep it in sync with `basra-server.js`.
 - `basra-rules.md` — Basra rules reference.
+
+## AI training data (MongoDB `shithead_training`, vs-computer games only)
+- Every event has `game` ('shithead' | 'basra') and `v` (app version) — compare AI changes per version.
+- Shithead: client `aiTrackEvent()` → `POST /api/ai/event` (card_play, pile_take, burn, swap_done, game_end).
+- Basra: server-side only — `basra.playCard` is wrapped in server.js → `basra_move` (incl. `basraAvailable` = missed-basra detection), `basra_round`, `basra_game_end` (in `recordBasraStats`).
+- Summary: `GET /api/ai/stats?key=…` · raw events: `GET /api/ai/export?key=…&game=basra&type=basra_move&v=v4.385&limit=1000&skip=0`
+- Restore point before the v4.385 AI/stats overhaul: git tag `v4.384-stable`, folder `backups/v4.384`.

@@ -541,7 +541,7 @@ app.post('/api/ai/event', async (req, res) => {
         const { type, ...data } = req.body;
         const allowed = ['pile_take', 'card_play', 'game_end', 'swap_done', 'burn'];
         if (!allowed.includes(type)) return;
-        await trainingCol.insertOne({ type, ...data, ts: new Date() });
+        await trainingCol.insertOne({ type, ...data, game: 'shithead', v: _serverAppVer, ts: new Date() });
     } catch(e) { console.error('[training] insert error:', e.message); }
 });
 
@@ -550,7 +550,9 @@ app.get('/api/ai/stats', async (req, res) => {
     if (req.query.key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
     if (!trainingCol || !mongoOk) return res.json({ error: 'no db' });
     try {
-        const [takeByRank, gameStats, cardPlays, totalEvents] = await Promise.all([
+        const notBasra = { game: { $ne: 'basra' } };
+        const verKey = { $ifNull: ['$v', 'old'] };
+        const [takeByRank, gameStats, cardPlays, totalEvents, shByVersion, shPlaces, basraByVersion, basraMoves, basraRounds] = await Promise.all([
             // Which ranks caused human to take pile most
             trainingCol.aggregate([
                 { $match: { type: 'pile_take' } },
@@ -568,16 +570,161 @@ app.get('/api/ai/stats', async (req, res) => {
                 }}
             ]).toArray(),
             // What ranks does human prefer to play (and with how many options)
+            // New events store `played: [ranks]` + `options: [ranks]`; old ones `rank` + `optionCount`
             trainingCol.aggregate([
                 { $match: { type: 'card_play' } },
-                { $group: { _id: '$rank', count: { $sum: 1 }, avgOptions: { $avg: '$optionCount' } } },
+                { $group: {
+                    _id: { $ifNull: [{ $arrayElemAt: ['$played', 0] }, '$rank'] },
+                    count: { $sum: 1 },
+                    avgOptions: { $avg: { $ifNull: ['$optionCount', { $size: { $ifNull: ['$options', []] } }] } },
+                    burns: { $sum: { $cond: ['$willBurn', 1, 0] } }
+                } },
                 { $sort: { count: -1 } }
             ]).toArray(),
-            trainingCol.countDocuments()
+            trainingCol.countDocuments(),
+            // Shithead: human win rate per app version (compare before/after AI changes)
+            trainingCol.aggregate([
+                { $match: { type: 'game_end', ...notBasra } },
+                { $group: { _id: verKey, games: { $sum: 1 },
+                    humanWins: { $sum: { $cond: ['$humanWon', 1, 0] } },
+                    avgPlace: { $avg: '$humanPlace' }, avgTurns: { $avg: '$turns' } } },
+                { $sort: { _id: 1 } }
+            ]).toArray(),
+            // Shithead: human finishing place distribution
+            trainingCol.aggregate([
+                { $match: { type: 'game_end', ...notBasra } },
+                { $group: { _id: { players: '$playerCount', place: '$humanPlace' }, count: { $sum: 1 } } },
+                { $sort: { '_id.players': 1, '_id.place': 1 } }
+            ]).toArray(),
+            // Basra vs bot: games per version
+            trainingCol.aggregate([
+                { $match: { type: 'basra_game_end' } },
+                { $group: { _id: verKey, games: { $sum: 1 },
+                    humanWins: { $sum: { $cond: ['$humanWon', 1, 0] } },
+                    abandoned: { $sum: { $cond: ['$abandon', 1, 0] } },
+                    avgRounds: { $avg: '$rounds' } } },
+                { $sort: { _id: 1 } }
+            ]).toArray(),
+            // Basra moves: per player type — captures, basras, missed basras, J/7d usage
+            trainingCol.aggregate([
+                { $match: { type: 'basra_move' } },
+                { $group: { _id: { v: verKey, who: '$who' }, moves: { $sum: 1 },
+                    captures: { $sum: { $cond: [{ $gt: ['$capturedCount', 0] }, 1, 0] } },
+                    avgCaptured: { $avg: '$capturedCount' },
+                    basras: { $sum: { $cond: ['$basra', 1, 0] } },
+                    jackBasras: { $sum: { $cond: ['$jackBasra', 1, 0] } },
+                    basraAvailable: { $sum: { $cond: ['$basraAvailable', 1, 0] } },
+                    missedBasra: { $sum: { $cond: [{ $and: ['$basraAvailable', { $not: ['$basra'] }] }, 1, 0] } },
+                    jPlayed: { $sum: { $cond: [{ $eq: ['$rank', 'J'] }, 1, 0] } },
+                    jThrownNoCapture: { $sum: { $cond: [{ $and: [{ $eq: ['$rank', 'J'] }, { $eq: ['$capturedCount', 0] }] }, 1, 0] } },
+                    d7Played: { $sum: { $cond: [{ $eq: ['$card', '7d'] }, 1, 0] } },
+                    gaveBasra: { $sum: { $cond: ['$leftSingleCard', 1, 0] } } } },
+                { $sort: { '_id.v': 1, '_id.who': 1 } }
+            ]).toArray(),
+            // Basra rounds: average points / cards / basras per round, human vs bot
+            trainingCol.aggregate([
+                { $match: { type: 'basra_round' } },
+                { $group: { _id: verKey, rounds: { $sum: 1 },
+                    humanPts: { $avg: '$human.points' }, botPts: { $avg: '$bot.points' },
+                    humanCards: { $avg: '$human.cards' }, botCards: { $avg: '$bot.cards' },
+                    humanBasras: { $avg: '$human.basras' }, botBasras: { $avg: '$bot.basras' },
+                    humanMajority: { $sum: { $cond: [{ $gt: ['$human.majorityPoints', 0] }, 1, 0] } },
+                    botMajority: { $sum: { $cond: [{ $gt: ['$bot.majorityPoints', 0] }, 1, 0] } },
+                    majorityTies: { $sum: { $cond: [{ $eq: ['$human.cards', '$bot.cards'] }, 1, 0] } } } },
+                { $sort: { _id: 1 } }
+            ]).toArray()
         ]);
-        res.json({ takeByRank, gameStats: gameStats[0] || {}, cardPlays, totalEvents });
+        res.json({
+            totalEvents,
+            shithead: { gameStats: gameStats[0] || {}, byVersion: shByVersion, places: shPlaces, takeByRank, cardPlays },
+            basra: { byVersion: basraByVersion, moves: basraMoves, rounds: basraRounds }
+        });
     } catch(e) { res.json({ error: e.message }); }
 });
+
+// GET /api/ai/export?key=...&type=...&game=...&v=...&limit=...&skip=... — raw training events (read-only)
+app.get('/api/ai/export', async (req, res) => {
+    if (req.query.key !== 'shithead_admin_2026') return res.status(403).json({ error: 'Forbidden' });
+    if (!trainingCol || !mongoOk) return res.json({ error: 'no db' });
+    try {
+        const q = {};
+        if (req.query.type) q.type = String(req.query.type);
+        if (req.query.game === 'basra') q.game = 'basra';
+        else if (req.query.game === 'shithead') q.game = { $ne: 'basra' };
+        if (req.query.v) q.v = String(req.query.v);
+        const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit) || 1000));
+        const skip = Math.max(0, parseInt(req.query.skip) || 0);
+        const [events, total] = await Promise.all([
+            trainingCol.find(q, { projection: { _id: 0 } }).sort({ ts: 1 }).skip(skip).limit(limit).toArray(),
+            trainingCol.countDocuments(q)
+        ]);
+        res.json({ total, skip, count: events.length, events });
+    } catch(e) { res.json({ error: e.message }); }
+});
+
+// ── Basra AI training (vs-bot rooms only) — written directly from the server ──
+function trackBasraEvent(room, type, data) {
+    if (!room || !room.isBot || !trainingCol || !mongoOk) return;
+    if (!room._aiGameId) room._aiGameId = crypto.randomUUID();
+    trainingCol.insertOne({ type, game: 'basra', gameId: room._aiGameId, v: _serverAppVer, ts: new Date(), ...data })
+        .catch(e => console.error('[training basra] insert error:', e.message));
+}
+
+// Best basra available for this hand on this table: null | { card, jack }
+// Uses the same capture selection as the bot's execution (largest groups first + leftover singles)
+function basraBestAvailable(hand, tableCards) {
+    let best = null;
+    for (const c of hand) {
+        const caps = basraBotFindCaptures(c, tableCards);
+        if (!caps.length) continue;
+        const used = new Set(), combined = [];
+        [...caps].sort((a,b)=>b.length-a.length).forEach(grp => {
+            if (grp.every(i=>!used.has(i))) { grp.forEach(i=>used.add(i)); combined.push(...grp); }
+        });
+        caps.forEach(grp => { if (grp.length === 1 && !used.has(grp[0])) { used.add(grp[0]); combined.push(grp[0]); } });
+        if (combined.length !== tableCards.length) continue;
+        const captured = combined.map(i => tableCards[i]);
+        if (!basra.isBasra(c, captured, tableCards)) continue;
+        const jack = c.slice(0,-1) === 'J' || (c === '7d' && captured.every(x => x.slice(0,-1) === 'J'));
+        if (!best || (jack && !best.jack)) best = { card: c, jack };
+    }
+    return best;
+}
+
+// Wrap basra.playCard once so every play (human, bot, timeout auto-play) is tracked in vs-bot rooms
+const _basraPlayCardRaw = basra.playCard;
+basra.playCard = function(room, slotIdx, card, captureIdxs, alreadyRemoved) {
+    let pre = null;
+    try {
+        if (room && room.isBot && trainingCol && mongoOk) {
+            const slot = room.slots[slotIdx];
+            const hand = alreadyRemoved ? [...slot.hand, card] : [...slot.hand];
+            pre = { tableBefore: [...room.tableCards], hand, avail: basraBestAvailable(hand, room.tableCards),
+                    jackBasrasBefore: slot.jackBasras || 0 };
+        }
+    } catch(e) { pre = null; }
+    const result = _basraPlayCardRaw.apply(this, arguments);
+    if (pre && result && result.ok) {
+        try {
+            const slot = room.slots[slotIdx];
+            trackBasraEvent(room, 'basra_move', {
+                who: slot.isBot ? 'bot' : 'human',
+                round: room.roundNum || 0,
+                card, rank: card.slice(0,-1),
+                handBefore: pre.hand, handSize: pre.hand.length,
+                tableBefore: pre.tableBefore, tableSize: pre.tableBefore.length,
+                capturedCount: (result.capturedCards || []).length,
+                basra: !!result.basra,
+                jackBasra: (slot.jackBasras || 0) > pre.jackBasrasBefore,
+                basraAvailable: !!pre.avail, jackBasraAvailable: !!(pre.avail && pre.avail.jack),
+                leftSingleCard: room.tableCards.length === 1, // opponent may basra next
+                tableAfterSize: room.tableCards.length,
+                deckLeft: room.deck.length,
+            });
+        } catch(e) { console.error('[training basra] move error:', e.message); }
+    }
+    return result;
+};
 
 // GET /api/ai/reset?key=... — wipe training data (use after applying improvements)
 app.get('/api/ai/reset', async (req, res) => {
@@ -929,6 +1076,17 @@ async function recordShitheadStats(room) {
 }
 
 async function recordBasraStats(room, winnerSlotIdx, isAbandon = false) {
+    try {
+        if (room.isBot && !room._aiGameEndTracked) {
+            room._aiGameEndTracked = true;
+            const hi = room.slots.findIndex(s => !s.isBot), bi = room.slots.findIndex(s => s.isBot);
+            trackBasraEvent(room, 'basra_game_end', {
+                humanWon: winnerSlotIdx === hi, abandon: !!isAbandon,
+                rounds: (room.roundNum || 0) + 1, winScore: room.winScore || 120,
+                humanScore: room.slots[hi]?.score || 0, botScore: room.slots[bi]?.score || 0,
+            });
+        }
+    } catch(e) { console.error('[training basra] game end error:', e.message); }
     try {
         const isBot = room.slots.some(s => s.isBot);
         const mode = isBot ? 'bot' : 'online';
@@ -2459,6 +2617,12 @@ function basraAdvanceTurn(room) {
             }
             room.roundOver = true;
             const roundScores = basra.scoreRound(room);
+            if (room.isBot) {
+                const _pick = isBot => { const i = room.slots.findIndex(s => !!s.isBot === isBot); const sc = roundScores[i] || {};
+                    return { cards: sc.cards, basras: sc.basras, jackBasras: sc.jackBasras, majorityPoints: sc.majorityPoints,
+                             points: sc.points, total: room.slots[i]?.score || 0 }; };
+                trackBasraEvent(room, 'basra_round', { round: room.roundNum || 0, human: _pick(false), bot: _pick(true) });
+            }
             basraBroadcast(room, 'basraRoundOver', {
                 scores: roundScores,
                 totalScores: room.slots.map(s => s.score || 0),
