@@ -750,7 +750,7 @@
         <button onclick="showMenu('menuBasra')" class="setup-btn" style="font-size:1.1rem;padding:14px;" id="btn_basra">Basra</button>
         <button onclick="showMenu('menuAuth')" class="setup-btn" id="mainAuthBtn" id2="btn_account" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:0.85rem;padding:8px;margin-top:4px;">👤 חשבון / התחבר</button>
     </div>
-    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.385</div>
+    <div id="appVersionEl" style="position:absolute;bottom:12px;width:100%;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;letter-spacing:1px;">v4.386</div>
 
     <!-- Shithead sub-menu -->
     <div id="menuShithead" class="setup-grid hidden">
@@ -763,6 +763,15 @@
 
     <div id="menuVsAI" class="setup-grid hidden">
         <div class="setup-back" onclick="showMenu('menuShithead')"><span class="back-txt">← Back</span></div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"><span id="lbl_aiBet">הימור למשחק</span></div>
+        <div style="display:flex;gap:6px;justify-content:center;width:100%;max-width:280px;flex-wrap:wrap;">
+            <button onclick="setAIBet(0)" id="aiBetBtn0" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);">ללא</button>
+            <button onclick="setAIBet(50)" id="aiBetBtn50" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>50</button>
+            <button onclick="setAIBet(100)" id="aiBetBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>100</button>
+            <button onclick="setAIBet(200)" id="aiBetBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>200</button>
+            <button onclick="setAIBet(500)" id="aiBetBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>500</button>
+        </div>
+        <div id="aiBetWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
         <button onclick="startGame(2)" class="setup-btn" id="btn_p2ai">2 Players</button>
         <button onclick="startGame(3)" class="setup-btn" id="btn_p3ai">3 Players</button>
         <button onclick="startGame(4)" class="setup-btn" id="btn_p4ai">4 Players</button>
@@ -860,6 +869,15 @@
             <button onclick="setBasraAIWinScore(180)" id="basraAIWinBtn180" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">180</button>
             <button onclick="setBasraAIWinScore(220)" id="basraAIWinBtn220" class="setup-btn" style="flex:1;font-size:0.8rem;padding:10px 4px;">220</button>
         </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;"><span id="lbl_basraAIBet">הימור למשחק</span></div>
+        <div style="display:flex;gap:6px;justify-content:center;width:100%;max-width:280px;flex-wrap:wrap;">
+            <button onclick="setBasraAIBet(0)" id="basraAIBetBtn0" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;border-color:var(--gold);">ללא</button>
+            <button onclick="setBasraAIBet(50)" id="basraAIBetBtn50" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>50</button>
+            <button onclick="setBasraAIBet(100)" id="basraAIBetBtn100" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>100</button>
+            <button onclick="setBasraAIBet(200)" id="basraAIBetBtn200" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>200</button>
+            <button onclick="setBasraAIBet(500)" id="basraAIBetBtn500" class="setup-btn" style="flex:1;min-width:50px;font-size:0.8rem;padding:8px 2px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #ffe066, #f5a623 60%, #b8760a);border:1.5px solid #f5c842;box-shadow:0 1px 3px rgba(245,168,35,0.4);font-size:8px;font-weight:900;color:#7a4a00;font-family:Georgia,serif;font-style:italic;vertical-align:middle;">C</span>500</button>
+        </div>
+        <div id="basraAIBetWarning" style="font-size:11px;color:#f87171;min-height:14px;"></div>
         <button onclick="startBasraVsAI()" class="setup-btn" style="background:linear-gradient(135deg,#16a34a,#14532d);margin-top:8px;" id="btn_basraStartGame"><span id="btn_basraStart">▶ Start Game</span></button>
     </div>
     <div id="menuBasraAccess" class="setup-grid hidden">
@@ -1322,6 +1340,8 @@ function applyLang() {
   const brtPrv=document.getElementById('basraRoomTypePrivate'); if(brtPrv) brtPrv.textContent='🔒 '+T('prv');
   const b0=document.getElementById('betBtn0'); if(b0) b0.textContent=T('noBet');
   const bb0=document.getElementById('basraBetBtn0'); if(bb0) bb0.textContent=T('noBet');
+  ['aiBetBtn0','basraAIBetBtn0'].forEach(id=>{const e=document.getElementById(id); if(e) e.textContent=T('noBet');});
+  _el('lbl_aiBet',T('bet')); _el('lbl_basraAIBet',T('bet'));
   _el('tabLogin',T('login')); _el('tabRegister',T('register'));
   _el('mainDailyBtn',T('dailyCoins'));
   // Back buttons
@@ -1522,7 +1542,12 @@ function toggleSpeed() {
 //  GAME SETUP
 // ══════════════════════════════════════════════════════
 let lastAIPlayerCount = 2; // remember for restart
-function startGame(count) {
+function startGame(count, _betReady) {
+    // Bet vs computer: take the bet on the server first (it calls back with _betReady=true)
+    if (!_betReady) {
+        window._shBotBet = null;
+        if (aiBet > 0) { _startShBotBet(count); return; }
+    }
     // Hide any lingering basra overlays
     const _bro = document.getElementById('basraResultOverlay'); if (_bro) _bro.style.display='none';
     const _bg = document.getElementById('basraGame'); if (_bg) _bg.style.display='none';
@@ -3256,6 +3281,8 @@ function showResults() {
     document.getElementById('waitingRestart').style.display = 'none';
     document.getElementById('waitingCount').style.display = 'none';
     document.getElementById('resultOverlay').style.display = 'flex';
+    // Bet vs computer: settle by the human's finishing place
+    if (window._shBotBet) _finishShBotBet(winnersOrder.indexOf(0) + 1 || players.length, false);
 }
 
 function nextTurn(skips = 1) {
@@ -3790,8 +3817,74 @@ function setBet(amount) {
     });
 }
 
+// ── Bet vs computer (Shithead + Basra) — coins the computer wins go to its bank (admin page) ──
+let aiBet = 0, basraAIBet = 0;
+function _pickAIBet(amount, prefix, warnId) {
+    const errEl = document.getElementById(warnId);
+    if (amount > 0 && !authUser) { if (errEl) errEl.textContent = t('loginToPlay'); showMenu('menuAuth'); return null; }
+    if (amount > 0 && authUser.coins < amount) {
+        if (errEl) errEl.textContent = H(`אין מספיק מטבעות (יש לך 🪙${authUser.coins})`, `Not enough coins (you have 🪙${authUser.coins})`);
+        return null;
+    }
+    if (errEl) errEl.textContent = amount > 0 ? H(`הימור: 🪙${amount} מול המחשב`, `Bet: 🪙${amount} vs computer`) : '';
+    ['0','50','100','200','500'].forEach(v => {
+        const b = document.getElementById(prefix + v);
+        if (b) b.style.borderColor = (parseInt(v) === amount) ? 'var(--gold)' : '';
+    });
+    return amount;
+}
+function setAIBet(a) { const v = _pickAIBet(a, 'aiBetBtn', 'aiBetWarning'); if (v !== null) aiBet = v; }
+function setBasraAIBet(a) { const v = _pickAIBet(a, 'basraAIBetBtn', 'basraAIBetWarning'); if (v !== null) basraAIBet = v; }
+function _aiBetPrecheck(bet) {
+    if (!bet) return true;
+    if (!authUser?.username || !authUser?.token) { showToast(t('loginToPlay')); return false; }
+    if (!navigator.onLine) { showToast(H('הימור מול המחשב דורש חיבור לאינטרנט', 'Betting vs computer requires internet')); return false; }
+    if ((authUser.coins || 0) < bet) { showToast(H(`אין מספיק מטבעות (יש לך 🪙${authUser.coins})`, `Not enough coins (you have 🪙${authUser.coins})`)); return false; }
+    return true;
+}
+
+// Shithead: server takes the bet before the game starts, then the game starts
+async function _startShBotBet(count) {
+    const bet = aiBet;
+    const fail = msg => {
+        if (msg) showToast(msg);
+        const ro = document.getElementById('resultOverlay');
+        if (ro && ro.style.display === 'flex') _doLeaveToMenu(); // came from "New Game" on the results screen
+    };
+    if (!_aiBetPrecheck(bet)) { fail(); return; }
+    try {
+        const r = await fetch('/api/botbet/start', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: authUser.username, token: authUser.token, bet, players: count }) });
+        const d = await r.json();
+        if (!d.ok) { fail(d.error || 'Error'); return; }
+        authUser.coins = d.coins; saveAuthLocal(); updateCoinsUI();
+        document.getElementById('resultOverlay').style.display = 'none';
+        startGame(count, true);
+        window._shBotBet = { betId: d.betId, bet };
+        showToast(H(`🪙 הימור ${bet} מול המחשב`, `🪙 Bet ${bet} vs computer`));
+    } catch(e) { fail(H('השרת לא זמין להימור כרגע', 'Server unavailable for betting')); }
+}
+
+// Shithead: settle by finishing place (abandon = loss); shows the change on the human's leaderboard row
+function _finishShBotBet(place, abandon) {
+    const b = window._shBotBet; if (!b) return;
+    window._shBotBet = null;
+    if (!authUser?.username || !authUser?.token) return;
+    const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: authUser.username, token: authUser.token, betId: b.betId, place, abandon: !!abandon }) };
+    fetch('/api/botbet/finish', opts).then(r => r.json()).then(d => {
+        if (!d.ok) return;
+        authUser.coins = d.coins; saveAuthLocal(); updateCoinsUI();
+        const idx = winnersOrder.indexOf(0);
+        const cell = document.querySelectorAll('#leaderboardList .lb-row')[idx]?.querySelector('.lb-coins');
+        const txt = d.delta === 0 ? '±0 🪙' : (d.delta > 0 ? '+' : '') + d.delta + ' 🪙';
+        if (cell) { cell.style.color = d.delta > 0 ? '#4ade80' : d.delta < 0 ? '#f87171' : 'rgba(255,255,255,0.5)'; cell.textContent = txt; }
+        showToast(txt);
+    }).catch(() => _offlineEnqueue('/api/botbet/finish', opts)); // retried when back online
+}
+
 function showMenu(id) {
-    const _netMenus = ['menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuBasraOnline','menuBasraCreate','menuBasraJoin'];
+    const _netMenus =['menuOnline','menuCreate','menuJoin','menuJoinPublic','menuJoinPrivate','menuLobby','menuBasraOnline','menuBasraCreate','menuBasraJoin'];
     if (!navigator.onLine && _netMenus.includes(id)) {
         showOfflineMsg();
         return;
@@ -4227,6 +4320,13 @@ if (!onlineMode) return; // already left to menu
             if (basraState) basraRender(basraState);
         }
     });
+    // Bet vs computer taken by the server at game start
+    socket.on('botBetStarted', ({ bet, coins }) => {
+        if (authUser && coins !== undefined && coins !== null) { authUser.coins = coins; saveAuthLocal(); updateCoinsUI(); }
+        showToast(H(`🪙 הימור ${bet} מול המחשב`, `🪙 Bet ${bet} vs computer`));
+    });
+    // Bet could not be placed — no game was created, so drop the abandon marker
+    socket.on('botBetFailed', () => { try { localStorage.removeItem('_activeGame'); } catch(e) {} });
     socket.on('basraJoined', ({code, slotIdx, playerCount, bet}) => {
         basraRoomCode=code; basraMySlot=slotIdx;
         const lc=document.getElementById('basraLobbyCode'); if(lc) lc.textContent=code;
@@ -4856,7 +4956,7 @@ if (!onlineMode) return; // already left to menu
         const me = results.find(r => r.slotIdx === basraMySlot);
         if (me && me.coins !== null && authUser) {
             authUser.coins = me.coins;
-            updateCoinDisplay();
+            saveAuthLocal(); updateCoinsUI(); // was updateCoinDisplay() — not defined
         }
     }
 
@@ -6781,6 +6881,8 @@ function leaveToMenu() {
         document.getElementById('waitingRestart') && (document.getElementById('waitingRestart').style.display = 'none');
         document.getElementById('waitingCount') && (document.getElementById('waitingCount').style.display = 'none');
         document.getElementById('resultOverlay').style.display = 'flex';
+        // Bet vs computer: leaving mid-game = loss
+        if (window._shBotBet) _finishShBotBet(players.length, true);
         return;
     }
     _doLeaveToMenu();
@@ -7034,6 +7136,7 @@ function setBasraAIWinScore(score) {
 }
 
 function startBasraVsAI() {
+    if (basraAIBet > 0 && !_aiBetPrecheck(basraAIBet)) return; // betting needs login + coins + internet
     if (!navigator.onLine) { startBasraOffline(); return; }
     if (!socket) initSocket();
     window._basraStatsRecorded = false;
@@ -7048,6 +7151,7 @@ function startBasraVsAI() {
     const name = authUser?.username || localStorage.getItem('guestName') || 'שחקן';
     socket.emit('basraCreateVsAI', {
         name,
+        bet: basraAIBet,
         winScore: basraAIWinScore,
         username: authUser?.username || null,
         token: authUser?.token || null
@@ -7055,7 +7159,7 @@ function startBasraVsAI() {
     // Response handled by existing basraJoined + basraStart + basraState events
 }
 
-// ══ BASRA OFFLINE ENGINE v4.385 ══
+// ══ BASRA OFFLINE ENGINE v4.386 ══
 // Runs Basra vs AI entirely client-side when offline.
 // Ports all pure logic from basra-server.js and the bot from server.js.
 // Dispatches to the same socket.on handlers the online game uses via socket._callbacks.

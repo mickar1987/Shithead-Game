@@ -123,6 +123,7 @@ const mongoClient = new MongoClient(MONGO_URI, {
 });
 let usersCol = null;
 let trainingCol = null;
+let botBetsCol = null; // bets vs computer — also the house bank ledger
 
 async function connectMongo(retries = 5) {
     for (let i = 0; i < retries; i++) {
@@ -134,6 +135,8 @@ async function connectMongo(retries = 5) {
             trainingCol = db.collection('shithead_training');
             await trainingCol.createIndex({ ts: 1 });
             await trainingCol.createIndex({ type: 1 });
+            botBetsCol = db.collection('bot_bets');
+            await botBetsCol.createIndex({ status: 1, ts: 1 });
             console.log('[mongo] Connected to MongoDB Atlas ✅'); mongoOk = true;
             return true;
         } catch(e) {
@@ -164,6 +167,117 @@ async function saveUser(username, data) {
             const result = await usersCol.updateOne({ username }, { $set: data }, { upsert: true });
                     } catch(e) { mongoOk = false; console.error('[saveUser] MongoDB error:', e.message); }
     }
+}
+
+// ══ COINS VS COMPUTER — house bank ══
+// The bet is taken from the player when the game starts (held by the house).
+// At game end the player gets back bet + delta. An unfinished game = loss (house keeps the bet).
+// House balance = Σ(−delta) of finished bets + Σ(bet) of open/abandoned bets — computed from bot_bets.
+const BOT_BET_AMOUNTS = [50, 100, 200, 500];
+const BOT_BET_STALE_MS = 6 * 60 * 60 * 1000; // open longer than this = abandoned
+
+// Player's coin delta by finishing place — same rule as online games (settleCoins)
+function botBetDelta(bet, place, players) {
+    if (place === 1) return bet;
+    if (place >= players) return -bet;                                   // last place
+    if (players >= 4) return place === 2 ? Math.floor(bet / 2) : -Math.floor(bet / 2);
+    return 0;                                                            // 3 players, 2nd place
+}
+
+async function startBotBet(username, token, game, bet, players) {
+    if (!usersCol || !botBetsCol || !mongoOk) return { ok: false, error: H_ERR('db') };
+    bet = parseInt(bet); players = parseInt(players);
+    if (!BOT_BET_AMOUNTS.includes(bet)) return { ok: false, error: 'invalid bet' };
+    if (!['shithead', 'basra'].includes(game)) return { ok: false, error: 'invalid game' };
+    if (!(players >= 2 && players <= 4)) return { ok: false, error: 'invalid players' };
+    const u = await getUser(username);
+    if (!u || u.token !== token) return { ok: false, error: 'invalid token' };
+    // Atomic: only deduct if the player has enough coins
+    const upd = await usersCol.updateOne({ username, coins: { $gte: bet } }, { $inc: { coins: -bet } });
+    if (!upd.modifiedCount) return { ok: false, error: H_ERR('coins') };
+    const coins = (u.coins || 0) - bet;
+    if (memUsers[username]) memUsers[username].coins = coins;
+    const betId = crypto.randomUUID();
+    await botBetsCol.insertOne({ _id: betId, username, game, bet, players, status: 'open', ts: new Date() });
+    console.log(`[botBet] start ${username} ${game} bet=${bet} players=${players} id=${betId}`);
+    return { ok: true, betId, coins };
+}
+function H_ERR(k) { return k === 'coins' ? 'אין מספיק מטבעות' : 'השרת לא זמין להימור כרגע'; }
+
+// Settle once (atomic status check). place: 1..players; abandon → counts as last place loss
+async function finishBotBet(betId, username, place, abandon) {
+    if (!botBetsCol || !mongoOk) return { ok: false, error: 'no db' };
+    const doc = await botBetsCol.findOne({ _id: betId, username, status: 'open' });
+    if (!doc) return { ok: false, error: 'bet not found' };
+    place = parseInt(place) || doc.players;
+    const delta = abandon ? -doc.bet : botBetDelta(doc.bet, Math.min(Math.max(place, 1), doc.players), doc.players);
+    const claimed = await botBetsCol.updateOne({ _id: betId, status: 'open' },
+        { $set: { status: abandon ? 'abandoned' : 'done', place, delta, finishedTs: new Date() } });
+    if (!claimed.modifiedCount) return { ok: false, error: 'already settled' };
+    const payout = doc.bet + delta; // 0 .. 2×bet
+    let coins = null;
+    if (payout > 0) {
+        await usersCol.updateOne({ username }, { $inc: { coins: payout } });
+    }
+    const u = await usersCol.findOne({ username }, { projection: { coins: 1 } });
+    coins = u ? (u.coins || 0) : null;
+    if (memUsers[username] && coins !== null) memUsers[username].coins = coins;
+    console.log(`[botBet] finish ${username} ${doc.game} bet=${doc.bet} place=${place} abandon=${!!abandon} delta=${delta} coins=${coins}`);
+    return { ok: true, delta, coins, bet: doc.bet };
+}
+
+// Admin page section: computer's bank (balance, per-game results, recent bets)
+async function buildHouseHtml() {
+    if (!botBetsCol || !mongoOk) return '<div class="stat-section"><h3>🤖 קופת המחשב</h3>אין חיבור למסד הנתונים</div>';
+    try {
+        // Stale open bets (app closed mid-game) → abandoned = loss, house keeps the bet
+        await botBetsCol.updateMany({ status: 'open', ts: { $lt: new Date(Date.now() - BOT_BET_STALE_MS) } },
+            [{ $set: { status: 'abandoned', delta: { $multiply: ['$bet', -1] }, finishedTs: '$$NOW' } }]);
+        const byGame = await botBetsCol.aggregate([
+            { $group: { _id: '$game', bets: { $sum: 1 },
+                house: { $sum: { $cond: [{ $eq: ['$status', 'open'] }, '$bet', { $multiply: ['$delta', -1] }] } },
+                houseWon: { $sum: { $cond: [{ $lt: ['$delta', 0] }, 1, 0] } },
+                houseLost: { $sum: { $cond: [{ $gt: ['$delta', 0] }, 1, 0] } },
+                even: { $sum: { $cond: [{ $and: [{ $eq: ['$delta', 0] }, { $ne: ['$status', 'open'] }] }, 1, 0] } },
+                abandoned: { $sum: { $cond: [{ $eq: ['$status', 'abandoned'] }, 1, 0] } },
+                open: { $sum: { $cond: [{ $eq: ['$status', 'open'] }, 1, 0] } },
+                wagered: { $sum: '$bet' } } }
+        ]).toArray();
+        const recent = await botBetsCol.find({}).sort({ ts: -1 }).limit(20).toArray();
+        const total = byGame.reduce((s, g) => s + g.house, 0);
+        const gName = { shithead: '🃏 Shithead', basra: '🎴 Basra' };
+        const fmt = n => (n > 0 ? '+' : '') + n.toLocaleString();
+        const col = n => n > 0 ? '#4ade80' : n < 0 ? '#f87171' : '#aaa';
+        const gameBoxes = ['shithead', 'basra'].map(k => {
+            const g = byGame.find(x => x._id === k) || { bets: 0, house: 0, houseWon: 0, houseLost: 0, even: 0, abandoned: 0, open: 0, wagered: 0 };
+            return `<div class="stat-section" style="flex:1;min-width:220px"><h3>${gName[k]} — מול המחשב</h3>
+              <div class="srow"><span>יתרת המחשב מהמשחק</span><b style="color:${col(g.house)}">${fmt(g.house)}</b></div>
+              <div class="srow"><span>משחקים על מטבעות</span><span>${g.bets}</span></div>
+              <div class="srow"><span>המחשב ניצח / הפסיד / תיקו</span><span>${g.houseWon} / ${g.houseLost} / ${g.even}</span></div>
+              <div class="srow"><span>מתוכם נטישות</span><span>${g.abandoned}</span></div>
+              <div class="srow"><span>משחקים פתוחים כעת</span><span>${g.open}</span></div>
+              <div class="srow"><span>סה"כ הומר</span><span>${g.wagered.toLocaleString()}</span></div></div>`;
+        }).join('');
+        const st = { open: '⏳ פתוח', done: '✔ הסתיים', abandoned: '🚪 ננטש' };
+        const rows = recent.map(b => {
+            const house = b.status === 'open' ? b.bet : -(b.delta || 0);
+            const t = new Date(b.ts).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+            return `<tr style="border-bottom:1px solid #333"><td style="padding:6px">${t}</td><td style="padding:6px"><b>${b.username}</b></td>
+              <td style="padding:6px">${gName[b.game] || b.game}</td><td style="padding:6px;text-align:center">${b.bet}</td>
+              <td style="padding:6px;text-align:center">${b.status === 'open' ? '—' : (b.place || '—') + '/' + b.players}</td>
+              <td style="padding:6px;text-align:center">${st[b.status] || b.status}</td>
+              <td style="padding:6px;text-align:center;color:${col(house)}"><b>${fmt(house)}</b></td></tr>`;
+        }).join('');
+        return `<div class="stat-section" style="border-color:#b8860b">
+          <h3 style="color:gold">🤖 קופת המחשב — מטבעות שהמחשב זכה בהם</h3>
+          <div class="stats"><div class="stat"><span style="color:${col(total)}">${fmt(total)}</span>יתרת קופת המחשב</div></div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">${gameBoxes}</div>
+          <details style="margin-top:8px"><summary style="cursor:pointer;color:#86efac">20 ההימורים האחרונים</summary>
+          <table style="margin-top:8px"><tr><th>זמן</th><th>משתמש</th><th>משחק</th><th>הימור</th><th>מקום</th><th>סטטוס</th><th>שינוי לקופה</th></tr>${rows || '<tr><td colspan="7" style="padding:8px;color:#888">אין עדיין הימורים</td></tr>'}</table>
+          </details>
+          <div style="font-size:11px;color:#888;margin-top:6px">הקופה מקבלת את ההימור כשהמשחק מתחיל ומחזירה לשחקן לפי המקום בסיום. משחק שלא הסתיים (יציאה / סגירת אפליקציה) = הפסד. פתוח יותר מ-6 שעות נחשב ננטש.</div>
+        </div>`;
+    } catch(e) { return `<div class="stat-section"><h3>🤖 קופת המחשב</h3>שגיאה: ${e.message}</div>`; }
 }
 
 async function updateCoins(username, delta) {
@@ -518,6 +632,27 @@ app.post('/api/stats/record', async (req, res) => {
         stats[game] = g;
         await saveUser(username, { stats });
         res.json({ ok: true });
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+// POST /api/botbet/start — Shithead vs computer: take the bet when the game starts
+app.post('/api/botbet/start', async (req, res) => {
+    try {
+        const { username, token, bet, players } = req.body;
+        res.json(await startBotBet(username, token, 'shithead', bet, players));
+    } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+// POST /api/botbet/finish — Shithead vs computer: settle by finishing place (or abandon)
+// Basra bets are settled server-side only (the game runs on the server).
+app.post('/api/botbet/finish', async (req, res) => {
+    try {
+        const { username, token, betId, place, abandon } = req.body;
+        const u = await getUser(username);
+        if (!u || u.token !== token) return res.json({ ok: false, error: 'invalid token' });
+        const doc = botBetsCol && await botBetsCol.findOne({ _id: String(betId) }, { projection: { game: 1 } });
+        if (!doc || doc.game !== 'shithead') return res.json({ ok: false, error: 'bet not found' });
+        res.json(await finishBotBet(String(betId), username, place, !!abandon));
     } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
@@ -897,6 +1032,7 @@ app.get('/api/admin/users', async (req, res) => {
             </tr>`;
         }).join('');
 
+        const houseHtml = await buildHouseHtml();
         res.send(`<!DOCTYPE html>
 <html dir="rtl">
 <head><meta charset="utf-8"><title>Admin — משתמשים</title>
@@ -1000,6 +1136,8 @@ async function showStats(u) {
   <div class="stat"><span>${totalCoins}</span>מטבעות</div>
 </div>
 
+${houseHtml}
+
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
   <div class="stat-section" style="flex:1;min-width:220px">
     <h3>🃏 Shithead — כלל המשתמשים</h3>
@@ -1087,6 +1225,21 @@ async function recordBasraStats(room, winnerSlotIdx, isAbandon = false) {
             });
         }
     } catch(e) { console.error('[training basra] game end error:', e.message); }
+    // Bet vs computer: settle once (abandon = loss)
+    if (room.botBet && !room.botBet.settled) {
+        room.botBet.settled = true;
+        try {
+            const hi = room.slots.findIndex(s => !s.isBot), bi = room.slots.findIndex(s => s.isBot);
+            const human = room.slots[hi];
+            const r = await finishBotBet(room.botBet.betId, human.username, winnerSlotIdx === hi ? 1 : 2, !!isAbandon);
+            if (r.ok && human.socketId) {
+                io.to(human.socketId).emit('coinsResult', [
+                    { name: human.name, delta: r.delta, coins: r.coins, slotIdx: hi },
+                    { name: room.slots[bi].name, delta: -r.delta, coins: null, slotIdx: bi },
+                ]);
+            }
+        } catch(e) { console.error('[botBet basra] settle error:', e.message); }
+    }
     try {
         const isBot = room.slots.some(s => s.isBot);
         const mode = isBot ? 'bot' : 'online';
@@ -3704,11 +3857,23 @@ function registerBasraHandlers(socket) {
     });
 
     // VS AI: create a room and fill second slot with a bot
-    socket.on('basraCreateVsAI', async ({ name, winScore, username, token }) => {
+    socket.on('basraCreateVsAI', async ({ name, winScore, username, token, bet }) => {
         const code = basraMakeCode();
         let uname = null;
         if (username && token) {
-            try { const u = await getUser(username); if (u && u.token === token) uname = username; } catch(e) {} 
+            try { const u = await getUser(username); if (u && u.token === token) uname = username; } catch(e) {}
+        }
+        // Bet vs computer: taken now, settled in recordBasraStats (room.bet stays 0 — no online settlement)
+        let botBet = null;
+        if (parseInt(bet) > 0) {
+            const fail = msg => { socket.emit('botBetFailed'); socket.emit('basraError', msg); };
+            if (!uname) { fail('יש להתחבר כדי לשחק על מטבעות'); return; }
+            try {
+                const r = await startBotBet(uname, token, 'basra', bet, 2);
+                if (!r.ok) { fail(r.error); return; }
+                botBet = { betId: r.betId, bet: parseInt(bet) };
+                socket.emit('botBetStarted', { bet: botBet.bet, coins: r.coins });
+            } catch(e) { fail(H_ERR('db')); return; }
         }
         const room = basra.createBasraRoom(code, [
             { id: 0, name: name || 'שחקן', socketId: socket.id, connected: true, username: uname },
@@ -3717,11 +3882,12 @@ function registerBasraHandlers(socket) {
         room.winScore = winScore || 120;
         room.isBot = true;
         room.gameStarted = true;
+        room.botBet = botBet;
         basraRooms[code] = room;
         socket.data.basraRoom = code;
         socket.data.basraSlot = 0;
         socket.join('basra_' + code);
-        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: 2, bet: 0 });
+        socket.emit('basraJoined', { code, slotIdx: 0, playerCount: 2, bet: botBet ? botBet.bet : 0 });
         // Start game
         const dealerIdx = (room.currentPlayer - 1 + 2) % 2;
         room.dealerIdx = dealerIdx;

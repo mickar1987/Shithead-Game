@@ -17,3 +17,9 @@
 - Basra: server-side only — `basra.playCard` is wrapped in server.js → `basra_move` (incl. `basraAvailable` = missed-basra detection), `basra_round`, `basra_game_end` (in `recordBasraStats`).
 - Summary: `GET /api/ai/stats?key=…` · raw events: `GET /api/ai/export?key=…&game=basra&type=basra_move&v=v4.385&limit=1000&skip=0`
 - Restore point before the v4.385 AI/stats overhaul: git tag `v4.384-stable`, folder `backups/v4.384`.
+
+## Coins vs computer (house bank)
+- Bet is taken when the game starts (`startBotBet`), settled once at the end (`finishBotBet`) — same payout rule as online (`botBetDelta`). Unfinished game = loss; open > 6h is marked abandoned.
+- Ledger + house balance = MongoDB `bot_bets` (no separate balance field). Shown on the admin page (`buildHouseHtml`).
+- Shithead (runs in browser): `POST /api/botbet/start` / `/api/botbet/finish`. Basra (runs on server): bet in `basraCreateVsAI`, settled in `recordBasraStats`; the finish endpoint refuses Basra bets.
+- Restore point before this feature: `backups/v4.385`.
